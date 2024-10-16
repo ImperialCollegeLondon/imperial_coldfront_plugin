@@ -11,6 +11,7 @@ dependencies = [
     "coldfront==v1.1.6",
     "django",
     "mozilla_django_oidc",
+    "django-stubs-ext",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +25,7 @@ dev = [
     "pytest-mypy",
     "pytest-mock",
     "pytest-django",
+    "django-stubs",
 ]
 doc = [
     "mkdocs",
@@ -49,13 +51,22 @@ warn_unreachable = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 exclude = [".venv/", "docs/"]
+plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = ["mozilla_django_oidc.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["imperial_coldfront_plugin.oidc"]
+disallow_any_explicit = false
+
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=imperial_coldfront_plugin/__main__.py"
+addopts = "-v --mypy -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=docs"
 
 [tool.ruff]
 target-version = "py311"
@@ -73,3 +84,6 @@ pydocstyle.convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D100", "D104"] # Missing docstring in public module, Missing docstring in public package
+
+[tool.django-stubs]
+django_settings_module = "imperial_coldfront_plugin"  # a lie but seems to satisfy
