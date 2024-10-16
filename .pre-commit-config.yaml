@@ -6,6 +6,7 @@ repos:
       - id: debug-statements
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        exclude: .*/static/.*/js/.*
       - id: pretty-format-json
         args: [--autofix, --indent, '4', --no-sort]
   - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
@@ -23,10 +24,6 @@ repos:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
-    hooks:
-      - id: mypy
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.40.0
     hooks:
@@ -36,3 +33,9 @@ repos:
     hooks:
       - id: codespell
         args: [-L, .codespell_ignore.txt]
+        exclude: .*/static/.*/js/.*
+  - repo: https://github.com/djlint/djLint
+    rev: v1.35.2
+    hooks:
+      - id: djlint-reformat-django
+      - id: djlint-django

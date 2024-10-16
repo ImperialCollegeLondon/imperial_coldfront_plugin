@@ -1,6 +1,10 @@
+"""Pytest configuration."""
+
 from django.conf import settings
 
+
 def pytest_configure():
+    """Configure Django settings for standalone test suite execution."""
     settings.configure(
         DEBUG=True,
         DATABASES={

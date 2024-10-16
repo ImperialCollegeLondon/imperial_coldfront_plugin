@@ -69,6 +69,7 @@ disallow_any_explicit = false
 addopts = "-v --mypy -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=docs"
 
 [tool.ruff]
+exclude = ["*/migrations"]
 target-version = "py311"
 
 [tool.ruff.lint]
