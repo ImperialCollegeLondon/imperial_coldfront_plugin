@@ -32,7 +32,7 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
-        args: [-L, .codespell_ignore.txt]
+        args: [-I, .codespell_ignore.txt]
         exclude: .*/static/.*/js/.*
   - repo: https://github.com/djlint/djLint
     rev: v1.35.2
