@@ -243,7 +243,7 @@ types-python-dateutil==2.9.0.20241003
     #   coldfront
 typing-extensions==4.10.0
     # via coldfront
-urllib3==2.2.1
+urllib3==2.2.3
     # via
     #   coldfront
     #   requests
