@@ -107,7 +107,7 @@ future==1.0.0
     #   doi2bib
 ghp-import==2.1.0
     # via mkdocs
-griffe==1.4.1
+griffe==1.5.1
     # via mkdocstrings-python
 humanize==4.9.0
     # via coldfront
