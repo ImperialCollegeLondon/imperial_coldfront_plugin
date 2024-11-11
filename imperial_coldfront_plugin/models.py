@@ -1,1 +1,28 @@
 """Plugin Django models."""
+
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.db import models
+
+
+class GroupMember(models.Model):
+    """Membership relationship within a group, associating an owner with a member.
+
+    This model stores relationships where each instance represents an ownership
+    connection between two users within a group, where `owner` is the user who
+    owns the membership (or perhaps manages the group) and `member` is the
+    associated user.
+
+    Attributes:
+        owner (ForeignKey): A reference to the user designated as owner, connected to
+            AUTH_USER_MODEL. Deletes related memberships when the owner is deleted.
+        member (ForeignKey): A reference to the user designated as member, connected to
+            AUTH_USER_MODEL. Deletes related memberships when the member is deleted.
+    """
+
+    owner: User = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    member: User = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    def __str__(self) -> str:
+        """Returns a string representation of the GroupMember instance."""
+        return f"Group owner is: {self.owner}\n - Group member is: {self.member}"
