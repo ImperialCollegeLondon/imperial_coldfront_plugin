@@ -60,3 +60,20 @@ To get started:
    ```bash
    pre-commit install
    ```
+
+## Making Migrations
+
+As a standalone Django application this plugin provides models to extend the
+Coldfront data model. A helper script is provided to generate migrations for
+these models. To use it, run the following command:
+
+```bash
+python makemigrations.py
+```
+
+This is equivalent to running `python manage.py makemigrations` in a Django
+project and all the same options are available. See options with:
+
+```bash
+python makemigrations.py --help
+```
