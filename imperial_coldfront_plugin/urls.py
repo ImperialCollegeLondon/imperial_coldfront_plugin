@@ -1,1 +1,3 @@
 """Plugin URL configuration."""
+
+urlpatterns = []
