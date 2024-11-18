@@ -124,7 +124,7 @@ humanize==4.9.0
     # via coldfront
 identify==2.6.1
     # via pre-commit
-idna==3.6
+idna==3.10
     # via
     #   coldfront
     #   requests

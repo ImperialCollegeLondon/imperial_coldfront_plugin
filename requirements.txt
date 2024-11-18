@@ -100,7 +100,7 @@ future==1.0.0
     #   doi2bib
 humanize==4.9.0
     # via coldfront
-idna==3.6
+idna==3.10
     # via
     #   coldfront
     #   requests
