@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 
 
-class GroupMember(models.Model):
+class GroupMembership(models.Model):
     """Membership relationship within a group, associating an owner with a member.
 
     This model stores relationships where each instance represents an ownership
@@ -19,5 +19,13 @@ class GroupMember(models.Model):
             AUTH_USER_MODEL. Deletes related memberships when the member is deleted.
     """
 
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    member = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="owned_group_memberships_set",
+    )
+    member = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="group_memberships_set",
+    )
