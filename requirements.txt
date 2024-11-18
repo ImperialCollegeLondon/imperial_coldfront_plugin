@@ -56,7 +56,7 @@ django==4.2.11
     #   django-su
     #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
-django-crispy-forms==2.1
+django-crispy-forms==2.3
     # via
     #   coldfront
     #   crispy-bootstrap4
