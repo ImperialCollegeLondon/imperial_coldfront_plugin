@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A plugin for the Coldfront HPC management platform."
 authors = [
     { name = "Christopher Cave-Ayland", email = "c.cave-ayland@imperial.ac.uk" },
-    { name = "Imperial College London RSE Team", email = "ict-rse-team@imperial.ac.uk" }
+    { name = "Imperial College London RSE Team", email = "ict-rse-team@imperial.ac.uk" },
 ]
 requires-python = "~=3.11"
 dependencies = [
@@ -42,7 +42,9 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-exclude = ["htmlcov"] # Exclude the coverage report file from setuptools package finder
+exclude = [
+    "htmlcov",
+] # Exclude the coverage report file from setuptools package finder
 
 [tool.mypy]
 disallow_any_explicit = true
@@ -66,7 +68,7 @@ module = ["imperial_coldfront_plugin.oidc"]
 disallow_any_explicit = false
 
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=docs"
+addopts = "-v --mypy -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=docs --ignore=makemigrations.py"
 
 [tool.ruff]
 exclude = ["*/migrations"]
@@ -79,12 +81,15 @@ select = [
     "F",   # Pyflakes
     "I",   # isort
     "UP",  # pyupgrade
-    "RUF"  # ruff
+    "RUF", # ruff
 ]
 pydocstyle.convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D100", "D104"] # Missing docstring in public module, Missing docstring in public package
+"tests/*" = [
+    "D100",
+    "D104",
+] # Missing docstring in public module, Missing docstring in public package
 
 [tool.django-stubs]
-django_settings_module = "imperial_coldfront_plugin"  # a lie but seems to satisfy
+django_settings_module = "imperial_coldfront_plugin" # a lie but seems to satisfy
