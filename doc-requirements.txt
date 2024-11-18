@@ -45,7 +45,7 @@ colorama==0.4.6
     # via
     #   griffe
     #   mkdocs-material
-crispy-bootstrap4==2024.1
+crispy-bootstrap4==2024.10
     # via coldfront
 cryptography==43.0.3
     # via

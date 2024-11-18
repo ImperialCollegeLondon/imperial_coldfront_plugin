@@ -46,7 +46,7 @@ coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
 coverage[toml]==7.6.4
     # via pytest-cov
-crispy-bootstrap4==2024.1
+crispy-bootstrap4==2024.10
     # via coldfront
 cryptography==43.0.3
     # via

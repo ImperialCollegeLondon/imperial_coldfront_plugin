@@ -35,7 +35,7 @@ charset-normalizer==3.3.2
     #   requests
 coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
-crispy-bootstrap4==2024.1
+crispy-bootstrap4==2024.10
     # via coldfront
 cryptography==43.0.3
     # via
