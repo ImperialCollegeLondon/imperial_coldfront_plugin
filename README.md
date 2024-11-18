@@ -64,6 +64,23 @@ To upgrade pinned versions, use the `--upgrade` flag with `pip-compile`.
 
 Versions can be restricted from updating within the `pyproject.toml` using standard python package version specifiers, i.e. `"black<23"` or `"pip-tools!=6.12.2"`
 
+## Making Migrations
+
+As a standalone Django application this plugin provides models to extend the
+Coldfront data model. A helper script is provided to generate migrations for
+these models. To use it, run the following command:
+
+```bash
+python makemigrations.py
+```
+
+This is equivalent to running `python manage.py makemigrations` in a Django
+project and all the same options are available. See options with:
+
+```bash
+python makemigrations.py --help
+```
+
 ## Customising
 
 All configuration can be customised to your preferences. The key places to make changes
