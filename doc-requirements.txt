@@ -195,7 +195,7 @@ pymdown-extensions==10.12
     #   mkdocstrings
 pyopenssl==24.2.1
     # via josepy
-pyparsing==3.1.2
+pyparsing==3.2.0
     # via
     #   bibtexparser
     #   coldfront
