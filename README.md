@@ -44,7 +44,7 @@ To get started:
 
 1. Create and activate a [virtual environment](https://docs.python.org/3/library/venv.html).
    
-!!! note: It is important that this environment is created with `Python 3.11`. It cannot be any higher or lower Python version due to `coldfront` limitations at the time of writing. You may note we ensure this requirenment in the `pyproject.toml` file by `requires-python = "~=3.11"`, but wish to mention it again explicitly here. A tool like `pyenv` that has any Python version activated tht is different from `Python 3.11`, can bypass this requirenment and lead to side effects.
+*Note:** It is important that this environment is created with `Python 3.11`. It cannot be any higher or lower Python version due to `coldfront` limitations at the time of writing. You may note we ensure this requirenment in the `pyproject.toml` file by `requires-python = "~=3.11"`, but wish to mention it again explicitly here. A tool like `pyenv` that has any Python version activated tht is different from `Python 3.11`, can bypass this requirenment and lead to side effects.
 
 Taking care of the note, we can then create a virual environment from the comman line like so:
 
