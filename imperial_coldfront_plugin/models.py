@@ -49,4 +49,4 @@ class UnixUID(models.Model):
         on_delete=models.CASCADE,
         related_name="user_id",
     )
-    identifier = models.IntegerField(default=0)
+    identifier = models.IntegerField()
