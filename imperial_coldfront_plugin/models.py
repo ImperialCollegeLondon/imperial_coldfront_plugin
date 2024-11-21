@@ -31,7 +31,7 @@ class GroupMembership(models.Model):
     )
 
 
-class UserID(models.Model):
+class UnixUID(models.Model):
     """Identity data to map a user to a unique identifier.
 
     This model stores a unique identifier for each user, which can be used to
