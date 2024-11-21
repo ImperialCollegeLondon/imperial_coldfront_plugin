@@ -12,6 +12,7 @@ dependencies = [
     "django",
     "mozilla_django_oidc",
     "django-stubs-ext",
+    "python-ldap",
 ]
 
 [project.optional-dependencies]
@@ -60,7 +61,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["mozilla_django_oidc.*"]
+module = ["mozilla_django_oidc.*", "ldap.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -92,4 +93,4 @@ pydocstyle.convention = "google"
 ] # Missing docstring in public module, Missing docstring in public package
 
 [tool.django-stubs]
-django_settings_module = "imperial_coldfront_plugin" # a lie but seems to satisfy
+django_settings_module = "imperial_coldfront_plugin.settings"

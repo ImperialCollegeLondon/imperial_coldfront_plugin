@@ -154,6 +154,12 @@ pluggy==1.5.0
     # via pytest
 pre-commit==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
+pyasn1==0.6.1
+    # via
+    #   pyasn1-modules
+    #   python-ldap
+pyasn1-modules==0.4.1
+    # via python-ldap
 pycparser==2.22
     # via cffi
 pyopenssl==24.2.1
@@ -186,6 +192,8 @@ python-dateutil==2.9.0.post0
     #   arrow
     #   coldfront
     #   faker
+python-ldap==3.4.4
+    # via imperial_coldfront_plugin (pyproject.toml)
 python-memcached==1.62
     # via coldfront
 pytz==2024.1
