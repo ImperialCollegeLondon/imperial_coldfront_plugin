@@ -1,7 +1,6 @@
 name: Dependabot and Pre-commit auto-merge
 
 on:
-  push:
   schedule:
     - cron: 0 0 * * 1   # midnight every Monday
 
