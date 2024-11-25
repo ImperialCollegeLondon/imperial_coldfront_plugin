@@ -78,7 +78,7 @@ django-split-settings==1.3.0
     # via coldfront
 django-sslserver==0.22
     # via coldfront
-django-stubs-ext==5.1.1
+django-stubs-ext==5.1.0
     # via imperial_coldfront_plugin (pyproject.toml)
 django-su==1.0.0
     # via coldfront
