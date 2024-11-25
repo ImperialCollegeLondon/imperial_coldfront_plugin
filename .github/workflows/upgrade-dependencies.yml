@@ -30,13 +30,7 @@ jobs:
           pip-compile --upgrade --extra=doc --output-file=doc-requirements.txt
 
       - name: Check file consistency
-        run: |
-          pip-sync --dry-run requirements.txt dev-requirements.txt doc-requirements.txt
-
-          # An exit code of 1 means there are changes but the files are consistent
-          if [ $? == 1 ]; then
-            exit 0
-          fi
+        run: pip-sync requirements.txt dev-requirements.txt doc-requirements.txt
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7.0.5
