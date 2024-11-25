@@ -1,7 +1,11 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "enabledManagers": ["pip-compile"],
-  "pip-compile": {
-    "fileMatch": ["(^|/)requirements\\.txt$"]
-  }
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "enabledManagers": [
+        "pip-compile"
+    ],
+    "pip-compile": {
+        "fileMatch": [
+            "^.*?[-]*requirements.txt$"
+        ]
+    }
 }
