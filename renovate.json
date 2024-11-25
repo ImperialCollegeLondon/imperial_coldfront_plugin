@@ -1,8 +1,7 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "enabledManagers": [
-        "pip-compile",
-        "pep621"
+        "pip-compile"
     ],
     "pip-compile": {
         "fileMatch": [
