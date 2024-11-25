@@ -6,6 +6,8 @@ from .models import GroupMembership
 
 
 class GroupMembershipAdmin(admin.ModelAdmin):
+    """Admin configuration for the GroupMembership model."""
+
     pass
 
 
