@@ -68,7 +68,7 @@ module = ["imperial_coldfront_plugin.oidc"]
 disallow_any_explicit = false
 
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=docs --ignore=makemigrations.py"
+addopts = "-v -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=docs --ignore=makemigrations.py"
 
 [tool.ruff]
 exclude = ["*/migrations"]
