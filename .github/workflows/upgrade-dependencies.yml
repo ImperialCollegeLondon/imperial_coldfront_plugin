@@ -1,4 +1,4 @@
-name: Dependabot and Pre-commit auto-merge
+name: Upgrade Python Dependencies with pip-compile
 
 on:
   schedule:
@@ -9,7 +9,7 @@ permissions:
   pull-requests: write # Needed if in a private repository
 
 jobs:
-  auto-merge:
+  upgrade-dependencies:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
