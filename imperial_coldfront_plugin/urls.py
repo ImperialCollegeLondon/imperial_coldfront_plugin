@@ -1,4 +1,10 @@
 """Plugin URL configuration."""
 
-# just ignore type issue for now, will sort itself out when we add urlpatterns later
-urlpatterns = []  # type: ignore[var-annotated]
+from django.urls import path
+
+from .views import add_to_group, add_to_group_confirm
+
+urlpatterns = [
+    path("add_to_group/", add_to_group, name="add_to_group"),
+    path("add_to_group_confirm/", add_to_group_confirm, name="add_to_group_confirm"),
+]
