@@ -1,6 +1,7 @@
 """Plugin views."""
 
-# from django.core.mail import send_mail
+from django.conf import settings
+from django.core.mail import send_mail
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
@@ -11,16 +12,26 @@ def invite_to_group(request: HttpRequest) -> HttpResponse:
     """Add an individual to a group."""
     signer = TimestampSigner()
 
+    # TODO: Get invitee email from request.
+    invitee_email = "my@email.org"
+
     # Sign invitation.
     token = signer.sign_object(
         {
             "inviter_pk": request.user.pk,
-            "invitee_email": "my@email.org",
+            "invitee_email": invitee_email,
         }
     )
 
     # Send invitation via email.
-    invite_url = request.get_host() + reverse("accept_invite", args=[token])
+    # TODO: get_host does not include protocol -- need an automagic way to get it.
+    invite_url = "http://" + request.get_host() + reverse("accept_invite", args=[token])
+    send_mail(
+        "You've been invited to a group",
+        f"Click the following link to accept the invitation: {invite_url}",
+        settings.DEFAULT_FROM_EMAIL,
+        [invitee_email],
+    )
 
     return render(
         request=request,
