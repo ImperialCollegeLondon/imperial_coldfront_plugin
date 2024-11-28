@@ -4,3 +4,10 @@
     <br>
     {{ token }}
 </p>
+<p>
+    Invite URL:
+    <br>
+    {# djlint:off H022 #}
+    <a href="http://{{ invite_url }}">{{ invite_url }}</a>
+    {# djlint:on H022 #}
+</p>
