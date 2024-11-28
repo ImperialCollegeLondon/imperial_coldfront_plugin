@@ -4,6 +4,29 @@ from django.conf import settings
 from django.db import models
 
 
+class ResearchGroup(models.Model):
+    """Represents a research group.
+
+    This model stores information about research groups, including their owner,
+    a unique group ID (gid), and the group name.
+
+    Attributes:
+        owner (ForeignKey): A reference to the user designated as the group's owner,
+            connected to AUTH_USER_MODEL. Deletes related groups when the owner
+            is deleted.
+        gid (IntegerField): A unique identifier for the group.
+        name (CharField): The name of the research group with a maximum length
+            of 255 characters.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
+    gid = models.IntegerField()
+    name = models.CharField(max_length=255)
+
+
 class GroupMembership(models.Model):
     """Membership relationship within a group, associating an owner with a member.
 
@@ -19,11 +42,11 @@ class GroupMembership(models.Model):
             AUTH_USER_MODEL. Deletes related memberships when the member is deleted.
     """
 
-    owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    group = models.ForeignKey(
+        ResearchGroup,
         on_delete=models.CASCADE,
-        related_name="owned_group_memberships_set",
     )
+
     member = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
