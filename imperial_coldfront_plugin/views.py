@@ -82,8 +82,7 @@ def invite_to_group(request: HttpRequest) -> HttpResponse:
     )
 
     # Send invitation via email.
-    # TODO: get_host does not include protocol -- need an automagic way to get it.
-    invite_url = "http://" + request.get_host() + reverse("accept_invite", args=[token])
+    invite_url = request.build_absolute_uri(reverse("accept_invite", args=[token]))
     send_mail(
         "You've been invited to a group",
         f"Click the following link to accept the invitation: {invite_url}",
