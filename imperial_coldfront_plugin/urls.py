@@ -2,9 +2,9 @@
 
 from django.urls import path
 
-from .views import add_to_group, add_to_group_confirm
+from .views import accept_invite, invite_to_group
 
 urlpatterns = [
-    path("add_to_group/", add_to_group, name="add_to_group"),
-    path("add_to_group_confirm/", add_to_group_confirm, name="add_to_group_confirm"),
+    path("invite_to_group/", invite_to_group, name="invite_to_group"),
+    path("accept_invite/<str:token>/", accept_invite, name="accept_invite"),
 ]
