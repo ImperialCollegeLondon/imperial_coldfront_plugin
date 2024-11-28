@@ -32,16 +32,17 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     signer = TimestampSigner()
 
     try:
-        original = signer.unsign_object(token, max_age=86400)
+        invite = signer.unsign_object(token, max_age=86400)
     except SignatureExpired:
-        return HttpResponseBadRequest("Token expired")
+        return HttpResponseBadRequest("Expired token")
     except BadSignature:
         return HttpResponseBadRequest("Bad token")
 
     import logging
 
     logger = logging.getLogger("django")
-    logger.info(f"original: {original}")
+    logger.info(f"token: {token}")
+    logger.info(f"invite: {invite}")
 
     return render(
         request=request,
