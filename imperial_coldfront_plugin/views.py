@@ -8,22 +8,17 @@ from django.shortcuts import render
 def invite_to_group(request: HttpRequest) -> HttpResponse:
     """Add an individual to a group."""
     signer = TimestampSigner()
-
-    invite = {
-        "inviter_pk": request.user.pk,
-        "invitee_email": "my@email.org",
-    }
-
-    token = signer.sign_object(invite)
-
-    import logging
-
-    logger = logging.getLogger("django")
-    logger.info(f"invite: {invite}")
-    logger.info(f"token: {token}")
+    token = signer.sign_object(
+        {
+            "inviter_pk": request.user.pk,
+            "invitee_email": "my@email.org",
+        }
+    )
 
     return render(
-        request=request, template_name="imperial_coldfront_plugin/invite_to_group.html"
+        request=request,
+        context={"token": token},
+        template_name="imperial_coldfront_plugin/invite_to_group.html",
     )
 
 
@@ -38,13 +33,8 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     except BadSignature:
         return HttpResponseBadRequest("Bad token")
 
-    import logging
-
-    logger = logging.getLogger("django")
-    logger.info(f"token: {token}")
-    logger.info(f"invite: {invite}")
-
     return render(
         request=request,
+        context={"invite": invite},
         template_name="imperial_coldfront_plugin/accept_invite.html",
     )
