@@ -127,6 +127,8 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     if invite["invitee_email"] != request.user.email:
         return HttpResponseForbidden("This token is not for you")
 
+    # TODO: update GroupMembership in the database.
+
     return render(
         request=request,
         context={
