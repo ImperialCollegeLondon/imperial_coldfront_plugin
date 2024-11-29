@@ -63,7 +63,7 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
 
 
 def invite_to_group(request: HttpRequest) -> HttpResponse:
-    """Add an individual to a group.
+    """Invite an individual to a group.
 
     Args:
         request: The HTTP request object containing metadata about the request.
@@ -81,8 +81,11 @@ def invite_to_group(request: HttpRequest) -> HttpResponse:
         }
     )
 
+    invite_url = request.build_absolute_uri(
+        reverse("imperial_coldfront_plugin:accept_invite", args=[token])
+    )
+
     # Send invitation via email.
-    invite_url = request.build_absolute_uri(reverse("accept_invite", args=[token]))
     send_mail(
         "You've been invited to a group",
         f"Click the following link to accept the invitation: {invite_url}",
@@ -119,3 +122,12 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         context={"invite": invite},
         template_name="imperial_coldfront_plugin/accept_invite.html",
     )
+
+
+def index(request: HttpRequest) -> HttpResponse:
+    """Render the index page.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+    """
+    return render(request=request, template_name="imperial_coldfront_plugin/index.html")
