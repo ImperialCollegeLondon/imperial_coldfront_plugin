@@ -64,6 +64,7 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
 
 
 @require_POST
+@login_required
 def invite_to_group(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group.
 
@@ -104,6 +105,7 @@ def invite_to_group(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
 def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     """Accept invitation to a group.
 
@@ -120,6 +122,10 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
         return HttpResponseBadRequest("Expired token")
     except BadSignature:
         return HttpResponseBadRequest("Bad token")
+
+    # Check the correct user is using the token.
+    if invite["invitee_email"] != request.user.email:
+        return HttpResponseForbidden("This token is not for you")
 
     return render(
         request=request,
