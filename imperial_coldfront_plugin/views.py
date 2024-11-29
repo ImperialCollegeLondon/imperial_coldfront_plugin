@@ -13,6 +13,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .models import GroupMembership
 
@@ -62,6 +63,7 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     return render(request, "group_members.html", {"group_members": group_members})
 
 
+@require_POST
 def invite_to_group(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group.
 
@@ -69,9 +71,7 @@ def invite_to_group(request: HttpRequest) -> HttpResponse:
         request: The HTTP request object containing metadata about the request.
     """
     signer = TimestampSigner()
-
-    # TODO: Get invitee email from request.
-    invitee_email = "my@email.org"
+    invitee_email = request.POST.get("invitee_email")
 
     # Sign invitation.
     token = signer.sign_object(
@@ -95,7 +95,11 @@ def invite_to_group(request: HttpRequest) -> HttpResponse:
 
     return render(
         request=request,
-        context={"token": token, "invite_url": invite_url},
+        context={
+            "invitee_email": invitee_email,
+            "token": token,
+            "invite_url": invite_url,
+        },
         template_name="imperial_coldfront_plugin/invite_to_group.html",
     )
 
@@ -119,7 +123,10 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     return render(
         request=request,
-        context={"invite": invite},
+        context={
+            "inviter_pk": invite["inviter_pk"],
+            "invitee_email": invite["invitee_email"],
+        },
         template_name="imperial_coldfront_plugin/accept_invite.html",
     )
 
