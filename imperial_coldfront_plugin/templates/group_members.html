@@ -1,0 +1,7 @@
+{% extends "common/base.html" %}
+{% block content %}
+    <h1>Group Members</h1>
+    <ul>
+        {% for member in group_members %}<li>{{ member.member.get_full_name }}</li>{% endfor %}
+    </ul>
+{% endblock content %}

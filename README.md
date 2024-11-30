@@ -43,10 +43,10 @@ Versions can be restricted from updating within the `pyproject.toml` using stand
 To get started:
 
 1. Create and activate a [virtual environment](https://docs.python.org/3/library/venv.html).
-   
-**Note:** It is important that this environment is created with `Python 3.11`. It cannot be any higher or lower Python version due to `coldfront` limitations at the time of writing. You may note we ensure this requirement in the `pyproject.toml` file by `requires-python = "~=3.11"`, but wish to mention it again explicitly here.
 
-Taking care of the note, we can then create a virtual environment from the command line like so:
+   **Note:** It is important that this environment is created with `Python 3.11`. It cannot be any higher or lower Python version due to `coldfront` limitations at the time of writing. You may note we ensure this requirement in the `pyproject.toml` file by `requires-python = "~=3.11"`, but wish to mention it again explicitly here.
+
+   Taking care of the note, we can then create a virtual environment from the command line like so:
 
    ```bash
    python -m venv .venv

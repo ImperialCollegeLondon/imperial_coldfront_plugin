@@ -17,6 +17,7 @@ def pytest_configure():
             "django.contrib.auth",
             "django.contrib.contenttypes",
             "django.contrib.sites",
+            "django.contrib.admin",
             "mozilla_django_oidc",
             "imperial_coldfront_plugin",
         ],
