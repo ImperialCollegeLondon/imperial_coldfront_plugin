@@ -44,11 +44,11 @@ click==8.1.7
     # via pip-tools
 coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
-coverage[toml]==7.6.4
+coverage[toml]==7.6.8
     # via pytest-cov
 crispy-bootstrap4==2024.1
     # via coldfront
-cryptography==43.0.3
+cryptography==44.0.0
     # via
     #   josepy
     #   mozilla-django-oidc
@@ -122,7 +122,7 @@ future==1.0.0
     #   doi2bib
 humanize==4.9.0
     # via coldfront
-identify==2.6.1
+identify==2.6.3
     # via pre-commit
 idna==3.6
     # via
@@ -142,7 +142,7 @@ mypy-extensions==1.0.0
     # via mypy
 nodeenv==1.9.1
     # via pre-commit
-packaging==24.1
+packaging==24.2
     # via
     #   build
     #   pytest
@@ -156,7 +156,7 @@ pre-commit==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyopenssl==24.2.1
+pyopenssl==24.3.0
     # via josepy
 pyparsing==3.1.2
     # via
@@ -166,7 +166,7 @@ pyproject-hooks==1.2.0
     # via
     #   build
     #   pip-tools
-pytest==8.3.3
+pytest==8.3.4
     # via
     #   imperial_coldfront_plugin (pyproject.toml)
     #   pytest-cov
@@ -201,7 +201,7 @@ requests==2.31.0
     #   coldfront
     #   doi2bib
     #   mozilla-django-oidc
-ruff==0.7.2
+ruff==0.8.1
     # via imperial_coldfront_plugin (pyproject.toml)
 six==1.16.0
     # via
@@ -230,13 +230,13 @@ urllib3==2.2.1
     # via
     #   coldfront
     #   requests
-virtualenv==20.27.1
+virtualenv==20.28.0
     # via pre-commit
 wcwidth==0.2.13
     # via
     #   blessed
     #   coldfront
-wheel==0.44.0
+wheel==0.45.1
     # via pip-tools
 
 # The following packages are considered to be unsafe in a requirements file:
