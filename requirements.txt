@@ -133,6 +133,7 @@ requests==2.31.0
     # via
     #   coldfront
     #   doi2bib
+    #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
 six==1.16.0
     # via

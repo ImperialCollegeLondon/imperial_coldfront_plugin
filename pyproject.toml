@@ -12,6 +12,7 @@ dependencies = [
     "django",
     "mozilla_django_oidc",
     "django-stubs-ext",
+    "requests",
 ]
 
 [project.optional-dependencies]
