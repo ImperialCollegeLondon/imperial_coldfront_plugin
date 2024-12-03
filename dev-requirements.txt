@@ -200,6 +200,7 @@ requests==2.31.0
     # via
     #   coldfront
     #   doi2bib
+    #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
 ruff==0.8.1
     # via imperial_coldfront_plugin (pyproject.toml)

@@ -2,8 +2,11 @@
 
 from typing import Any
 
+import requests
 from django.contrib.auth.models import User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
+
+from .models import UnixUID
 
 
 def _update_user(user: User, claims: dict[str, Any]) -> None:
@@ -25,6 +28,7 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         """
         user = super().create_user(claims)
         _update_user(user, claims)
+        UnixUID.objects.create(user=user, identifier=claims["uid"])
         return user
 
     def update_user(self, user: User, claims: dict[str, Any]) -> User:
@@ -44,7 +48,7 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         We extend the superclass implementation of this method which provides data from
         the configured OIDC userinfo endpoint to include preferred_username from the
-        id_token.
+        id_token and the user's unix uid retrieved from the Microsoft Graph API.
 
         Args:
           access_token: for use with the Microsoft Entra graph API.
@@ -53,4 +57,14 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         """
         user_info = super().get_userinfo(access_token, id_token, payload)
         user_info["preferred_username"] = payload["preferred_username"]
+
+        # get user uid from Microsoft Graph API using the access token
+        # uid is stored under a custom attribute
+        response = requests.get(
+            "https://graph.microsoft.com/v1.0/me?$select=onPremisesExtensionAttributes",
+            headers={"Authorization": f"Bearer {access_token}"},
+        ).json()
+        user_info["uid"] = int(
+            response["onPremisesExtensionAttributes"]["extensionAttribute12"]
+        )
         return user_info
