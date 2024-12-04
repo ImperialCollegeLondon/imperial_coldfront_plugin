@@ -37,7 +37,7 @@ coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
 crispy-bootstrap4==2024.1
     # via coldfront
-cryptography==43.0.3
+cryptography==44.0.0
     # via
     #   josepy
     #   mozilla-django-oidc
@@ -110,7 +110,7 @@ mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyopenssl==24.2.1
+pyopenssl==24.3.0
     # via josepy
 pyparsing==3.1.2
     # via
