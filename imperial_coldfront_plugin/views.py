@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .models import GroupMembership
+from .models import GroupMembership, ResearchGroup
 
 User = get_user_model()
 
@@ -125,9 +125,13 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     # Check the correct user is using the token.
     if invite["invitee_email"] != request.user.email:
-        return HttpResponseForbidden("This token is not for you")
+        return HttpResponseForbidden(
+            "The invite token is not associated with this email address."
+        )
 
-    # TODO: update GroupMembership in the database.
+    # Update group membership in the database.
+    group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
+    GroupMembership.objects.create(group=group, member=request.user)
 
     return render(
         request=request,
@@ -139,6 +143,7 @@ def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
     )
 
 
+@login_required
 def index(request: HttpRequest) -> HttpResponse:
     """Render the index page.
 
