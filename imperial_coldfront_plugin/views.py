@@ -135,7 +135,7 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
             "inviter_pk": invite["inviter_pk"],
             "invitee_email": invite["invitee_email"],
         },
-        template_name="imperial_coldfront_plugin/accept_invite.html",
+        template_name="imperial_coldfront_plugin/accept_group_invite.html",
     )
 
 
