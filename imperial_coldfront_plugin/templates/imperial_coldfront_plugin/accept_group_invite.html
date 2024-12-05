@@ -1,11 +1,14 @@
-<h1>Invitation accepted</h1>
-<p>
+{% extends "common/base.html" %}
+{% block content %}
+  <h1>Invitation accepted</h1>
+  <p>
     Inviter PK:
     <br>
     {{ inviter_pk }}
-</p>
-<p>
+  </p>
+  <p>
     Invitee email:
     <br>
     {{ invitee_email }}
-</p>
+  </p>
+{% endblock content %}
