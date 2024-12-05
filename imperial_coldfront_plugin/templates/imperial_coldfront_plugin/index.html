@@ -1,8 +1,1 @@
-<h1>Invite user to group</h1>
-<form action="{% url 'imperial_coldfront_plugin:invite_to_group' %}"
-      method="post">
-    {% csrf_token %}
-    <label for="invitee_email">Invitee Email:</label>
-    <input type="email" name="invitee_email" id="invitee_email" required>
-    <button type="submit">Invite</button>
-</form>
+<a href="{% url 'imperial_coldfront_plugin:send_group_invite' %}">Invite user to group.</a>

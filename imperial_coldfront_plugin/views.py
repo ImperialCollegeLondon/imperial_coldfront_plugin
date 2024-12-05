@@ -1,6 +1,5 @@
 """Plugin views."""
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
@@ -13,8 +12,8 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
-from django.views.decorators.http import require_POST
 
+from .forms import GroupMembershipForm
 from .models import GroupMembership, ResearchGroup
 
 User = get_user_model()
@@ -63,50 +62,47 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     return render(request, "group_members.html", {"group_members": group_members})
 
 
-@require_POST
 @login_required
-def invite_to_group(request: HttpRequest) -> HttpResponse:
-    """Invite an individual to a group.
+def send_group_invite(request: HttpRequest) -> HttpResponse:
+    """Invite an individual to a group."""
+    if request.method == "POST":
+        form = GroupMembershipForm(request.POST)
 
-    Args:
-        request: The HTTP request object containing metadata about the request.
-    """
-    signer = TimestampSigner()
-    invitee_email = request.POST.get("invitee_email")
+        if form.is_valid():
+            invitee_email = form.cleaned_data["invitee_email"]
 
-    # Sign invitation.
-    token = signer.sign_object(
-        {
-            "inviter_pk": request.user.pk,
-            "invitee_email": invitee_email,
-        }
-    )
+            # Create invitation URL.
+            signer = TimestampSigner()
+            token = signer.sign_object(
+                {
+                    "inviter_pk": request.user.pk,
+                    "invitee_email": invitee_email,
+                }
+            )
+            invite_url = request.build_absolute_uri(
+                reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
+            )
 
-    invite_url = request.build_absolute_uri(
-        reverse("imperial_coldfront_plugin:accept_invite", args=[token])
-    )
+            # Send invitation via email.
+            send_mail(
+                "You've been invited to a group",
+                f"Click the following link to accept the invitation:\n{invite_url}",
+                request.user.email,
+                [invitee_email],
+            )
 
-    # Send invitation via email.
-    send_mail(
-        "You've been invited to a group",
-        f"Click the following link to accept the invitation: {invite_url}",
-        settings.DEFAULT_FROM_EMAIL,
-        [invitee_email],
-    )
+    else:
+        form = GroupMembershipForm()
 
     return render(
-        request=request,
-        context={
-            "invitee_email": invitee_email,
-            "token": token,
-            "invite_url": invite_url,
-        },
-        template_name="imperial_coldfront_plugin/invite_to_group.html",
+        request,
+        "imperial_coldfront_plugin/send_group_invite.html",
+        {"form": form},
     )
 
 
 @login_required
-def accept_invite(request: HttpRequest, token: str) -> HttpResponse:
+def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
     """Accept invitation to a group.
 
     Args:
@@ -150,4 +146,4 @@ def index(request: HttpRequest) -> HttpResponse:
     Args:
         request: The HTTP request object containing metadata about the request.
     """
-    return render(request=request, template_name="imperial_coldfront_plugin/index.html")
+    return render(request, "imperial_coldfront_plugin/index.html")
