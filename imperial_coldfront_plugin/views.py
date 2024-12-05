@@ -1,5 +1,6 @@
 """Plugin views."""
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
@@ -113,7 +114,7 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     # Validate token.
     try:
-        invite = signer.unsign_object(token, max_age=86400)
+        invite = signer.unsign_object(token, max_age=settings.TOKEN_TIMEOUT)
     except SignatureExpired:
         return HttpResponseBadRequest("Expired token")
     except BadSignature:
