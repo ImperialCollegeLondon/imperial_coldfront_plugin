@@ -2,13 +2,7 @@
 {% block content %}
   <h1>Invitation accepted</h1>
   <p>
-    Inviter PK:
-    <br>
-    {{ inviter_pk }}
-  </p>
-  <p>
-    Invitee email:
-    <br>
-    {{ invitee_email }}
+    You have accepted a group invitation from user <em>{{ inviter }}</em>.
+    You are now a member of group <em>{{ group }}</em>.
   </p>
 {% endblock content %}

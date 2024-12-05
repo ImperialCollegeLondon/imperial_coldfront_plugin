@@ -132,10 +132,7 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     return render(
         request=request,
-        context={
-            "inviter_pk": invite["inviter_pk"],
-            "invitee_email": invite["invitee_email"],
-        },
+        context={"inviter": group.owner, "group": group},
         template_name="imperial_coldfront_plugin/accept_group_invite.html",
     )
 
