@@ -44,7 +44,7 @@ click==8.1.7
     # via pip-tools
 coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
-coverage[toml]==7.6.8
+coverage[toml]==7.6.9
     # via pytest-cov
 crispy-bootstrap4==2024.1
     # via coldfront
@@ -201,7 +201,7 @@ requests==2.31.0
     #   coldfront
     #   doi2bib
     #   mozilla-django-oidc
-ruff==0.8.1
+ruff==0.8.2
     # via imperial_coldfront_plugin (pyproject.toml)
 six==1.16.0
     # via
