@@ -8,7 +8,7 @@ from .models import GroupMembership, ResearchGroup
 class ResearchGroupAdmin(admin.ModelAdmin):
     """Admin configuration for the ResearchGroup model."""
 
-    pass
+    list_display = ("owner", "gid", "name")
 
 
 admin.site.register(ResearchGroup, ResearchGroupAdmin)
