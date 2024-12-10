@@ -66,6 +66,9 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
 @login_required
 def send_group_invite(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group."""
+    if not ResearchGroup.objects.filter(owner=request.user).exists():
+        return HttpResponseForbidden("You are not a group owner.")
+
     if request.method == "POST":
         form = GroupMembershipForm(request.POST)
 
