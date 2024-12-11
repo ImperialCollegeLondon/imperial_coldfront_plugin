@@ -92,5 +92,9 @@ pydocstyle.convention = "google"
     "D104",
 ] # Missing docstring in public module, Missing docstring in public package
 
+[tool.djlint]
+profile = "django"
+indent = 2
+
 [tool.django-stubs]
 django_settings_module = "imperial_coldfront_plugin" # a lie but seems to satisfy
