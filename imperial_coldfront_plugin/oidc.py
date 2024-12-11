@@ -8,6 +8,14 @@ from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
 from .models import UnixUID
 
+ENTRA_UID_ENDPOINT = (
+    "https://graph.microsoft.com/v1.0/me?$select=onPremisesExtensionAttributes"
+)
+"""URL for the Microsoft Graph API endpoint to retrieve the user's uid."""
+
+ENTRA_UID_ATTRIBUTE = "extensionAttribute12"
+"""Attribute name for the user's uid in the Microsoft Graph API response."""
+
 
 def _update_user(user: User, claims: dict[str, Any]) -> None:
     user.username = claims["preferred_username"].removesuffix("@ic.ac.uk")
@@ -61,10 +69,10 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         # get user uid from Microsoft Graph API using the access token
         # uid is stored under a custom attribute
         response = requests.get(
-            "https://graph.microsoft.com/v1.0/me?$select=onPremisesExtensionAttributes",
+            ENTRA_UID_ENDPOINT,
             headers={"Authorization": f"Bearer {access_token}"},
         ).json()
         user_info["uid"] = int(
-            response["onPremisesExtensionAttributes"]["extensionAttribute12"]
+            response["onPremisesExtensionAttributes"][ENTRA_UID_ATTRIBUTE]
         )
         return user_info
