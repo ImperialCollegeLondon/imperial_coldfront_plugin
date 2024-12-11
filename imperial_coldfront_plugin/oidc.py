@@ -10,7 +10,7 @@ from .models import UnixUID
 
 
 def _update_user(user: User, claims: dict[str, Any]) -> None:
-    user.username = claims["preferred_username"].rstrip("@ic.ac.uk")
+    user.username = claims["preferred_username"].removesuffix("@ic.ac.uk")
     user.email = claims["email"]
     user.first_name = claims["given_name"]
     user.last_name = claims["family_name"]
