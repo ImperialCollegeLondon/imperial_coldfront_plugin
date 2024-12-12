@@ -23,7 +23,7 @@ class TestGroupMembersView:
     """Tests for the group members view."""
 
     def _get_url(self, user_pk):
-        return reverse("group_members", args=[user_pk])
+        return reverse("imperial_coldfront_plugin:group_members", args=[user_pk])
 
     def test_login_required(self, client):
         """Test that the view requires login."""
@@ -72,7 +72,7 @@ class TestGroupMembersView:
 class TestSendGroupInviteView:
     """Tests for the send group invite view."""
 
-    url = reverse("send_group_invite")
+    url = reverse("imperial_coldfront_plugin:send_group_invite")
 
     def test_login_required(self, client):
         """Test that the view requires login."""
@@ -106,7 +106,8 @@ class TestSendGroupInviteView:
         assert email.to == [invitee_email]
         token = timestamp_signer_mock().sign_object.return_value
         assert (
-            "http://testserver" + reverse("accept_group_invite", args=[token])
+            "http://testserver"
+            + reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             in email.body
         )
 
@@ -130,7 +131,7 @@ class TestAcceptGroupInvite:
     """Tests for the accept group invite view."""
 
     def _get_url(self, token):
-        return reverse("accept_group_invite", args=[token])
+        return reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
 
     def _get_token(self, invitee_email, inviter_pk):
         ts = TimestampSigner()
