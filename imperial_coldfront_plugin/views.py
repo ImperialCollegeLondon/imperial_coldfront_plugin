@@ -1,11 +1,21 @@
 """Plugin views."""
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.core.mail import send_mail
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+)
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 
-from .models import GroupMembership
+from .forms import GroupMembershipForm
+from .models import GroupMembership, ResearchGroup
 
 User = get_user_model()
 
@@ -51,3 +61,80 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     group_members = GroupMembership.objects.filter(owner=user)
 
     return render(request, "group_members.html", {"group_members": group_members})
+
+
+@login_required
+def send_group_invite(request: HttpRequest) -> HttpResponse:
+    """Invite an individual to a group."""
+    if not ResearchGroup.objects.filter(owner=request.user).exists():
+        return HttpResponseForbidden("You are not a group owner.")
+
+    if request.method == "POST":
+        form = GroupMembershipForm(request.POST)
+
+        if form.is_valid():
+            invitee_email = form.cleaned_data["invitee_email"]
+
+            # Create invitation URL.
+            signer = TimestampSigner()
+            token = signer.sign_object(
+                {
+                    "inviter_pk": request.user.pk,
+                    "invitee_email": invitee_email,
+                }
+            )
+            invite_url = request.build_absolute_uri(
+                reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
+            )
+
+            # Send invitation via email.
+            send_mail(
+                "You've been invited to a group",
+                f"Click the following link to accept the invitation:\n{invite_url}",
+                request.user.email,
+                [invitee_email],
+            )
+
+    else:
+        form = GroupMembershipForm()
+
+    return render(
+        request,
+        "imperial_coldfront_plugin/send_group_invite.html",
+        {"form": form},
+    )
+
+
+@login_required
+def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
+    """Accept invitation to a group.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+        token: The token that was sent to the invitee.
+    """
+    signer = TimestampSigner()
+
+    # Validate token.
+    try:
+        invite = signer.unsign_object(token, max_age=settings.TOKEN_TIMEOUT)
+    except SignatureExpired:
+        return HttpResponseBadRequest("Expired token")
+    except BadSignature:
+        return HttpResponseBadRequest("Bad token")
+
+    # Check the correct user is using the token.
+    if invite["invitee_email"] != request.user.email:
+        return HttpResponseForbidden(
+            "The invite token is not associated with this email address."
+        )
+
+    # Update group membership in the database.
+    group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
+    GroupMembership.objects.get_or_create(group=group, member=request.user)
+
+    return render(
+        request=request,
+        context={"inviter": group.owner, "group": group.name},
+        template_name="imperial_coldfront_plugin/accept_group_invite.html",
+    )
