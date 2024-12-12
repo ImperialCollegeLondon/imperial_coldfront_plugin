@@ -1,8 +1,7 @@
 {% extends "common/base.html" %}
 {% block content %}
   <h1>Invite user to group</h1>
-  <form action="{% url 'imperial_coldfront_plugin:send_group_invite' %}"
-        method="post">
+  <form action="{% url 'send_group_invite' %}" method="post">
     {% csrf_token %}
     {{ form.as_p }}
     <input type="submit" value="Send Invite">

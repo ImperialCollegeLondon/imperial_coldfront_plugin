@@ -107,7 +107,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
                 }
             )
             invite_url = request.build_absolute_uri(
-                reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
+                reverse("accept_group_invite", args=[token])
             )
 
             # Send invitation via email.

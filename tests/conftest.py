@@ -118,6 +118,18 @@ def pi(user_factory):
 
 
 @pytest.fixture
+def pi_group(research_group_factory, pi):
+    """Provides a research group with a single member."""
+    return research_group_factory(owner=pi)[0]
+
+
+@pytest.fixture
 def auth_client(auth_client_factory, user):
     """Return an authenticated Django test client for `user`."""
     return auth_client_factory(user)
+
+
+@pytest.fixture
+def pi_client(auth_client_factory, pi):
+    """Return an authenticated Django test client for a PI."""
+    return auth_client_factory(pi)
