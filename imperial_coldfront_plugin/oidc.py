@@ -2,12 +2,23 @@
 
 from typing import Any
 
+import requests
 from django.contrib.auth.models import User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
+from .models import UnixUID
+
+ENTRA_UID_ENDPOINT = (
+    "https://graph.microsoft.com/v1.0/me?$select=onPremisesExtensionAttributes"
+)
+"""URL for the Microsoft Graph API endpoint to retrieve the user's uid."""
+
+ENTRA_UID_ATTRIBUTE = "extensionAttribute12"
+"""Attribute name for the user's uid in the Microsoft Graph API response."""
+
 
 def _update_user(user: User, claims: dict[str, Any]) -> None:
-    user.username = claims["preferred_username"].rstrip("@ic.ac.uk")
+    user.username = claims["preferred_username"].removesuffix("@ic.ac.uk")
     user.email = claims["email"]
     user.first_name = claims["given_name"]
     user.last_name = claims["family_name"]
@@ -25,6 +36,7 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         """
         user = super().create_user(claims)
         _update_user(user, claims)
+        UnixUID.objects.create(user=user, identifier=claims["uid"])
         return user
 
     def update_user(self, user: User, claims: dict[str, Any]) -> User:
@@ -44,7 +56,7 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         We extend the superclass implementation of this method which provides data from
         the configured OIDC userinfo endpoint to include preferred_username from the
-        id_token.
+        id_token and the user's unix uid retrieved from the Microsoft Graph API.
 
         Args:
           access_token: for use with the Microsoft Entra graph API.
@@ -53,4 +65,14 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         """
         user_info = super().get_userinfo(access_token, id_token, payload)
         user_info["preferred_username"] = payload["preferred_username"]
+
+        # get user uid from Microsoft Graph API using the access token
+        # uid is stored under a custom attribute
+        response = requests.get(
+            ENTRA_UID_ENDPOINT,
+            headers={"Authorization": f"Bearer {access_token}"},
+        ).json()
+        user_info["uid"] = int(
+            response["onPremisesExtensionAttributes"][ENTRA_UID_ATTRIBUTE]
+        )
         return user_info
