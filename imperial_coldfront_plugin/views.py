@@ -58,12 +58,34 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     if not user.userprofile.is_pi:
         return render(request, "no_group.html", {"message": "You do not own a group."})
 
-    group_members = GroupMembership.objects.filter(owner=user)
+    group_members = GroupMembership.objects.filter(group__owner=user)
 
     return render(request, "group_members.html", {"group_members": group_members})
 
 
 @login_required
+def check_access(request: HttpRequest):
+    """Informational view displaying the user's current access to RCS resources."""
+    if request.user.userprofile.is_pi:
+        message = "You have access to RCS resources as a PI."
+    elif request.user.is_superuser:
+        message = "You have access to RCS resources as an administrator."
+    else:
+        try:
+            group_membership = GroupMembership.objects.get(member=request.user)
+            message = (
+                "You have been granted access to the RCS compute cluster as a member "
+                "of the research group of "
+                f"{group_membership.group.owner.get_full_name()}."
+            )
+        except GroupMembership.DoesNotExist:
+            message = "You do not currently have access to the RCS compute cluster."
+
+    return render(
+        request, "imperial_coldfront_plugin/check_access.html", dict(message=message)
+    )
+
+
 def send_group_invite(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group."""
     if not ResearchGroup.objects.filter(owner=request.user).exists():
