@@ -48,6 +48,7 @@ def pytest_configure():
             "django.contrib.sessions.middleware.SessionMiddleware",
             "django.contrib.auth.middleware.AuthenticationMiddleware",
         ],
+        TOKEN_TIMEOUT=60,
     )
 
 
@@ -114,7 +115,7 @@ def user(user_factory):
 @pytest.fixture
 def pi(user_factory):
     """Provides a Django user with PI status."""
-    return user_factory(username="testuser", is_pi=True)
+    return user_factory(username="testpi", is_pi=True)
 
 
 @pytest.fixture

@@ -4,9 +4,11 @@ from http import HTTPStatus
 
 import pytest
 from django.conf import settings
+from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
 
 from imperial_coldfront_plugin.forms import GroupMembershipForm
+from imperial_coldfront_plugin.models import GroupMembership
 
 
 @pytest.fixture
@@ -122,3 +124,60 @@ class TestSendGroupInviteView:
         assert response.context["form"].errors == {"invitee_email": [error]}
         assert error in response.content.decode()
         assert len(mailoutbox) == 0
+
+
+class TestAcceptGroupInvite:
+    """Tests for the accept group invite view."""
+
+    def _get_url(self, token):
+        return reverse("accept_group_invite", args=[token])
+
+    def _get_token(self, invitee_email, inviter_pk):
+        ts = TimestampSigner()
+        return ts.sign_object(
+            {"invitee_email": invitee_email, "inviter_pk": inviter_pk}
+        )
+
+    def test_login_required(self, client):
+        """Test that the view requires login."""
+        response = client.get(self._get_url("dummy_token"))
+        assert response.status_code == HTTPStatus.FOUND
+        assert response.url.startswith(settings.LOGIN_URL)
+
+    def test_get_invalid_token(self, auth_client):
+        """Test that the view renders the form for the group owner."""
+        response = auth_client.get(self._get_url("dummy_token"))
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"Bad token"
+
+    def test_get_expired_token(self, settings, auth_client):
+        """Test that the view rejects expired tokens."""
+        settings.TOKEN_TIMEOUT = 0  # make token expire immediately
+        token = self._get_token("", 1)
+        response = auth_client.get(self._get_url(token))
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"Expired token"
+
+    def test_get_wrong_email(self, auth_client):
+        """Test that the view rejects tokens with the wrong email."""
+        token = self._get_token("foo@bar.com", 1)
+        response = auth_client.get(self._get_url(token))
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert (
+            response.content
+            == b"The invite token is not associated with this email address."
+        )
+
+    def test_get_valid_token(self, auth_client, pi_group, user):
+        """Test that the view accepts valid tokens."""
+        token = self._get_token(user.email, pi_group.owner.pk)
+        response = auth_client.get(self._get_url(token))
+        assert response.status_code == HTTPStatus.OK
+        assert b"You have accepted a group invitation" in response.content
+        GroupMembership.objects.get(group=pi_group, member=user)
+
+    def test_get_valid_token_already_member(self, auth_client, pi_group, user):
+        """Test that the view doesn't duplicate group memberships."""
+        token = self._get_token(user.email, pi_group.owner.pk)
+        auth_client.get(self._get_url(token))
+        GroupMembership.objects.get(group=pi_group, member=user)
