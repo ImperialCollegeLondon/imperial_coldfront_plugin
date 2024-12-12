@@ -131,7 +131,7 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     # Update group membership in the database.
     group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
-    GroupMembership.objects.create(group=group, member=request.user)
+    GroupMembership.objects.get_or_create(group=group, member=request.user)
 
     return render(
         request=request,
