@@ -140,7 +140,7 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     # Validate token.
     try:
-        invite = signer.unsign_object(token, max_age=settings.TOKEN_TIMEOUT)
+        invite = signer.unsign_object(token, max_age=settings.INVITATION_TOKEN_TIMEOUT)
     except SignatureExpired:
         return HttpResponseBadRequest("Expired token")
     except BadSignature:
