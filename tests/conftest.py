@@ -17,7 +17,7 @@ def pytest_configure():
                 "ENGINE": "django.db.backends.sqlite3",
             }
         },
-        ROOT_URLCONF="imperial_coldfront_plugin.urls",
+        ROOT_URLCONF="tests.urls",
         INSTALLED_APPS=[
             "django.contrib.auth",
             "django.contrib.contenttypes",
