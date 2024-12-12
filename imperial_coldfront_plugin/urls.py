@@ -7,7 +7,6 @@ from . import views
 app_name = "imperial_coldfront_plugin"
 
 urlpatterns = [
-    path("", views.index, name="index"),
     path(
         "group/<int:user_pk>/members/", views.group_members_view, name="group_members"
     ),

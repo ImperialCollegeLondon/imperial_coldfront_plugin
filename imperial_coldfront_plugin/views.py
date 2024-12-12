@@ -138,13 +138,3 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         context={"inviter": group.owner, "group": group.name},
         template_name="imperial_coldfront_plugin/accept_group_invite.html",
     )
-
-
-@login_required
-def index(request: HttpRequest) -> HttpResponse:
-    """Render the index page.
-
-    Args:
-        request: The HTTP request object containing metadata about the request.
-    """
-    return render(request, "imperial_coldfront_plugin/index.html")
