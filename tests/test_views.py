@@ -8,7 +8,7 @@ from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
 
 from imperial_coldfront_plugin.forms import GroupMembershipForm
-from imperial_coldfront_plugin.models import GroupMembership
+from imperial_coldfront_plugin.models import GroupMembership, UnixUID
 
 
 @pytest.fixture
@@ -223,3 +223,21 @@ class TestCheckAccessView(LoginRequiredMixin):
             response.context["message"]
             == "You do not currently have access to the RCS compute cluster."
         )
+
+
+class TestGetActiveUsersView:
+    """Tests for the get active users view."""
+
+    url = reverse("imperial_coldfront_plugin:active_users")
+
+    def test_get(self, auth_client_factory, research_group_factory):
+        """Test the get_active_users view returns the right data."""
+        group, memberships = research_group_factory(number_of_members=1)
+        UnixUID.objects.create(user=memberships[0].member, identifier=123456)
+
+        response = auth_client_factory(group.owner).get(self.url)
+        assert response.status_code == HTTPStatus.OK
+        expected = (
+            b"user1:x:123456:654321:First Last:/rds/general/user/user1/home:/bin/bash\n"
+        )
+        assert response.content == expected
