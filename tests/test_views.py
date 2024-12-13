@@ -182,3 +182,54 @@ class TestAcceptGroupInvite:
         token = self._get_token(user.email, pi_group.owner.pk)
         auth_client.get(self._get_url(token))
         GroupMembership.objects.get(group=pi_group, member=user)
+
+
+class TestCheckAccessView:
+    """Tests for the check_access view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:check_access")
+
+    def test_login_required(self, client):
+        """Test that the view requires login."""
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FOUND
+        assert response.url.startswith(settings.LOGIN_URL)
+
+    def test_pi(self, pi_client):
+        """Test that the view works for PIs."""
+        response = pi_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert (
+            response.context["message"] == "You have access to RCS resources as a PI."
+        )
+
+    def test_superuser(self, auth_client_factory, user_factory):
+        """Test that the view works for superusers."""
+        superuser = user_factory(is_superuser=True)
+        client = auth_client_factory(superuser)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert (
+            response.context["message"]
+            == "You have access to RCS resources as an administrator."
+        )
+
+    def test_group_member(self, pi, pi_group, auth_client_factory):
+        """Test that the view works for members of a group."""
+        member = pi_group.groupmembership_set.first().member
+        response = auth_client_factory(member).get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["message"] == (
+            "You have been granted access to the RCS compute cluster as a member "
+            f"of the research group of {pi.get_full_name()}."
+        )
+
+    def test_not_group_member(self, auth_client):
+        """Test the view response for users who don't have access."""
+        response = auth_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert (
+            response.context["message"]
+            == "You do not currently have access to the RCS compute cluster."
+        )
