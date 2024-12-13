@@ -1,6 +1,7 @@
 """Tests for the views of the plugin."""
 
 from http import HTTPStatus
+from random import randint
 
 import pytest
 from django.conf import settings
@@ -228,16 +229,20 @@ class TestCheckAccessView(LoginRequiredMixin):
 class TestGetActiveUsersView:
     """Tests for the get active users view."""
 
-    url = reverse("imperial_coldfront_plugin:active_users")
+    url = reverse("imperial_coldfront_plugin:get_active_users")
 
     def test_get(self, auth_client_factory, research_group_factory):
         """Test the get_active_users view returns the right data."""
         group, memberships = research_group_factory(number_of_members=1)
-        UnixUID.objects.create(user=memberships[0].member, identifier=123456)
+        user = memberships[0].member
+        uid = UnixUID.objects.create(user=user, identifier=randint(0, 100000))
 
         response = auth_client_factory(group.owner).get(self.url)
         assert response.status_code == HTTPStatus.OK
-        expected = (
-            b"user1:x:123456:654321:First Last:/rds/general/user/user1/home:/bin/bash\n"
+        expected = bytes(
+            f"{user.username}:x:{uid.identifier}:{group.gid}:"
+            f"{user.first_name} {user.last_name}:"
+            f"/rds/general/user/{user.username}/home:/bin/bash\n",
+            "utf-8",
         )
         assert response.content == expected

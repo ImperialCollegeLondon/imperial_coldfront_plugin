@@ -161,3 +161,13 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         context={"inviter": group.owner, "group": group.name},
         template_name="imperial_coldfront_plugin/accept_group_invite.html",
     )
+
+
+@login_required
+def get_active_users(request: HttpRequest) -> HttpResponse:
+    """Get the active users in unix passwd format.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+    """
+    return HttpResponse("Not implemented")
