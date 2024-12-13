@@ -23,4 +23,5 @@ urlpatterns = [
         views.accept_group_invite,
         name="accept_group_invite",
     ),
+    path("actve_users/", views.get_active_users, name="get_active_users"),
 ]
