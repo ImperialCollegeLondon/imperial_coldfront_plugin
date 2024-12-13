@@ -86,6 +86,7 @@ def check_access(request: HttpRequest):
     )
 
 
+@login_required
 def send_group_invite(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group."""
     if not ResearchGroup.objects.filter(owner=request.user).exists():
