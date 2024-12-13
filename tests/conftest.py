@@ -62,9 +62,14 @@ def random_string(length=10):
 def user_factory(django_user_model):
     """Provides a factory for Django users."""
 
-    def create_user(username=None, is_pi=False, is_superuser=False):
+    def create_user(
+        username=None, is_pi=False, is_superuser=False, first_name=None, last_name=None
+    ):
         user = django_user_model.objects.create_user(
-            username=username or random_string(), is_superuser=is_superuser
+            username=username or random_string(),
+            is_superuser=is_superuser,
+            first_name=first_name or random_string(),
+            last_name=last_name or random_string(),
         )
         user.userprofile.is_pi = is_pi
         user.userprofile.save()
