@@ -169,6 +169,8 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 def get_active_users(request: HttpRequest) -> HttpResponse:
     """Get the active users in unix passwd format.
 
+    TODO: the UnixUID must exist for each user in a group, this needs to be ensured.
+
     Args:
         request: The HTTP request object containing metadata about the request.
     """
