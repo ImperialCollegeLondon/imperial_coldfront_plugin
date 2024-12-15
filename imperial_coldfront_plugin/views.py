@@ -11,6 +11,7 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseForbidden,
+    JsonResponse,
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -183,4 +184,4 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
             f"/rds/general/user/{user.username}/home:/bin/bash\n"
         )
 
-    return HttpResponse(passwd)
+    return JsonResponse(dict(data=passwd))
