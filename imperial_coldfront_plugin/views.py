@@ -5,7 +5,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
-from django.db.models import Q
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -175,15 +174,18 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
         request: The HTTP request object containing metadata about the request.
     """
     passwd = ""
-    for user in User.objects.filter(
-        Q(groupmembership__member__isnull=False) | Q(userprofile__is_pi=True)
-    ).distinct():
+    format_str = (
+        "{user.username}:x:{uid.identifier}:{group.gid}:{user.first_name} "
+        "{user.last_name}:/rds/general/user/{user.username}/home:/bin/bash\n"
+    )
+    qs = User.objects.filter(groupmembership__member__isnull=False).distinct()
+    for user in qs:
         uid = UnixUID.objects.get(user=user)
-        group = GroupMembership.objects.get(Q(member=user) | Q(group__owner=user)).group
-        passwd += (
-            f"{user.username}:x:{uid.identifier}:{group.gid}:"
-            f"{user.first_name} {user.last_name}:"
-            f"/rds/general/user/{user.username}/home:/bin/bash\n"
-        )
+        group = GroupMembership.objects.get(member=user).group
+        passwd += format_str.format(user=user, uid=uid, group=group)
+    for user in User.objects.filter(userprofile__is_pi=True).distinct().difference(qs):
+        uid = UnixUID.objects.get(user=user)
+        group = ResearchGroup.objects.get(owner=user)
+        passwd += format_str.format(user=user, uid=uid, group=group)
 
     return JsonResponse(dict(data=passwd))
