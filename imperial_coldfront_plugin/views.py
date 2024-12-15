@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.db.models import Q
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -15,7 +16,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
 from .forms import GroupMembershipForm
-from .models import GroupMembership, ResearchGroup
+from .models import GroupMembership, ResearchGroup, UnixUID
 
 User = get_user_model()
 
@@ -170,4 +171,16 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
     Args:
         request: The HTTP request object containing metadata about the request.
     """
-    return HttpResponse("Not implemented")
+    passwd = ""
+    for user in User.objects.filter(
+        Q(groupmembership__member__isnull=False) | Q(userprofile__is_pi=True)
+    ).distinct():
+        uid = UnixUID.objects.get(user=user)
+        group = GroupMembership.objects.get(Q(member=user) | Q(group__owner=user)).group
+        passwd += (
+            f"{user.username}:x:{uid.identifier}:{group.gid}:"
+            f"{user.first_name} {user.last_name}:"
+            f"/rds/general/user/{user.username}/home:/bin/bash\n"
+        )
+
+    return HttpResponse(passwd)
