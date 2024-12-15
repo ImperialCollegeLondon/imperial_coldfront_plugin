@@ -10,12 +10,13 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseForbidden,
+    JsonResponse,
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
 from .forms import GroupMembershipForm
-from .models import GroupMembership, ResearchGroup
+from .models import GroupMembership, ResearchGroup, UnixUID
 
 User = get_user_model()
 
@@ -161,3 +162,30 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         context={"inviter": group.owner, "group": group.name},
         template_name="imperial_coldfront_plugin/accept_group_invite.html",
     )
+
+
+@login_required
+def get_active_users(request: HttpRequest) -> HttpResponse:
+    """Get the active users in unix passwd format.
+
+    TODO: the UnixUID must exist for each user in a group, this needs to be ensured.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+    """
+    passwd = ""
+    format_str = (
+        "{user.username}:x:{uid.identifier}:{group.gid}:{user.first_name} "
+        "{user.last_name}:/rds/general/user/{user.username}/home:/bin/bash\n"
+    )
+    qs = User.objects.filter(groupmembership__member__isnull=False).distinct()
+    for user in qs:
+        uid = UnixUID.objects.get(user=user)
+        group = GroupMembership.objects.get(member=user).group
+        passwd += format_str.format(user=user, uid=uid, group=group)
+    for user in User.objects.filter(userprofile__is_pi=True).distinct().difference(qs):
+        uid = UnixUID.objects.get(user=user)
+        group = ResearchGroup.objects.get(owner=user)
+        passwd += format_str.format(user=user, uid=uid, group=group)
+
+    return JsonResponse(dict(data=passwd))
