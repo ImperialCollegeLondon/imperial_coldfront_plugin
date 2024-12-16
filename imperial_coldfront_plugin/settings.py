@@ -3,4 +3,6 @@
 These are imported into the project level settings by the Coldfront plugin mechanism.
 """
 
-INVITATION_TOKEN_TIMEOUT = 86400
+from datetime import timedelta
+
+INVITATION_TOKEN_TIMEOUT = timedelta(days=7).total_seconds()
