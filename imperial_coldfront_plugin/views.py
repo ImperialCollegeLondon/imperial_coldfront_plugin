@@ -10,7 +10,6 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseForbidden,
-    JsonResponse,
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -188,4 +187,4 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
         group = ResearchGroup.objects.get(owner=user)
         passwd += format_str.format(user=user, uid=uid, group=group)
 
-    return JsonResponse(dict(data=passwd))
+    return HttpResponse(passwd)

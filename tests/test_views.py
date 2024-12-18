@@ -242,15 +242,17 @@ class TestGetActiveUsersView:
 
         response = auth_client_factory(group.owner).get(self.url)
         assert response.status_code == HTTPStatus.OK
-        expected_user = (
+        expected_user = bytes(
             f"{user.username}:x:{user_uid.identifier}:{group.gid}:"
             f"{user.first_name} {user.last_name}:"
-            f"/rds/general/user/{user.username}/home:/bin/bash\n"
+            f"/rds/general/user/{user.username}/home:/bin/bash\n",
+            "utf-8",
         )
-        expected_owner = (
+        expected_owner = bytes(
             f"{group.owner.username}:x:{owner_uid.identifier}:{group.gid}:"
             f"{group.owner.first_name} {group.owner.last_name}:"
-            f"/rds/general/user/{group.owner.username}/home:/bin/bash\n"
+            f"/rds/general/user/{group.owner.username}/home:/bin/bash\n",
+            "utf-8",
         )
-        assert expected_user in response.json()["data"]
-        assert expected_owner in response.json()["data"]
+        assert expected_user in response.content
+        assert expected_owner in response.content
