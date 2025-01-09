@@ -1,6 +1,11 @@
 """Pytest configuration."""
 
+from random import choices, randint
+from string import ascii_lowercase
+
+import pytest
 from django.conf import settings
+from django.test import Client
 
 
 def pytest_configure():
@@ -12,20 +17,22 @@ def pytest_configure():
                 "ENGINE": "django.db.backends.sqlite3",
             }
         },
-        ROOT_URLCONF="imperial_coldfront_plugin.urls",
+        ROOT_URLCONF="tests.urls",
         INSTALLED_APPS=[
             "django.contrib.auth",
             "django.contrib.contenttypes",
             "django.contrib.sites",
             "django.contrib.admin",
+            "django.contrib.sessions",
             "mozilla_django_oidc",
+            "coldfront.core.user",
             "imperial_coldfront_plugin",
         ],
         SECRET_KEY="123",
         TEMPLATES=[
             {
                 "BACKEND": "django.template.backends.django.DjangoTemplates",
-                "DIRS": [],
+                "DIRS": ["tests/templates"],
                 "APP_DIRS": True,
                 "OPTIONS": {
                     "context_processors": [
@@ -37,4 +44,107 @@ def pytest_configure():
                 },
             }
         ],
+        MIDDLEWARE=[
+            "django.contrib.sessions.middleware.SessionMiddleware",
+            "django.contrib.auth.middleware.AuthenticationMiddleware",
+        ],
+        TOKEN_TIMEOUT=60,
     )
+
+
+def random_string(length=10):
+    """Return a random string."""
+    return "".join(choices(ascii_lowercase, k=length))
+
+
+# flexible factory fixtures for more complex test cases
+@pytest.fixture
+def user_factory(django_user_model):
+    """Provides a factory for Django users.
+
+    The factory takes the following arguments:
+
+    - username: The username of the user. If not provided, a random string is used.
+    - is_pi: Whether the user is a PI. Default is False.
+    - is_superuser: Whether the user is a superuser. Default is False.
+    - first_name: The first name of the user. If not provided, a random string is used.
+    - last_name: The last name of the user. If not provided, a random string is used.
+    """
+
+    def create_user(
+        username=None, is_pi=False, is_superuser=False, first_name=None, last_name=None
+    ):
+        user = django_user_model.objects.create_user(
+            username=username or random_string(),
+            is_superuser=is_superuser,
+            first_name=first_name or random_string(),
+            last_name=last_name or random_string(),
+        )
+        user.userprofile.is_pi = is_pi
+        user.userprofile.save()
+        return user
+
+    return create_user
+
+
+@pytest.fixture
+def research_group_factory(user_factory):
+    """Provides a factory for research groups with optional members."""
+    from imperial_coldfront_plugin.models import GroupMembership, ResearchGroup
+
+    def create_group(number_of_members=1, owner=None):
+        group = ResearchGroup.objects.create(
+            owner=owner or user_factory(is_pi=True),
+            gid=randint(0, 100000),
+            name=random_string(),
+        )
+        memberships = [
+            GroupMembership.objects.create(member=user_factory(), group=group)
+            for _ in range(number_of_members)
+        ]
+        return group, memberships
+
+    return create_group
+
+
+@pytest.fixture
+def auth_client_factory():
+    """Provides a factory for authenticated Django test clients."""
+
+    def create_auth_client(user):
+        client = Client()
+        client.force_login(user)
+        return client
+
+    return create_auth_client
+
+
+# fixtures for simple test cases
+@pytest.fixture
+def user(user_factory):
+    """Provides a Django user with a fixed username."""
+    return user_factory(username="testuser")
+
+
+@pytest.fixture
+def pi(user_factory):
+    """Provides a Django user with PI status."""
+    return user_factory(username="testpi", is_pi=True)
+
+
+@pytest.fixture
+def pi_group(research_group_factory, pi):
+    """Provides a research group with a single member."""
+    return research_group_factory(owner=pi)[0]
+
+
+@pytest.fixture
+def user_client(auth_client_factory, user):
+    """Return an authenticated Django test client for `user`."""
+    return auth_client_factory(user)
+
+
+@pytest.fixture
+def pi_client(auth_client_factory, pi):
+    """Return an authenticated Django test client for a PI."""
+    return auth_client_factory(pi)
