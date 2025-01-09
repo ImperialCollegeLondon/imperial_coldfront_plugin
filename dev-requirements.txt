@@ -14,7 +14,7 @@ asgiref==3.7.2
     #   django
     #   django-simple-history
     #   django-stubs
-attrs==24.2.0
+attrs==24.3.0
     # via pytest-mypy
 bibtexparser==1.4.1
     # via
@@ -40,11 +40,11 @@ charset-normalizer==3.3.2
     # via
     #   coldfront
     #   requests
-click==8.1.7
+click==8.1.8
     # via pip-tools
 coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
-coverage[toml]==7.6.8
+coverage[toml]==7.6.10
     # via pytest-cov
 crispy-bootstrap4==2024.1
     # via coldfront
@@ -122,7 +122,7 @@ future==1.0.0
     #   doi2bib
 humanize==4.9.0
     # via coldfront
-identify==2.6.3
+identify==2.6.5
     # via pre-commit
 idna==3.6
     # via
@@ -134,7 +134,7 @@ josepy==1.14.0
     # via mozilla-django-oidc
 mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
-mypy==1.13.0
+mypy==1.14.1
     # via
     #   imperial_coldfront_plugin (pyproject.toml)
     #   pytest-mypy
@@ -202,7 +202,7 @@ requests==2.31.0
     #   doi2bib
     #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
-ruff==0.8.1
+ruff==0.8.6
     # via imperial_coldfront_plugin (pyproject.toml)
 six==1.16.0
     # via
@@ -219,7 +219,7 @@ types-python-dateutil==2.8.19.20240106
     # via
     #   arrow
     #   coldfront
-types-pyyaml==6.0.12.20240917
+types-pyyaml==6.0.12.20241230
     # via django-stubs
 typing-extensions==4.10.0
     # via
@@ -231,7 +231,7 @@ urllib3==2.2.1
     # via
     #   coldfront
     #   requests
-virtualenv==20.28.0
+virtualenv==20.28.1
     # via pre-commit
 wcwidth==0.2.13
     # via
