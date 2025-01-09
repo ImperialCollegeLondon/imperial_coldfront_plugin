@@ -151,7 +151,7 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
 
     def test_get_expired_token(self, settings, user_client):
         """Test that the view rejects expired tokens."""
-        settings.TOKEN_TIMEOUT = 0  # make token expire immediately
+        settings.INVITATION_TOKEN_TIMEOUT = 0  # make token expire immediately
         token = self._get_token("", 1)
         response = user_client.get(self._get_url(token))
         assert response.status_code == HTTPStatus.BAD_REQUEST
