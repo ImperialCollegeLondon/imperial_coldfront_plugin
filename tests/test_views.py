@@ -13,7 +13,10 @@ from imperial_coldfront_plugin.models import GroupMembership
 
 @pytest.fixture
 def timestamp_signer_mock(mocker):
-    """Mock the TimestampSigner class."""
+    """Mock the TimestampSigner class.
+
+    Mocking this class allows checking the output token is used where expected.
+    """
     mock = mocker.patch("imperial_coldfront_plugin.views.TimestampSigner")
     mock().sign_object.return_value = "dummytoken"
     return mock
