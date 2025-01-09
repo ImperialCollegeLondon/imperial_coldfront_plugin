@@ -54,9 +54,9 @@ class TestGroupMembersView:
         assert response.status_code == HTTPStatus.OK
         assert set(response.context["group_members"]) == set(memberships)
 
-    def test_not_pi(self, auth_client):
+    def test_not_pi(self, user_client):
         """Test that a user who is not a PI cannot access the view."""
-        response = auth_client.get(self._get_url(1))
+        response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.OK
         assert response.context["message"] == "You do not own a group."
 
@@ -80,9 +80,9 @@ class TestSendGroupInviteView:
         assert response.status_code == HTTPStatus.FOUND
         assert response.url.startswith(settings.LOGIN_URL)
 
-    def test_not_group_owner(self, auth_client):
+    def test_not_group_owner(self, user_client):
         """Test that the view sends an email when a POST request is made."""
-        response = auth_client.get(self.url)
+        response = user_client.get(self.url)
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"You are not a group owner."
 
@@ -145,42 +145,42 @@ class TestAcceptGroupInvite:
         assert response.status_code == HTTPStatus.FOUND
         assert response.url.startswith(settings.LOGIN_URL)
 
-    def test_get_invalid_token(self, auth_client):
+    def test_get_invalid_token(self, user_client):
         """Test that the view renders the form for the group owner."""
-        response = auth_client.get(self._get_url("dummy_token"))
+        response = user_client.get(self._get_url("dummy_token"))
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"Bad token"
 
-    def test_get_expired_token(self, settings, auth_client):
+    def test_get_expired_token(self, settings, user_client):
         """Test that the view rejects expired tokens."""
         settings.TOKEN_TIMEOUT = 0  # make token expire immediately
         token = self._get_token("", 1)
-        response = auth_client.get(self._get_url(token))
+        response = user_client.get(self._get_url(token))
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"Expired token"
 
-    def test_get_wrong_email(self, auth_client):
+    def test_get_wrong_email(self, user_client):
         """Test that the view rejects tokens with the wrong email."""
         token = self._get_token("foo@bar.com", 1)
-        response = auth_client.get(self._get_url(token))
+        response = user_client.get(self._get_url(token))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert (
             response.content
             == b"The invite token is not associated with this email address."
         )
 
-    def test_get_valid_token(self, auth_client, pi_group, user):
+    def test_get_valid_token(self, user_client, pi_group, user):
         """Test that the view accepts valid tokens."""
         token = self._get_token(user.email, pi_group.owner.pk)
-        response = auth_client.get(self._get_url(token))
+        response = user_client.get(self._get_url(token))
         assert response.status_code == HTTPStatus.OK
         assert b"You have accepted a group invitation" in response.content
         GroupMembership.objects.get(group=pi_group, member=user)
 
-    def test_get_valid_token_already_member(self, auth_client, pi_group, user):
+    def test_get_valid_token_already_member(self, user_client, pi_group, user):
         """Test that the view doesn't duplicate group memberships."""
         token = self._get_token(user.email, pi_group.owner.pk)
-        auth_client.get(self._get_url(token))
+        user_client.get(self._get_url(token))
         GroupMembership.objects.get(group=pi_group, member=user)
 
 
@@ -225,9 +225,9 @@ class TestCheckAccessView:
             f"of the research group of {pi.get_full_name()}."
         )
 
-    def test_not_group_member(self, auth_client):
+    def test_not_group_member(self, user_client):
         """Test the view response for users who don't have access."""
-        response = auth_client.get(self._get_url())
+        response = user_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert (
             response.context["message"]

@@ -139,7 +139,7 @@ def pi_group(research_group_factory, pi):
 
 
 @pytest.fixture
-def auth_client(auth_client_factory, user):
+def user_client(auth_client_factory, user):
     """Return an authenticated Django test client for `user`."""
     return auth_client_factory(user)
 
