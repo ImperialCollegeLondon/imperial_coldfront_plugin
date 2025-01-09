@@ -10,6 +10,8 @@ from django.test import Client
 
 def pytest_configure():
     """Configure Django settings for standalone test suite execution."""
+    from imperial_coldfront_plugin import settings as plugin_settings
+
     settings.configure(
         DEBUG=True,
         DATABASES={
@@ -49,6 +51,11 @@ def pytest_configure():
             "django.contrib.auth.middleware.AuthenticationMiddleware",
         ],
         TOKEN_TIMEOUT=60,
+        **{
+            key: getattr(plugin_settings, key)
+            for key in dir(plugin_settings)
+            if key.isupper()
+        },
     )
 
 
