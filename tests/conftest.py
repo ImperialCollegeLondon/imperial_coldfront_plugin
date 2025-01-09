@@ -60,7 +60,16 @@ def random_string(length=10):
 # flexible factory fixtures for more complex test cases
 @pytest.fixture
 def user_factory(django_user_model):
-    """Provides a factory for Django users."""
+    """Provides a factory for Django users.
+
+    The factory takes the following arguments:
+
+    - username: The username of the user. If not provided, a random string is used.
+    - is_pi: Whether the user is a PI. Default is False.
+    - is_superuser: Whether the user is a superuser. Default is False.
+    - first_name: The first name of the user. If not provided, a random string is used.
+    - last_name: The last name of the user. If not provided, a random string is used.
+    """
 
     def create_user(
         username=None, is_pi=False, is_superuser=False, first_name=None, last_name=None
