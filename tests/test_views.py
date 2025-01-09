@@ -22,17 +22,21 @@ def timestamp_signer_mock(mocker):
     return mock
 
 
-class TestGroupMembersView:
-    """Tests for the group members view."""
-
-    def _get_url(self, user_pk):
-        return reverse("imperial_coldfront_plugin:group_members", args=[user_pk])
+class LoginRequiredMixin:
+    """Mixin for tests that require a user to be logged in."""
 
     def test_login_required(self, client):
-        """Test that the view requires login."""
-        response = client.get(self._get_url(1))
+        """Test for redirect to the login page if the user is not logged in."""
+        response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FOUND
         assert response.url.startswith(settings.LOGIN_URL)
+
+
+class TestGroupMembersView(LoginRequiredMixin):
+    """Tests for the group members view."""
+
+    def _get_url(self, user_pk=1):
+        return reverse("imperial_coldfront_plugin:group_members", args=[user_pk])
 
     def test_not_group_owner(
         self, auth_client_factory, research_group_factory, user_factory
@@ -72,26 +76,21 @@ class TestGroupMembersView:
         assert set(response.context["group_members"]) == set(memberships)
 
 
-class TestSendGroupInviteView:
+class TestSendGroupInviteView(LoginRequiredMixin):
     """Tests for the send group invite view."""
 
-    url = reverse("imperial_coldfront_plugin:send_group_invite")
-
-    def test_login_required(self, client):
-        """Test that the view requires login."""
-        response = client.get(self.url)
-        assert response.status_code == HTTPStatus.FOUND
-        assert response.url.startswith(settings.LOGIN_URL)
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:send_group_invite")
 
     def test_not_group_owner(self, user_client):
         """Test that the view sends an email when a POST request is made."""
-        response = user_client.get(self.url)
+        response = user_client.get(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"You are not a group owner."
 
     def test_get(self, pi_group, pi_client):
         """Test that the view renders the form for the group owner."""
-        response = pi_client.get(self.url)
+        response = pi_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], GroupMembershipForm)
 
@@ -100,7 +99,9 @@ class TestSendGroupInviteView:
     ):
         """Test that the view sends an email when a POST request is made."""
         invitee_email = "foo@bar.com"
-        response = pi_client.post(self.url, data={"invitee_email": invitee_email})
+        response = pi_client.post(
+            self._get_url(), data={"invitee_email": invitee_email}
+        )
         assert response.status_code == HTTPStatus.OK
         assert f"Invitation sent to {invitee_email}" in response.content.decode()
 
@@ -123,17 +124,17 @@ class TestSendGroupInviteView:
     )
     def test_post_invalid(self, pi_client, pi_group, mailoutbox, email, error):
         """Test the view renders the form with errors when invalid data is posted."""
-        response = pi_client.post(self.url, data={"invitee_email": email})
+        response = pi_client.post(self._get_url(), data={"invitee_email": email})
         response.status_code == HTTPStatus.OK
         assert response.context["form"].errors == {"invitee_email": [error]}
         assert error in response.content.decode()
         assert len(mailoutbox) == 0
 
 
-class TestAcceptGroupInvite:
+class TestAcceptGroupInvite(LoginRequiredMixin):
     """Tests for the accept group invite view."""
 
-    def _get_url(self, token):
+    def _get_url(self, token="dummy_token"):
         return reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
 
     def _get_token(self, invitee_email, inviter_pk):
@@ -142,15 +143,9 @@ class TestAcceptGroupInvite:
             {"invitee_email": invitee_email, "inviter_pk": inviter_pk}
         )
 
-    def test_login_required(self, client):
-        """Test that the view requires login."""
-        response = client.get(self._get_url("dummy_token"))
-        assert response.status_code == HTTPStatus.FOUND
-        assert response.url.startswith(settings.LOGIN_URL)
-
     def test_get_invalid_token(self, user_client):
         """Test that the view renders the form for the group owner."""
-        response = user_client.get(self._get_url("dummy_token"))
+        response = user_client.get(self._get_url())
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"Bad token"
 
@@ -187,17 +182,11 @@ class TestAcceptGroupInvite:
         GroupMembership.objects.get(group=pi_group, member=user)
 
 
-class TestCheckAccessView:
+class TestCheckAccessView(LoginRequiredMixin):
     """Tests for the check_access view."""
 
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:check_access")
-
-    def test_login_required(self, client):
-        """Test that the view requires login."""
-        response = client.get(self._get_url())
-        assert response.status_code == HTTPStatus.FOUND
-        assert response.url.startswith(settings.LOGIN_URL)
 
     def test_pi(self, pi_client):
         """Test that the view works for PIs."""
