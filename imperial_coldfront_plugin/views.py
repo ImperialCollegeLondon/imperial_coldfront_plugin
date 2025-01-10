@@ -167,7 +167,8 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 def get_active_users(request: HttpRequest) -> HttpResponse:
     """Get the active users in unix passwd format.
 
-    TODO: the UnixUID must exist for each user in a group, this needs to be ensured.
+    Note: the UnixUID must exist for each user in a group and the group owner, this view
+    ignores users that do not have a UnixUID.
 
     Args:
         request: The HTTP request object containing metadata about the request.
@@ -186,7 +187,12 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
         passwd += format_str.format(
             user=user, uid=user.unixuid, group=user.groupmembership_set.get().group
         )
-    for user in User.objects.filter(userprofile__is_pi=True).distinct().difference(qs):
+    for user in (
+        User.objects.filter(userprofile__is_pi=True)
+        .filter(unixuid__isnull=False)
+        .distinct()
+        .difference(qs)
+    ):
         passwd += format_str.format(
             user=user, uid=user.unixuid, group=user.researchgroup_set.get()
         )
