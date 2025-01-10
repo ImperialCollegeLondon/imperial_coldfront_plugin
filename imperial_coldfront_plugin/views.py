@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
 from .forms import GroupMembershipForm
-from .models import GroupMembership, ResearchGroup, UnixUID
+from .models import GroupMembership, ResearchGroup
 
 User = get_user_model()
 
@@ -177,14 +177,14 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
         "{user.username}:x:{uid.identifier}:{group.gid}:{user.first_name} "
         "{user.last_name}:/rds/general/user/{user.username}/home:/bin/bash\n"
     )
-    qs = User.objects.filter(groupmembership__member__isnull=False).distinct()
+    qs = User.objects.filter(groupmembership__isnull=False).distinct()
     for user in qs:
-        uid = UnixUID.objects.get(user=user)
-        group = GroupMembership.objects.get(member=user).group
-        passwd += format_str.format(user=user, uid=uid, group=group)
+        passwd += format_str.format(
+            user=user, uid=user.unixuid, group=user.groupmembership_set.get().group
+        )
     for user in User.objects.filter(userprofile__is_pi=True).distinct().difference(qs):
-        uid = UnixUID.objects.get(user=user)
-        group = ResearchGroup.objects.get(owner=user)
-        passwd += format_str.format(user=user, uid=uid, group=group)
+        passwd += format_str.format(
+            user=user, uid=user.unixuid, group=user.researchgroup_set.get()
+        )
 
     return HttpResponse(passwd)
