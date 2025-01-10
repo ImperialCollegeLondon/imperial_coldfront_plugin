@@ -177,7 +177,11 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
         "{user.username}:x:{uid.identifier}:{group.gid}:{user.first_name} "
         "{user.last_name}:/rds/general/user/{user.username}/home:/bin/bash\n"
     )
-    qs = User.objects.filter(groupmembership__isnull=False).distinct()
+    qs = (
+        User.objects.filter(groupmembership__isnull=False)
+        .filter(unixuid__isnull=False)
+        .distinct()
+    )
     for user in qs:
         passwd += format_str.format(
             user=user, uid=user.unixuid, group=user.groupmembership_set.get().group
