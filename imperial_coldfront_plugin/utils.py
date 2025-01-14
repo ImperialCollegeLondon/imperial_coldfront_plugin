@@ -5,7 +5,7 @@ from django.core.mail import send_mail
 from django_q.tasks import async_task
 
 
-def send_email_in_background(to_addresses, subject, body):
+def send_email_in_background(to_addresses: list[str], subject: str, body: str):
     """Wraps Django email functionality to send emails via a Django Q task.
 
     Args:
