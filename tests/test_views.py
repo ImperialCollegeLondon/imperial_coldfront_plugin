@@ -50,7 +50,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-    @pytest.mark.xfail(reason="This test is expected to fail due to a bug in the code.")
     def test_superuser(self, auth_client_factory, research_group_factory, user_factory):
         """Test that a superuser can access the view for any group."""
         owner = user_factory(is_pi=True)
@@ -67,7 +66,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert response.context["message"] == "You do not own a group."
 
-    @pytest.mark.xfail(reason="This test is expected to fail due to a bug in the code.")
     def test_owner(self, auth_client_factory, research_group_factory):
         """Test that the pi that owns a group can access the view."""
         group, memberships = research_group_factory(number_of_members=3)
