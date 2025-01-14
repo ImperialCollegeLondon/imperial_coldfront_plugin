@@ -3,7 +3,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.http import (
     HttpRequest,
@@ -16,6 +15,7 @@ from django.urls import reverse
 
 from .forms import GroupMembershipForm, TermsAndConditionsForm
 from .models import GroupMembership, ResearchGroup
+from .utils import send_email_in_background
 
 User = get_user_model()
 
@@ -114,13 +114,12 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             invite_url = request.build_absolute_uri(
                 reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             )
-
-            # Send invitation via email.
-            send_mail(
-                "You've been invited to a group",
-                f"Click the following link to accept the invitation:\n{invite_url}",
-                request.user.email,
+            send_email_in_background(
                 [invitee_email],
+                "HPC Access Invitation",
+                "You've been invited to join the access group of "
+                f"{request.user.get_full_name()}\n\n"
+                f"Click the following link to accept the invitation:\n{invite_url}",
             )
 
     else:
