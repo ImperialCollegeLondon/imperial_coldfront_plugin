@@ -40,6 +40,7 @@ class GroupMembership(models.Model):
             AUTH_USER_MODEL. Deletes related memberships when the owner is deleted.
         member (ForeignKey): A reference to the user designated as member, connected to
             AUTH_USER_MODEL. Deletes related memberships when the member is deleted.
+        is_manager (BooleanField): A boolean value indicating if a member is a manager.
     """
 
     group = models.ForeignKey(
@@ -52,6 +53,8 @@ class GroupMembership(models.Model):
         on_delete=models.CASCADE,
         related_name="group_memberships_set",
     )
+
+    is_manager = models.BooleanField(default=False)
 
 
 class UnixUID(models.Model):
