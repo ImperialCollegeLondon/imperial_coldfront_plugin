@@ -152,8 +152,9 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
             "The invite token is not associated with this email address."
         )
 
+    # Update group membership in the database.
     group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
-
+    GroupMembership.objects.get_or_create(group=group, member=request.user)
     return render(
         request=request,
         context={"inviter": group.owner, "group": group.name},
