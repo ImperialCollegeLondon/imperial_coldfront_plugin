@@ -170,6 +170,8 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
         token = self._get_token(user.email, pi_group.owner.pk)
         response = user_client.get(self._get_url(token))
         assert response.status_code == HTTPStatus.OK
+        assert b"You have accepted a group invitation" in response.content
+        GroupMembership.objects.get(group=pi_group, member=user)
 
     def test_get_valid_token_already_member(self, user_client, pi_group, user):
         """Test that the view doesn't duplicate group memberships."""
