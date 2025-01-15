@@ -6,6 +6,7 @@ import pytest
 from django.conf import settings
 from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
+from pytest_django.asserts import assertRedirects
 
 from imperial_coldfront_plugin.forms import GroupMembershipForm
 from imperial_coldfront_plugin.models import GroupMembership
@@ -225,3 +226,36 @@ class TestCheckAccessView(LoginRequiredMixin):
             response.context["message"]
             == "You do not currently have access to the RCS compute cluster."
         )
+
+
+class TestRemoveGroupMemberView(LoginRequiredMixin):
+    """Tests for the remove group member view."""
+
+    def _get_url(self, group_membership_pk=1):
+        return reverse(
+            "imperial_coldfront_plugin:remove_group_member", args=[group_membership_pk]
+        )
+
+    def test_not_group_owner(self, user_client, pi_group):
+        """Test that a user who is not the group owner cannot remove a group member."""
+        group_membership = pi_group.groupmembership_set.first()
+        response = user_client.get(self._get_url(group_membership.pk))
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
+    def test_group_owner(self, pi_client, pi_group):
+        """Test that the group owner can remove a group member."""
+        group_membership = pi_group.groupmembership_set.first()
+        response = pi_client.get(self._get_url(group_membership.pk))
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                args=[group_membership.group.owner.pk],
+            ),
+        )
+
+    def test_invalid_groupmembership(self, user_client):
+        """Test the view response for an invalid group membership."""
+        response = user_client.get(self._get_url(1))
+        assert response.status_code == HTTPStatus.NOT_FOUND
