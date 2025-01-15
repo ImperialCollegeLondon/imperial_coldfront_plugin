@@ -14,7 +14,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
-from .forms import GroupMembershipForm, TermsAndConditionsForm
+from .forms import GroupMembershipForm
 from .models import GroupMembership, ResearchGroup
 
 User = get_user_model()
@@ -154,21 +154,8 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
 
-    if request.method == "POST":
-        form = TermsAndConditionsForm(request.POST)
-        # Check if the user has accepted the terms and conditions.
-        if form.is_valid():
-            # Update group membership in the database.
-            GroupMembership.objects.get_or_create(group=group, member=request.user)
-            return render(
-                request=request,
-                template_name="imperial_coldfront_plugin/accept_group_invite.html",
-                context={"inviter": group.owner, "group": group.name},
-            )
-    else:
-        form = TermsAndConditionsForm()
     return render(
         request=request,
-        context={"inviter": group.owner, "group": group.name, "form": form},
-        template_name="imperial_coldfront_plugin/member_terms_and_conditions.html",
+        context={"inviter": group.owner, "group": group.name},
+        template_name="imperial_coldfront_plugin/accept_group_invite.html",
     )
