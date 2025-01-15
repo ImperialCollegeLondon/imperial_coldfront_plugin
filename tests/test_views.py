@@ -226,7 +226,7 @@ class TestCheckAccessView(LoginRequiredMixin):
         )
 
 
-class TestGetActiveUsersView(LoginRequiredMixin):
+class TestGetActiveUsersView:
     """Tests for the get active users view."""
 
     def _get_url(self):

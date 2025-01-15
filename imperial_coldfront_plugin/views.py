@@ -163,7 +163,6 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
     )
 
 
-@login_required
 def get_active_users(request: HttpRequest) -> HttpResponse:
     """Get the active users in unix passwd format.
 
