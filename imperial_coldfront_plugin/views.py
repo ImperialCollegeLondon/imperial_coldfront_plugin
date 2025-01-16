@@ -172,3 +172,39 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         context={"inviter": group.owner, "group": group.name, "form": form},
         template_name="imperial_coldfront_plugin/member_terms_and_conditions.html",
     )
+
+
+def get_active_users(request: HttpRequest) -> HttpResponse:
+    """Get the active users in unix passwd format.
+
+    Note: the UnixUID must exist for each user in a group and the group owner, this view
+    ignores users that do not have a UnixUID.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+    """
+    passwd = ""
+    format_str = (
+        "{user.username}:x:{uid.identifier}:{group.gid}:{user.first_name} "
+        "{user.last_name}:/rds/general/user/{user.username}/home:/bin/bash\n"
+    )
+    qs = (
+        User.objects.filter(groupmembership__isnull=False)
+        .filter(unixuid__isnull=False)
+        .distinct()
+    )
+    for user in qs:
+        passwd += format_str.format(
+            user=user, uid=user.unixuid, group=user.groupmembership_set.get().group
+        )
+    for user in (
+        User.objects.filter(userprofile__is_pi=True)
+        .filter(unixuid__isnull=False)
+        .distinct()
+        .difference(qs)
+    ):
+        passwd += format_str.format(
+            user=user, uid=user.unixuid, group=user.researchgroup_set.get()
+        )
+
+    return HttpResponse(passwd)

@@ -1,6 +1,7 @@
 """Tests for the views of the plugin."""
 
 from http import HTTPStatus
+from random import randint
 
 import pytest
 from django.conf import settings
@@ -9,7 +10,7 @@ from django.shortcuts import reverse
 from pytest_django.asserts import assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import GroupMembershipForm, TermsAndConditionsForm
-from imperial_coldfront_plugin.models import GroupMembership
+from imperial_coldfront_plugin.models import GroupMembership, UnixUID
 
 
 @pytest.fixture
@@ -51,7 +52,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-    @pytest.mark.xfail(reason="This test is expected to fail due to a bug in the code.")
     def test_superuser(self, auth_client_factory, research_group_factory, user_factory):
         """Test that a superuser can access the view for any group."""
         owner = user_factory(is_pi=True)
@@ -68,7 +68,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert response.context["message"] == "You do not own a group."
 
-    @pytest.mark.xfail(reason="This test is expected to fail due to a bug in the code.")
     def test_owner(self, auth_client_factory, research_group_factory):
         """Test that the pi that owns a group can access the view."""
         group, memberships = research_group_factory(number_of_members=3)
@@ -246,3 +245,56 @@ class TestCheckAccessView(LoginRequiredMixin):
             response.context["message"]
             == "You do not currently have access to the RCS compute cluster."
         )
+
+
+class TestGetActiveUsersView:
+    """Tests for the get active users view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:get_active_users")
+
+    def test_user(self, auth_client_factory, research_group_factory):
+        """Test the get_active_users view returns the right data."""
+        group, memberships = research_group_factory(number_of_members=1)
+        user = memberships[0].member
+        user_uid = UnixUID.objects.create(user=user, identifier=randint(0, 100000))
+        UnixUID.objects.create(user=group.owner, identifier=randint(0, 100000))
+
+        response = auth_client_factory(user).get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        expected = bytes(
+            f"{user.username}:x:{user_uid.identifier}:{group.gid}:"
+            f"{user.first_name} {user.last_name}:"
+            f"/rds/general/user/{user.username}/home:/bin/bash",
+            "utf-8",
+        )
+        psswd_list = response.content.split(b"\n")
+        assert len(psswd_list) == 3
+        assert psswd_list[0] == expected
+
+    def test_owner(self, auth_client_factory, research_group_factory):
+        """Test the get_active_users view returns the right data."""
+        group, memberships = research_group_factory(number_of_members=0)
+        owner_uid = UnixUID.objects.create(
+            user=group.owner, identifier=randint(0, 100000)
+        )
+
+        response = auth_client_factory(group.owner).get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        expected = bytes(
+            f"{group.owner.username}:x:{owner_uid.identifier}:{group.gid}:"
+            f"{group.owner.first_name} {group.owner.last_name}:"
+            f"/rds/general/user/{group.owner.username}/home:/bin/bash",
+            "utf-8",
+        )
+        psswd_list = response.content.split(b"\n")
+        assert len(psswd_list) == 2
+        assert psswd_list[0] == expected
+
+    def test_no_unixuid(self, auth_client_factory, research_group_factory):
+        """Test the get_active_users view returns the right data."""
+        group, memberships = research_group_factory(number_of_members=1)
+
+        response = auth_client_factory(group.owner).get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert b"" == response.content
