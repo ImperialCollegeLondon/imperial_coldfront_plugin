@@ -51,7 +51,6 @@ class GroupMembership(models.Model):
     member = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="group_memberships_set",
     )
 
     is_manager = models.BooleanField(default=False)
@@ -73,6 +72,5 @@ class UnixUID(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="user_id",
     )
     identifier = models.IntegerField()
