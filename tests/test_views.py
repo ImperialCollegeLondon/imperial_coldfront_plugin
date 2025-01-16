@@ -113,6 +113,21 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             in email.body
         )
 
+    def test_manager_can_access(
+        self, auth_client_factory, user_factory, research_group_factory
+    ):
+        """Test that a user with is_manager=True can access the view."""
+        manager = user_factory()
+        owner = user_factory(is_pi=True)
+        group, _ = research_group_factory(owner=owner)
+
+        GroupMembership.objects.create(group=group, member=manager, is_manager=True)
+
+        # Authenticate as the manager and try to access the invite view.
+        client = auth_client_factory(manager)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+
     @pytest.mark.parametrize(
         "email,error",
         [
