@@ -6,6 +6,11 @@ from uplink import Consumer, get, response_handler
 
 
 def _get_app_access_token():
+    """Get an access token for the application to use the Microsoft Graph API.
+
+    Fetches an access token that is enabled for app-only access i.e. not on behalf of a
+    logged in user.
+    """
     tenant_id = settings.MICROSOFT_TENANT_ID
     response = requests.post(
         f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
