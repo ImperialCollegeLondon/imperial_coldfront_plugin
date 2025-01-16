@@ -11,7 +11,7 @@ from django.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
 )
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .forms import GroupMembershipForm, TermsAndConditionsForm
@@ -171,6 +171,26 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         request=request,
         context={"inviter": group.owner, "group": group.name, "form": form},
         template_name="imperial_coldfront_plugin/member_terms_and_conditions.html",
+    )
+
+
+@login_required
+def remove_group_member(request: HttpRequest, group_membership_pk: int) -> HttpResponse:
+    """Remove a member from a research group.
+
+    Returns:
+        HttpResponse: Redirects to the group members view.
+    """
+    group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
+    group = group_membership.group
+
+    if request.user != group.owner and not request.user.is_superuser:
+        return HttpResponseForbidden("Permission denied")
+
+    group_membership.delete()
+
+    return redirect(
+        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
 
 

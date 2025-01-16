@@ -23,5 +23,10 @@ urlpatterns = [
         views.accept_group_invite,
         name="accept_group_invite",
     ),
+    path(
+        "remove_user/<int:group_membership_pk>/",
+        views.remove_group_member,
+        name="remove_group_member",
+    ),
     path("active_users/", views.get_active_users, name="get_active_users"),
 ]
