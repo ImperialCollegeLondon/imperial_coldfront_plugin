@@ -33,6 +33,13 @@ def parse_profile_data(response):
     }
 
 
+def get_uid_from_response(response):
+    """Extract the Unix uid from the API response."""
+    data = response.json()
+    uid = data.get("onPremisesExtensionAttributes", {}).get("extensionAttribute12")
+    return uid if uid is None else int(uid)
+
+
 class MicrosoftGraphClient(Consumer):
     """Client for interacting with the Microsoft Graph API.
 
@@ -47,6 +54,11 @@ class MicrosoftGraphClient(Consumer):
     def user_profile(self, username: str):
         """Get the profile data for a user."""
         pass
+
+    @response_handler(get_uid_from_response)
+    @get("users/{username}@ic.ac.uk?$select=onPremisesExtensionAttributes")
+    def user_uid(self, username: str):
+        """Get the Unix uid for a user."""
 
 
 def get_graph_api_client(access_token=None):
