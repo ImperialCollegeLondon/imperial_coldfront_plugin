@@ -202,6 +202,7 @@ requests==2.31.0
     #   doi2bib
     #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
+    #   uplink
 ruff==0.8.6
     # via imperial_coldfront_plugin (pyproject.toml)
 six==1.16.0
@@ -209,6 +210,7 @@ six==1.16.0
     #   blessed
     #   coldfront
     #   python-dateutil
+    #   uplink
 sqlparse==0.4.4
     # via
     #   coldfront
@@ -227,6 +229,10 @@ typing-extensions==4.10.0
     #   django-stubs
     #   django-stubs-ext
     #   mypy
+uplink==0.9.7
+    # via imperial_coldfront_plugin (pyproject.toml)
+uritemplate==4.1.1
+    # via uplink
 urllib3==2.2.1
     # via
     #   coldfront
