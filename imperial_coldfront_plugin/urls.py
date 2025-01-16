@@ -28,4 +28,5 @@ urlpatterns = [
         views.remove_group_member,
         name="remove_group_member",
     ),
+    path("active_users/", views.get_active_users, name="get_active_users"),
 ]

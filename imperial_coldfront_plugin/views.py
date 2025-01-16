@@ -14,7 +14,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .forms import GroupMembershipForm
+from .forms import GroupMembershipForm, TermsAndConditionsForm
 from .models import GroupMembership, ResearchGroup
 
 User = get_user_model()
@@ -152,14 +152,25 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
             "The invite token is not associated with this email address."
         )
 
-    # Update group membership in the database.
     group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
-    GroupMembership.objects.get_or_create(group=group, member=request.user)
 
+    if request.method == "POST":
+        form = TermsAndConditionsForm(request.POST)
+        # Check if the user has accepted the terms and conditions.
+        if form.is_valid():
+            # Update group membership in the database.
+            GroupMembership.objects.get_or_create(group=group, member=request.user)
+            return render(
+                request=request,
+                template_name="imperial_coldfront_plugin/accept_group_invite.html",
+                context={"inviter": group.owner, "group": group.name},
+            )
+    else:
+        form = TermsAndConditionsForm()
     return render(
         request=request,
-        context={"inviter": group.owner, "group": group.name},
-        template_name="imperial_coldfront_plugin/accept_group_invite.html",
+        context={"inviter": group.owner, "group": group.name, "form": form},
+        template_name="imperial_coldfront_plugin/member_terms_and_conditions.html",
     )
 
 
@@ -181,3 +192,39 @@ def remove_group_member(request: HttpRequest, group_membership_pk: int) -> HttpR
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
+
+
+def get_active_users(request: HttpRequest) -> HttpResponse:
+    """Get the active users in unix passwd format.
+
+    Note: the UnixUID must exist for each user in a group and the group owner, this view
+    ignores users that do not have a UnixUID.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+    """
+    passwd = ""
+    format_str = (
+        "{user.username}:x:{uid.identifier}:{group.gid}:{user.first_name} "
+        "{user.last_name}:/rds/general/user/{user.username}/home:/bin/bash\n"
+    )
+    qs = (
+        User.objects.filter(groupmembership__isnull=False)
+        .filter(unixuid__isnull=False)
+        .distinct()
+    )
+    for user in qs:
+        passwd += format_str.format(
+            user=user, uid=user.unixuid, group=user.groupmembership_set.get().group
+        )
+    for user in (
+        User.objects.filter(userprofile__is_pi=True)
+        .filter(unixuid__isnull=False)
+        .distinct()
+        .difference(qs)
+    ):
+        passwd += format_str.format(
+            user=user, uid=user.unixuid, group=user.researchgroup_set.get()
+        )
+
+    return HttpResponse(passwd)
