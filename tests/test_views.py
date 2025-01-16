@@ -7,8 +7,9 @@ import pytest
 from django.conf import settings
 from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
+from pytest_django.asserts import assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import GroupMembershipForm
+from imperial_coldfront_plugin.forms import GroupMembershipForm, TermsAndConditionsForm
 from imperial_coldfront_plugin.models import GroupMembership, UnixUID
 
 
@@ -171,13 +172,33 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
         token = self._get_token(user.email, pi_group.owner.pk)
         response = user_client.get(self._get_url(token))
         assert response.status_code == HTTPStatus.OK
-        assert b"You have accepted a group invitation" in response.content
-        GroupMembership.objects.get(group=pi_group, member=user)
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/member_terms_and_conditions.html"
+        )
+        assert isinstance(response.context["form"], TermsAndConditionsForm)
 
-    def test_get_valid_token_already_member(self, user_client, pi_group, user):
+    def test_post_invalid(self, user_client, pi_group, user):
+        """Test that view renders the form with errors when invalid data is posted."""
+        token = self._get_token(user.email, pi_group.owner.pk)
+        response = user_client.post(self._get_url(token), data={})
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["form"].errors == {
+            "accept": ["You must accept the terms and conditions"]
+        }
+
+    def test_post_valid(self, user_client, pi_group, user):
+        """Test that the view adds the user to the group when valid data is posted."""
+        token = self._get_token(user.email, pi_group.owner.pk)
+        response = user_client.post(self._get_url(token), data={"accept": True})
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/accept_group_invite.html"
+        )
+
+    def test_post_valid_already_member(self, user_client, pi_group, user):
         """Test that the view doesn't duplicate group memberships."""
         token = self._get_token(user.email, pi_group.owner.pk)
-        user_client.get(self._get_url(token))
+        user_client.post(self._get_url(token), data={"accept": True})
         GroupMembership.objects.get(group=pi_group, member=user)
 
 
