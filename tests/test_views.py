@@ -92,6 +92,13 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], GroupMembershipForm)
 
+    def test_manager_can_access(self, manager_in_group, auth_client_factory):
+        """Test that a group manager can access the view."""
+        manager, group = manager_in_group
+        client = auth_client_factory(manager)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+
     def test_post_valid(
         self, pi, pi_group, pi_client, mailoutbox, timestamp_signer_mock
     ):
@@ -112,21 +119,6 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             + reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             in email.body
         )
-
-    def test_manager_can_access(
-        self, auth_client_factory, user_factory, research_group_factory
-    ):
-        """Test that a user with is_manager=True can access the view."""
-        manager = user_factory()
-        owner = user_factory(is_pi=True)
-        group, _ = research_group_factory(owner=owner)
-
-        GroupMembership.objects.create(group=group, member=manager, is_manager=True)
-
-        # Authenticate as the manager and try to access the invite view.
-        client = auth_client_factory(manager)
-        response = client.get(self._get_url())
-        assert response.status_code == 200
 
     @pytest.mark.parametrize(
         "email,error",
