@@ -9,7 +9,10 @@ from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import GroupMembershipForm, TermsAndConditionsForm
+from imperial_coldfront_plugin.forms import (
+    TermsAndConditionsForm,
+    UserSearchForm,
+)
 from imperial_coldfront_plugin.models import GroupMembership, UnixUID
 
 
@@ -76,6 +79,34 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert set(response.context["group_members"]) == set(memberships)
 
 
+class TestUserSearchView(LoginRequiredMixin):
+    """Tests for the user search view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:user_search")
+
+    def test_get(self, get_graph_api_client_mock, user_client):
+        """Test that the view renders the form for the group owner."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], UserSearchForm)
+
+    def test_post(self, get_graph_api_client_mock, user_client):
+        """Test search form submission."""
+        get_graph_api_client_mock().user_search.return_value = []
+        response = user_client.post(self._get_url(), data={"search": "foo"})
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == []
+
+
+@pytest.fixture
+def get_graph_api_client_mock(mocker, parsed_profile):
+    """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
+    mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
+    mock().user_profile.return_value = parsed_profile
+    return mock
+
+
 class TestSendGroupInviteView(LoginRequiredMixin):
     """Tests for the send group invite view."""
 
@@ -84,31 +115,33 @@ class TestSendGroupInviteView(LoginRequiredMixin):
 
     def test_not_group_owner(self, user_client):
         """Test that the view sends an email when a POST request is made."""
-        response = user_client.get(self._get_url())
+        response = user_client.post(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"You are not a group owner."
 
-    def test_get(self, pi_group, pi_client):
-        """Test that the view renders the form for the group owner."""
-        response = pi_client.get(self._get_url())
-        assert response.status_code == HTTPStatus.OK
-        assert isinstance(response.context["form"], GroupMembershipForm)
-
-    def test_manager_can_access(self, manager_in_group, auth_client_factory):
+    def test_manager_can_access(
+        self, manager_in_group, auth_client_factory, get_graph_api_client_mock
+    ):
         """Test that a group manager can access the view."""
         manager, group = manager_in_group
         client = auth_client_factory(manager)
-        response = client.get(self._get_url())
+        response = client.post(self._get_url(), data={"username": "username"})
         assert response.status_code == 200
 
     def test_post_valid(
-        self, pi, pi_group, pi_client, mailoutbox, timestamp_signer_mock
+        self,
+        get_graph_api_client_mock,
+        parsed_profile,
+        pi,
+        pi_group,
+        pi_client,
+        mailoutbox,
+        timestamp_signer_mock,
     ):
         """Test that the view sends an email when a POST request is made."""
-        invitee_email = "foo@bar.com"
-        response = pi_client.post(
-            self._get_url(), data={"invitee_email": invitee_email}
-        )
+        username = "username"
+        invitee_email = parsed_profile["email"]
+        response = pi_client.post(self._get_url(), data={"username": username})
         assert response.status_code == HTTPStatus.OK
         assert f"Invitation sent to {invitee_email}" in response.content.decode()
 
@@ -131,10 +164,9 @@ class TestSendGroupInviteView(LoginRequiredMixin):
     )
     def test_post_invalid(self, pi_client, pi_group, mailoutbox, email, error):
         """Test the view renders the form with errors when invalid data is posted."""
-        response = pi_client.post(self._get_url(), data={"invitee_email": email})
-        response.status_code == HTTPStatus.OK
-        assert response.context["form"].errors == {"invitee_email": [error]}
-        assert error in response.content.decode()
+        response = pi_client.post(self._get_url())
+        response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"Invalid data"
         assert len(mailoutbox) == 0
 
 
