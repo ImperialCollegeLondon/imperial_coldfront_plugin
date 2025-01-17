@@ -9,8 +9,9 @@ from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import GroupMembershipForm, TermsAndConditionsForm
+from imperial_coldfront_plugin.forms import GroupMembershipForm, TermsAndConditionsForm, UserSearchForm
 from imperial_coldfront_plugin.models import GroupMembership, UnixUID
+from imperial_coldfront_plugin.views import user_filter
 
 
 @pytest.fixture
@@ -76,6 +77,34 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert set(response.context["group_members"]) == set(memberships)
 
 
+class TestUserSearchView(LoginRequiredMixin):
+    """Tests for the user search view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:user_search")
+
+    def test_get(self, get_graph_api_client_mock, user_client):
+        """Test that the view renders the form for the group owner."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], UserSearchForm)
+
+    def test_post(self, get_graph_api_client_mock, user_client):
+        """Test search form submission."""
+        get_graph_api_client_mock().user_search.return_value = []
+        response = user_client.post(self._get_url(), data={"search": "foo"})
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == []
+
+
+@pytest.fixture
+def get_graph_api_client_mock(mocker, parsed_profile):
+    """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
+    mock =  mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
+    mock().user_profile.return_value = parsed_profile
+    return mock
+
+
 class TestSendGroupInviteView(LoginRequiredMixin):
     """Tests for the send group invite view."""
 
@@ -84,31 +113,31 @@ class TestSendGroupInviteView(LoginRequiredMixin):
 
     def test_not_group_owner(self, user_client):
         """Test that the view sends an email when a POST request is made."""
-        response = user_client.get(self._get_url())
+        response = user_client.post(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"You are not a group owner."
 
-    def test_get(self, pi_group, pi_client):
-        """Test that the view renders the form for the group owner."""
-        response = pi_client.get(self._get_url())
-        assert response.status_code == HTTPStatus.OK
-        assert isinstance(response.context["form"], GroupMembershipForm)
-
-    def test_manager_can_access(self, manager_in_group, auth_client_factory):
+    def test_manager_can_access(self, manager_in_group, auth_client_factory, get_graph_api_client_mock):
         """Test that a group manager can access the view."""
         manager, group = manager_in_group
         client = auth_client_factory(manager)
-        response = client.get(self._get_url())
+        response = client.post(self._get_url(), data={"username": "username"})
         assert response.status_code == 200
 
     def test_post_valid(
-        self, pi, pi_group, pi_client, mailoutbox, timestamp_signer_mock
+        self,
+        get_graph_api_client_mock,
+        parsed_profile,
+        pi,
+        pi_group,
+        pi_client,
+        mailoutbox,
+        timestamp_signer_mock,
     ):
         """Test that the view sends an email when a POST request is made."""
-        invitee_email = "foo@bar.com"
-        response = pi_client.post(
-            self._get_url(), data={"invitee_email": invitee_email}
-        )
+        username = "username"
+        invitee_email = parsed_profile["email"]
+        response = pi_client.post(self._get_url(), data={"username": username})
         assert response.status_code == HTTPStatus.OK
         assert f"Invitation sent to {invitee_email}" in response.content.decode()
 
@@ -122,6 +151,16 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             in email.body
         )
 
+    def test_post_ineligible_user(
+        self, get_graph_api_client_mock, pi, pi_group, pi_client, mocker
+    ):
+        """Check that specified user is checked for eligibility."""
+        user_filter_mock = mocker.patch("imperial_coldfront_plugin.views.user_filter")
+        user_filter_mock.return_value = False
+        response = pi_client.post(self._get_url(), data={"username": "username"})
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"User not found or not eligible"
+
     @pytest.mark.parametrize(
         "email,error",
         [
@@ -131,10 +170,9 @@ class TestSendGroupInviteView(LoginRequiredMixin):
     )
     def test_post_invalid(self, pi_client, pi_group, mailoutbox, email, error):
         """Test the view renders the form with errors when invalid data is posted."""
-        response = pi_client.post(self._get_url(), data={"invitee_email": email})
-        response.status_code == HTTPStatus.OK
-        assert response.context["form"].errors == {"invitee_email": [error]}
-        assert error in response.content.decode()
+        response = pi_client.post(self._get_url())
+        response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"Invalid data"
         assert len(mailoutbox) == 0
 
 
@@ -338,3 +376,24 @@ class TestGetActiveUsersView:
         response = auth_client_factory(group.owner).get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert b"" == response.content
+
+
+def test_user_filter(parsed_profile):
+    """Test the user filter passes a valid profile."""
+    assert user_filter(parsed_profile)
+
+
+@pytest.mark.parametrize(
+    "override_key, override_value",
+    [
+        ("user_type", ""),
+        ("record_status", ""),
+        ("email", None),
+        ("name", None),
+        ("department", None),
+    ],
+)
+def test_user_filter_invalid(override_key, override_value, parsed_profile):
+    """Test the user filter catches invalid profiles."""
+    parsed_profile[override_key] = override_value
+    assert not user_filter(parsed_profile)
