@@ -5,4 +5,7 @@ These are imported into the project level settings by the Coldfront plugin mecha
 
 from datetime import timedelta
 
+from coldfront.config.env import ENV
+
 INVITATION_TOKEN_TIMEOUT = timedelta(days=7).total_seconds()
+MICROSOFT_TENANT_ID = ENV.str("MICROSOFT_TENANT_ID", default="")
