@@ -51,6 +51,7 @@ def pytest_configure():
             "django.contrib.auth.middleware.AuthenticationMiddleware",
         ],
         TOKEN_TIMEOUT=60,
+        Q_CLUSTER={"sync": True},
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
