@@ -89,7 +89,12 @@ def check_access(request: HttpRequest):
 @login_required
 def send_group_invite(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group."""
-    if not ResearchGroup.objects.filter(owner=request.user).exists():
+    if (
+        not ResearchGroup.objects.filter(owner=request.user).exists()
+        and not GroupMembership.objects.filter(
+            member=request.user, is_manager=True
+        ).exists()
+    ):
         return HttpResponseForbidden("You are not a group owner.")
 
     if request.method == "POST":
