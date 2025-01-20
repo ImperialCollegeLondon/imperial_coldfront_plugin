@@ -118,7 +118,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
                 [invitee_email],
                 "HPC Access Invitation",
                 "You've been invited to join the access group of "
-                f"{request.user.get_full_name()}\n\n"
+                f"{request.user.get_full_name()} ({request.user.email})\n\n"
                 f"Click the following link to accept the invitation:\n{invite_url}",
             )
 
