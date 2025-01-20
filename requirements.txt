@@ -78,7 +78,7 @@ django-split-settings==1.3.0
     # via coldfront
 django-sslserver==0.22
     # via coldfront
-django-stubs-ext==5.1.1
+django-stubs-ext==5.1.2
     # via imperial_coldfront_plugin (pyproject.toml)
 django-su==1.0.0
     # via coldfront
@@ -110,7 +110,7 @@ mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyopenssl==24.3.0
+pyopenssl==25.0.0
     # via josepy
 pyparsing==3.1.2
     # via
@@ -154,6 +154,7 @@ typing-extensions==4.10.0
     # via
     #   coldfront
     #   django-stubs-ext
+    #   pyopenssl
 urllib3==2.2.1
     # via
     #   coldfront
