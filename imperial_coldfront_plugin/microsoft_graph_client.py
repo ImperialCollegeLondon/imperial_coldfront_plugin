@@ -76,7 +76,6 @@ class MicrosoftGraphClient(Consumer):
     @get("users/{username}@ic.ac.uk?$select=" + PROFILE_ATTRIBUTES)
     def user_profile(self, username: str):
         """Get the profile data for a user."""
-        pass
 
     @response_handler(get_uid_from_response)
     @get("users/{username}@ic.ac.uk?$select=onPremisesExtensionAttributes")

@@ -87,24 +87,6 @@ def check_access(request: HttpRequest):
     )
 
 
-def user_filter(user):
-    """Assess the eligibility of a user to join a ResearchGroup."""
-    if any(
-        [
-            user["user_type"] != "Member",
-            user["record_status"] != "Live",
-            None in [user["email"], user["name"], user["department"]],
-        ]
-    ):
-        return False
-    return True
-
-
-def filter_users(user_profiles):
-    """Filter user profiles to only include those eligible to join a group."""
-    return [user for user in user_profiles if user_filter(user)]
-
-
 @login_required
 def user_search(request: HttpRequest) -> HttpResponse:
     """Simple search interface to find users eligible to join a ResearchGroup."""
@@ -114,11 +96,10 @@ def user_search(request: HttpRequest) -> HttpResponse:
             search_query = form.cleaned_data["search"]
             graph_client = get_graph_api_client()
             search_results = graph_client.user_search(search_query)
-            filtered_results = filter_users(search_results)
             return render(
                 request,
                 "imperial_coldfront_plugin/user_search.html",
-                dict(form=form, search_results=filtered_results),
+                dict(form=form, search_results=search_results),
             )
     else:
         form = UserSearchForm()
@@ -146,9 +127,6 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             username = form.cleaned_data["username"]
             graph_client = get_graph_api_client()
             user_profile = graph_client.user_profile(username)
-
-            if not user_filter(user_profile):
-                return HttpResponseBadRequest("User not found or not eligible")
 
             invitee_email = user_profile["email"]
 
