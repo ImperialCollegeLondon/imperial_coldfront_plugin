@@ -2,23 +2,15 @@
 
 from typing import Any
 
-import requests
 from django.contrib.auth.models import User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
+from .microsoft_graph_client import get_graph_api_client
 from .models import UnixUID
-
-ENTRA_UID_ENDPOINT = (
-    "https://graph.microsoft.com/v1.0/me?$select=onPremisesExtensionAttributes"
-)
-"""URL for the Microsoft Graph API endpoint to retrieve the user's uid."""
-
-ENTRA_UID_ATTRIBUTE = "extensionAttribute12"
-"""Attribute name for the user's uid in the Microsoft Graph API response."""
 
 
 def _update_user(user: User, claims: dict[str, Any]) -> None:
-    user.username = claims["preferred_username"].removesuffix("@ic.ac.uk")
+    user.username = claims["preferred_username"]
     user.email = claims["email"]
     user.first_name = claims["given_name"]
     user.last_name = claims["family_name"]
@@ -64,15 +56,9 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
           payload: decoded and verified claims from the id_token.
         """
         user_info = super().get_userinfo(access_token, id_token, payload)
-        user_info["preferred_username"] = payload["preferred_username"]
+        username = payload["preferred_username"].removesuffix("@ic.ac.uk")
+        user_info["preferred_username"] = username
 
-        # get user uid from Microsoft Graph API using the access token
-        # uid is stored under a custom attribute
-        response = requests.get(
-            ENTRA_UID_ENDPOINT,
-            headers={"Authorization": f"Bearer {access_token}"},
-        ).json()
-        user_info["uid"] = int(
-            response["onPremisesExtensionAttributes"][ENTRA_UID_ATTRIBUTE]
-        )
+        graph_client = get_graph_api_client(access_token)
+        user_info["uid"] = graph_client.user_uid(username)
         return user_info

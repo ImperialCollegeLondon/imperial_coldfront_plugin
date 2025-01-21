@@ -113,7 +113,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert f"Invitation sent to {invitee_email}" in response.content.decode()
 
         email = mailoutbox[0]
-        assert email.subject == "You've been invited to a group"
+        assert email.subject == "HPC Access Invitation"
         assert email.to == [invitee_email]
         token = timestamp_signer_mock().sign_object.return_value
         assert (
