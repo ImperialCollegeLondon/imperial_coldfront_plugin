@@ -259,8 +259,8 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         self, research_group_factory, auth_client_factory, user_client, pi_group
     ):
         """Test non group owner or manager cannot access the view."""
-        non_manager, group = research_group_factory(number_of_members=1)
-        client = auth_client_factory(non_manager)
+        group, memberships = research_group_factory(number_of_members=1)
+        client = auth_client_factory(group.owner)
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
