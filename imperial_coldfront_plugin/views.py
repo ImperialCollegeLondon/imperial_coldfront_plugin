@@ -26,8 +26,8 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
 
     This view retrieves and displays all members associated with a research group
     where the specified user (identified by `user_pk`) is the owner. Access is
-    restricted to either the group owner or an administrator. Unauthorised users will
-    receive a permission denied response.
+    restricted to either the group owner, an administrator, or a manager.
+    Unauthorised users will receive a permission denied response.
 
     The view also checks if the specified user has Principal Investigator (PI) status
     (via the `is_pi` attribute). If the user is not a PI, the view will render a
@@ -52,7 +52,12 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     """
     user = get_object_or_404(User, pk=user_pk)
 
-    if request.user != user and not request.user.is_superuser:
+    # Check if the user is the owner, a superuser, or a manager
+    membership = GroupMembership.objects.filter(
+        group__owner=user, member=request.user, is_manager=True
+    ).exists()
+
+    if request.user != user and not request.user.is_superuser and not membership:
         return HttpResponseForbidden("Permission denied")
 
     if not user.userprofile.is_pi:
