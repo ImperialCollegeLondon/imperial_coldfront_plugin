@@ -156,3 +156,14 @@ def user_client(auth_client_factory, user):
 def pi_client(auth_client_factory, pi):
     """Return an authenticated Django test client for a PI."""
     return auth_client_factory(pi)
+
+
+@pytest.fixture
+def manager_in_group(user_factory, research_group_factory):
+    """Return a user who is a manager in a research group."""
+    from imperial_coldfront_plugin.models import GroupMembership
+
+    manager = user_factory()
+    group, memberships = research_group_factory(number_of_members=0)
+    GroupMembership.objects.create(group=group, member=manager, is_manager=True)
+    return manager, group
