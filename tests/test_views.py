@@ -286,6 +286,14 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
+    def test_non_manager_cannot_access(self, no_manager_group, auth_client_factory):
+        """Test that a user who is not a manager cannot access the view."""
+        non_manager, group = no_manager_group
+        client = auth_client_factory(non_manager)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
 
 class TestGetActiveUsersView:
     """Tests for the get active users view."""

@@ -189,7 +189,11 @@ def remove_group_member(request: HttpRequest, group_membership_pk: int) -> HttpR
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
 
-    if request.user != group.owner and not request.user.is_superuser:
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not group_membership.is_manager
+    ):
         return HttpResponseForbidden("Permission denied")
 
     group_membership.delete()
