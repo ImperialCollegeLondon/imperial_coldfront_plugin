@@ -52,13 +52,7 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     """
     user = get_object_or_404(User, pk=user_pk)
 
-    membership = get_object_or_404(GroupMembership, member=request.user)
-
-    if (
-        request.user != user
-        and not request.user.is_superuser
-        and not (membership and membership.is_manager)
-    ):
+    if request.user != user and not request.user.is_superuser:
         return HttpResponseForbidden("Permission denied")
 
     if not user.userprofile.is_pi:
