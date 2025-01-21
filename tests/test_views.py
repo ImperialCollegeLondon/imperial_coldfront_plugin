@@ -265,7 +265,7 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
     def test_not_group_owner_or_manager(
         self, research_group_factory, auth_client_factory, user_client, pi_group
     ):
-        """Test_non_group_owner_or_manager cannot access the view."""
+        """Test non group owner or manager cannot access the view."""
         non_manager, group = research_group_factory(number_of_members=1)
         client = auth_client_factory(non_manager)
         response = client.get(self._get_url())
