@@ -40,7 +40,7 @@ class TestGroupMembersView(LoginRequiredMixin):
     def _get_url(self, user_pk=1):
         return reverse("imperial_coldfront_plugin:group_members", args=[user_pk])
 
-    def test_not_group_owner(
+    def test_not_group_owner_or_manager(
         self, auth_client_factory, research_group_factory, user_factory
     ):
         """Test that a user who is not the group owner cannot access the view."""
@@ -49,6 +49,11 @@ class TestGroupMembersView(LoginRequiredMixin):
         not_owner = user_factory(is_pi=True)
 
         response = auth_client_factory(not_owner).get(self._get_url(owner.pk))
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
+        manager, group = research_group_factory(number_of_members=1)
+        response = auth_client_factory(manager).get(self._get_url(group.owner.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
