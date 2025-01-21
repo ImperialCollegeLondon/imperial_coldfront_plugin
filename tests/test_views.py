@@ -9,7 +9,10 @@ from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import GroupMembershipForm, TermsAndConditionsForm, UserSearchForm
+from imperial_coldfront_plugin.forms import (
+    TermsAndConditionsForm,
+    UserSearchForm,
+)
 from imperial_coldfront_plugin.models import GroupMembership, UnixUID
 from imperial_coldfront_plugin.views import user_filter
 
@@ -100,7 +103,7 @@ class TestUserSearchView(LoginRequiredMixin):
 @pytest.fixture
 def get_graph_api_client_mock(mocker, parsed_profile):
     """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
-    mock =  mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
+    mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
     mock().user_profile.return_value = parsed_profile
     return mock
 
@@ -117,7 +120,9 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"You are not a group owner."
 
-    def test_manager_can_access(self, manager_in_group, auth_client_factory, get_graph_api_client_mock):
+    def test_manager_can_access(
+        self, manager_in_group, auth_client_factory, get_graph_api_client_mock
+    ):
         """Test that a group manager can access the view."""
         manager, group = manager_in_group
         client = auth_client_factory(manager)
