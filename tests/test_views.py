@@ -262,8 +262,16 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
             "imperial_coldfront_plugin:remove_group_member", args=[group_membership_pk]
         )
 
-    def test_not_group_owner(self, user_client, pi_group):
-        """Test that a user who is not the group owner cannot remove a group member."""
+    def test_not_group_owner_or_manager(
+        self, research_group_factory, auth_client_factory, user_client, pi_group
+    ):
+        """Test_non_group_owner_or_manager cannot access the view."""
+        non_manager, group = research_group_factory(number_of_members=1)
+        client = auth_client_factory(non_manager)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
         group_membership = pi_group.groupmembership_set.first()
         response = user_client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
@@ -285,14 +293,6 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         """Test the view response for an invalid group membership."""
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
-
-    def test_non_manager_cannot_access(self, no_manager_group, auth_client_factory):
-        """Test that a user who is not a manager cannot access the view."""
-        non_manager, group = no_manager_group
-        client = auth_client_factory(non_manager)
-        response = client.get(self._get_url())
-        assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
 
 class TestGetActiveUsersView:
