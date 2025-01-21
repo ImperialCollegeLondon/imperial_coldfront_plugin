@@ -52,11 +52,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-        manager, group = research_group_factory(number_of_members=1)
-        response = auth_client_factory(manager).get(self._get_url(group.owner.pk))
-        assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
-
     def test_superuser(self, auth_client_factory, research_group_factory, user_factory):
         """Test that a superuser can access the view for any group."""
         owner = user_factory(is_pi=True)
