@@ -4,6 +4,7 @@ import pytest
 import requests
 
 from imperial_coldfront_plugin.microsoft_graph_client import (
+    PROFILE_ATTRIBUTES,
     MicrosoftGraphClient,
     parse_profile_data,
 )
@@ -13,12 +14,16 @@ from imperial_coldfront_plugin.microsoft_graph_client import (
 def parsed_profile():
     """Return a dictionary of profile data as structured by the graph client."""
     return dict(
-        user_type="type",
+        user_type="Member",
         company_name="company",
         department="dept",
         job_family="job family",
         employment_status="employment status",
         job_title=None,
+        name="a name",
+        email="email",
+        username="username",
+        record_status="Live",
     )
 
 
@@ -29,10 +34,14 @@ def profile(parsed_profile):
         onPremisesExtensionAttributes=dict(
             extensionAttribute14=parsed_profile["job_family"],
             extensionAttribute6=parsed_profile["employment_status"],
+            extensionAttribute5=parsed_profile["record_status"],
         ),
         userType=parsed_profile["user_type"],
         companyName=parsed_profile["company_name"],
         department=parsed_profile["department"],
+        displayName=parsed_profile["name"],
+        mail=parsed_profile["email"],
+        userPrincipalName=parsed_profile["username"] + "@ic.ac.uk",
     )
 
 
@@ -69,11 +78,7 @@ def test_client_user_profile(graph_client, parsed_profile, send_mock):
     assert data == parsed_profile
     send_mock.assert_called_once()
     assert send_mock.call_args[0][0].url == (
-        BASE_URL
-        + (
-            f"/users/{username}@ic.ac.uk?$select=jobTitle,department,companyName"
-            ",userType,onPremisesExtensionAttributes"
-        )
+        BASE_URL + (f"/users/{username}@ic.ac.uk?$select=" + PROFILE_ATTRIBUTES)
     )
 
 

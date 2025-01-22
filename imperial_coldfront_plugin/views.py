@@ -13,7 +13,8 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .forms import GroupMembershipForm, TermsAndConditionsForm
+from .forms import GroupMembershipForm, TermsAndConditionsForm, UserSearchForm
+from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
 from .utils import send_email_in_background
 
@@ -86,6 +87,28 @@ def check_access(request: HttpRequest):
 
 
 @login_required
+def user_search(request: HttpRequest) -> HttpResponse:
+    """Simple search interface to find users eligible to join a ResearchGroup."""
+    if request.method == "POST":
+        form = UserSearchForm(request.POST)
+        if form.is_valid():
+            search_query = form.cleaned_data["search"]
+            graph_client = get_graph_api_client()
+            search_results = graph_client.user_search(search_query)
+            return render(
+                request,
+                "imperial_coldfront_plugin/user_search.html",
+                dict(form=form, search_results=search_results),
+            )
+    else:
+        form = UserSearchForm()
+
+    return render(
+        request, "imperial_coldfront_plugin/user_search.html", dict(form=form)
+    )
+
+
+@login_required
 def send_group_invite(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group."""
     if (
@@ -100,7 +123,11 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
         form = GroupMembershipForm(request.POST)
 
         if form.is_valid():
-            invitee_email = form.cleaned_data["invitee_email"]
+            username = form.cleaned_data["username"]
+            graph_client = get_graph_api_client()
+            user_profile = graph_client.user_profile(username)
+
+            invitee_email = user_profile["email"]
 
             # Create invitation URL.
             signer = TimestampSigner()
@@ -120,15 +147,12 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
                 f"{request.user.get_full_name()} ({request.user.email})\n\n"
                 f"Click the following link to accept the invitation:\n{invite_url}",
             )
-
-    else:
-        form = GroupMembershipForm()
-
-    return render(
-        request,
-        "imperial_coldfront_plugin/send_group_invite.html",
-        {"form": form},
-    )
+            return render(
+                request,
+                "imperial_coldfront_plugin/invite_sent.html",
+                dict(invitee_email=invitee_email),
+            )
+    return HttpResponseBadRequest("Invalid data")
 
 
 @login_required

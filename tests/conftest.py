@@ -167,3 +167,38 @@ def manager_in_group(user_factory, research_group_factory):
     group, memberships = research_group_factory(number_of_members=0)
     GroupMembership.objects.create(group=group, member=manager, is_manager=True)
     return manager, group
+
+
+@pytest.fixture
+def parsed_profile():
+    """Return a dictionary of profile data as structured by the graph client."""
+    return dict(
+        user_type="Member",
+        company_name="company",
+        department="dept",
+        job_family="job family",
+        employment_status="employment status",
+        job_title=None,
+        name="a name",
+        email="email",
+        username="username",
+        record_status="Live",
+    )
+
+
+@pytest.fixture
+def profile(parsed_profile):
+    """Return a dictionary of profile data as returned by the graph API."""
+    return dict(
+        onPremisesExtensionAttributes=dict(
+            extensionAttribute14=parsed_profile["job_family"],
+            extensionAttribute6=parsed_profile["employment_status"],
+            extensionAttribute5=parsed_profile["record_status"],
+        ),
+        userType=parsed_profile["user_type"],
+        companyName=parsed_profile["company_name"],
+        department=parsed_profile["department"],
+        displayName=parsed_profile["name"],
+        mail=parsed_profile["email"],
+        userPrincipalName=parsed_profile["username"] + "@ic.ac.uk",
+    )

@@ -2,7 +2,7 @@
 
 import requests
 from django.conf import settings
-from uplink import Consumer, get, response_handler
+from uplink import Consumer, get, headers, response_handler
 
 
 def _get_app_access_token():
@@ -24,9 +24,7 @@ def _get_app_access_token():
     return response.json()["access_token"]
 
 
-def parse_profile_data(response):
-    """Parse the user profile data from the API response into a useful format."""
-    data = response.json()
+def _transform_profile_data(data):
     extension_attributes = data.get("onPremisesExtensionAttributes", {})
     return {
         "job_title": data.get("jobTitle"),
@@ -35,7 +33,16 @@ def parse_profile_data(response):
         "user_type": data.get("userType"),
         "job_family": extension_attributes.get("extensionAttribute14"),
         "employment_status": extension_attributes.get("extensionAttribute6"),
+        "record_status": extension_attributes.get("extensionAttribute5"),
+        "name": data.get("displayName"),
+        "email": data.get("mail"),
+        "username": data.get("userPrincipalName").removesuffix("@ic.ac.uk"),
     }
+
+
+def parse_profile_data(response):
+    """Parse the user profile data from the API response into a useful format."""
+    return _transform_profile_data(response.json())
 
 
 def get_uid_from_response(response):
@@ -43,6 +50,19 @@ def get_uid_from_response(response):
     data = response.json()
     uid = data.get("onPremisesExtensionAttributes", {}).get("extensionAttribute12")
     return uid if uid is None else int(uid)
+
+
+def parse_profile_data_list(response):
+    """Parse a list of user profile data from the API response into a useful format."""
+    data = response.json()["value"]
+    return [_transform_profile_data(item) for item in data]
+
+
+PROFILE_ATTRIBUTES = (
+    "jobTitle,department,companyName,userType,onPremisesExtensionAttributes,displayName"
+    ",mail,userPrincipalName"
+)
+"""The attributes to request when fetching user profile data."""
 
 
 class MicrosoftGraphClient(Consumer):
@@ -53,9 +73,7 @@ class MicrosoftGraphClient(Consumer):
     """
 
     @response_handler(parse_profile_data)
-    @get(
-        "users/{username}@ic.ac.uk?$select=jobTitle,department,companyName,userType,onPremisesExtensionAttributes"
-    )
+    @get("users/{username}@ic.ac.uk?$select=" + PROFILE_ATTRIBUTES)
     def user_profile(self, username: str):
         """Get the profile data for a user."""
         pass
@@ -64,6 +82,15 @@ class MicrosoftGraphClient(Consumer):
     @get("users/{username}@ic.ac.uk?$select=onPremisesExtensionAttributes")
     def user_uid(self, username: str):
         """Get the Unix uid for a user."""
+
+    @response_handler(parse_profile_data_list)
+    @headers(dict(ConsistencyLevel="eventual"))
+    @get(
+        'users?$search="displayName:{query}" OR "userPrincipalName:{query}"&$select='
+        + PROFILE_ATTRIBUTES
+    )
+    def user_search(self, query: str):
+        """Search for a user by their display name or user principal name."""
 
 
 def get_graph_api_client(access_token=None):
