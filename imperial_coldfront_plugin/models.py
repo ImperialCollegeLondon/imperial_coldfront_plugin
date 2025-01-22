@@ -41,6 +41,7 @@ class GroupMembership(models.Model):
         member (ForeignKey): A reference to the user designated as member, connected to
             AUTH_USER_MODEL. Deletes related memberships when the member is deleted.
         is_manager (BooleanField): A boolean value indicating if a member is a manager.
+        expiration (DateTimeField): The date and time when the membership expires.
     """
 
     group = models.ForeignKey(
@@ -54,6 +55,8 @@ class GroupMembership(models.Model):
     )
 
     is_manager = models.BooleanField(default=False)
+
+    expiration = models.DateTimeField()
 
 
 class UnixUID(models.Model):
