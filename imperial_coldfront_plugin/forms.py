@@ -6,7 +6,7 @@ from django import forms
 class GroupMembershipForm(forms.Form):
     """Form for inviting a user to a research group."""
 
-    invitee_email = forms.EmailField(label="Email")
+    username = forms.CharField()
 
 
 class TermsAndConditionsForm(forms.Form):
@@ -17,3 +17,9 @@ class TermsAndConditionsForm(forms.Form):
         required=True,
         error_messages={"required": "You must accept the terms and conditions"},
     )
+
+
+class UserSearchForm(forms.Form):
+    """Form for searching users."""
+
+    search = forms.CharField(label="Search")
