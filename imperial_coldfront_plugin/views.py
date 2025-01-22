@@ -298,3 +298,32 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
+
+
+def remove_group_manager(
+    request: HttpRequest, group_membership_pk: int
+) -> HttpResponse:
+    """Remove a group manager.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+        group_membership_pk: The primary key of the group membership to be updated.
+    """
+    group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
+    group = group_membership.group
+
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user, is_manager=True
+        ).exists()
+    ):
+        return HttpResponseForbidden("Permission denied")
+
+    group_membership.is_manager = False
+    group_membership.save()
+
+    return redirect(
+        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
+    )
