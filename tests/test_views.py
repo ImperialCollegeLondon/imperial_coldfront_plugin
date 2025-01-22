@@ -326,6 +326,14 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
+    @pytest.mark.xfail
+    def test_manager_can_access(self, manager_in_group, auth_client_factory):
+        """Test that a group manager can access the view."""
+        manager, group = manager_in_group
+        client = auth_client_factory(manager)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+
 
 class TestGetActiveUsersView:
     """Tests for the get active users view."""
