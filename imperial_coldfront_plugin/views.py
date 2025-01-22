@@ -264,3 +264,30 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
         )
 
     return HttpResponse(passwd)
+
+
+def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpResponse:
+    """Make a group member a manager.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+        group_membership_pk: The primary key of the group membership to be updated.
+    """
+    group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
+    group = group_membership.group
+
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user, is_manager=True
+        ).exists()
+    ):
+        return HttpResponseForbidden("Permission denied")
+
+    group_membership.is_manager = True
+    group_membership.save()
+
+    return redirect(
+        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
+    )
