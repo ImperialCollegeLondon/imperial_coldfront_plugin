@@ -52,12 +52,7 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     """
     user = get_object_or_404(User, pk=user_pk)
 
-    # Check if the user is the owner, a superuser, or a manager
-    membership = GroupMembership.objects.filter(
-        group__owner=user, member=request.user, is_manager=True
-    ).exists()
-
-    if request.user != user and not request.user.is_superuser and not membership:
+    if request.user != user and not request.user.is_superuser:
         return HttpResponseForbidden("Permission denied")
 
     if not user.userprofile.is_pi:
