@@ -423,18 +423,13 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
             "imperial_coldfront_plugin:make_manager", args=[group_membership_pk]
         )
 
-    def test_not_group_owner_or_manager(
+    def test_not_group_owner(
         self, research_group_factory, auth_client_factory, user_client, pi_group
     ):
         """Test non group owner or manager cannot access the view."""
         group, memberships = research_group_factory(number_of_members=1)
         client = auth_client_factory(group.owner)
         response = client.get(self._get_url())
-        assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
-
-        group_membership = pi_group.groupmembership_set.first()
-        response = user_client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
@@ -455,14 +450,6 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    @pytest.mark.xfail
-    def test_manager_can_access(self, manager_in_group, auth_client_factory):
-        """Test that a group manager can access the view."""
-        manager, group = manager_in_group
-        client = auth_client_factory(manager)
-        response = client.get(self._get_url())
-        assert response.status_code == 200
-
 
 class TestRemoveGroupManagerView(LoginRequiredMixin):
     """Tests for the remove group manager view."""
@@ -472,18 +459,13 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
             "imperial_coldfront_plugin:remove_manager", args=[group_membership_pk]
         )
 
-    def test_not_group_owner_or_manager(
+    def test_not_group_owner(
         self, research_group_factory, auth_client_factory, user_client, pi_group
     ):
         """Test non group owner or manager cannot access the view."""
         group, memberships = research_group_factory(number_of_members=1)
         client = auth_client_factory(group.owner)
         response = client.get(self._get_url())
-        assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
-
-        group_membership = pi_group.groupmembership_set.first()
-        response = user_client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
@@ -503,11 +485,3 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         """Test the view response for an invalid group membership."""
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
-
-    @pytest.mark.xfail
-    def test_manager_can_access(self, manager_in_group, auth_client_factory):
-        """Test that a group manager can access the view."""
-        manager, group = manager_in_group
-        client = auth_client_factory(manager)
-        response = client.get(self._get_url())
-        assert response.status_code == 200
