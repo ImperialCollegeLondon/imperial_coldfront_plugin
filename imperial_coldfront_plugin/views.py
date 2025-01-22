@@ -266,6 +266,7 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
     return HttpResponse(passwd)
 
 
+@login_required
 def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpResponse:
     """Make a group member a manager.
 
@@ -293,6 +294,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     )
 
 
+@login_required
 def remove_group_manager(
     request: HttpRequest, group_membership_pk: int
 ) -> HttpResponse:
