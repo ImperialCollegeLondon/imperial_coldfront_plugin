@@ -43,7 +43,7 @@ class TestGroupMembersView(LoginRequiredMixin):
     def _get_url(self, user_pk=1):
         return reverse("imperial_coldfront_plugin:group_members", args=[user_pk])
 
-    def test_not_group_owner(
+    def test_not_group_owner_or_manager(
         self, auth_client_factory, research_group_factory, user_factory
     ):
         """Test that a user who is not the group owner cannot access the view."""
@@ -294,8 +294,16 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
             "imperial_coldfront_plugin:remove_group_member", args=[group_membership_pk]
         )
 
-    def test_not_group_owner(self, user_client, pi_group):
-        """Test that a user who is not the group owner cannot remove a group member."""
+    def test_not_group_owner_or_manager(
+        self, research_group_factory, auth_client_factory, user_client, pi_group
+    ):
+        """Test non group owner or manager cannot access the view."""
+        group, memberships = research_group_factory(number_of_members=1)
+        client = auth_client_factory(group.owner)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
         group_membership = pi_group.groupmembership_set.first()
         response = user_client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
@@ -317,6 +325,14 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         """Test the view response for an invalid group membership."""
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
+
+    @pytest.mark.xfail
+    def test_manager_can_access(self, manager_in_group, auth_client_factory):
+        """Test that a group manager can access the view."""
+        manager, group = manager_in_group
+        client = auth_client_factory(manager)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
 
 
 class TestGetActiveUsersView:

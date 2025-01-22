@@ -27,8 +27,8 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
 
     This view retrieves and displays all members associated with a research group
     where the specified user (identified by `user_pk`) is the owner. Access is
-    restricted to either the group owner or an administrator. Unauthorised users will
-    receive a permission denied response.
+    restricted to either the group owner, an administrator, or a manager.
+    Unauthorised users will receive a permission denied response.
 
     The view also checks if the specified user has Principal Investigator (PI) status
     (via the `is_pi` attribute). If the user is not a PI, the view will render a
@@ -60,7 +60,6 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
         return render(request, "no_group.html", {"message": "You do not own a group."})
 
     group_members = GroupMembership.objects.filter(group__owner=user)
-
     return render(request, "group_members.html", {"group_members": group_members})
 
 
@@ -212,8 +211,17 @@ def remove_group_member(request: HttpRequest, group_membership_pk: int) -> HttpR
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
 
-    if request.user != group.owner and not request.user.is_superuser:
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user, is_manager=True
+        ).exists()
+    ):
         return HttpResponseForbidden("Permission denied")
+
+    if group_membership.member == request.user:
+        return HttpResponseForbidden("You cannot remove yourself from the group.")
 
     group_membership.delete()
 
