@@ -35,4 +35,9 @@ urlpatterns = [
         views.make_group_manager,
         name="make_manager",
     ),
+    path(
+        "remove_manager/<int:group_membership_pk>/",
+        views.remove_group_manager,
+        name="remove_manager",
+    ),
 ]
