@@ -288,7 +288,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
         request.user != group.owner
         and not request.user.is_superuser
         and not GroupMembership.objects.filter(
-            group=group, member=request.user, is_manager=True
+            group=group, member=request.user
         ).exists()
     ):
         return HttpResponseForbidden("Permission denied")
@@ -318,7 +318,7 @@ def remove_group_manager(
         request.user != group.owner
         and not request.user.is_superuser
         and not GroupMembership.objects.filter(
-            group=group, member=request.user, is_manager=True
+            group=group, member=request.user
         ).exists()
     ):
         return HttpResponseForbidden("Permission denied")
