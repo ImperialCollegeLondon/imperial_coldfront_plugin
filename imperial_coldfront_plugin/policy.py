@@ -16,18 +16,16 @@ def user_eligible_for_hpc_access(user_profile):
     Imperial identity systems contain entries for non-human entities such as rooms and
     shared mailboxes that should be removed from consideration.
     """
-    if any(
+    return all(
         [
-            user_profile["user_type"] != "Member",
-            user_profile["record_status"] != "Live",
-            not _filter_entity_type(user_profile["entity_type"]),
+            user_profile["user_type"] == "Member",
+            user_profile["record_status"] == "Live",
+            _filter_entity_type(user_profile["entity_type"]),
             None
-            in [
+            not in (
                 user_profile["email"],
                 user_profile["name"],
                 user_profile["department"],
-            ],
+            ),
         ]
-    ):
-        return False
-    return True
+    )
