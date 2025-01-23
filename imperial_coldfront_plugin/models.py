@@ -48,14 +48,11 @@ class GroupMembership(models.Model):
         ResearchGroup,
         on_delete=models.CASCADE,
     )
-
     member = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
-
     is_manager = models.BooleanField(default=False)
-
     expiration = models.DateTimeField()
 
 
