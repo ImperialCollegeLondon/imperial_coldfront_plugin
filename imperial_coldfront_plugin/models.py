@@ -53,7 +53,7 @@ class GroupMembership(models.Model):
         on_delete=models.CASCADE,
     )
     is_manager = models.BooleanField(default=False)
-    expiration = models.DateTimeField()
+    expiration = models.DateTimeField(null=True)
 
 
 class UnixUID(models.Model):
