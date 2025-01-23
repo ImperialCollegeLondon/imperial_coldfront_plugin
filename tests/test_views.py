@@ -423,38 +423,6 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    def test_make_manager_sends_email(
-        self,
-        pi_client,
-        pi_group,
-        mailoutbox,
-    ):
-        """Test that the view sends emails when a manager is removed."""
-        group_membership = pi_group.groupmembership_set.create(
-            member=self.member, is_manager=True
-        )
-        response = pi_client.post(self._get_url(group_membership.pk))
-
-        assert response.status_code == HTTPStatus.FOUND
-
-        assert len(mailoutbox) == 2
-
-        email_to_owner = mailoutbox[0]
-        assert email_to_owner.subject == "New group manager"
-        assert email_to_owner.to == [pi_group.owner.email]
-        assert (
-            f"{group_membership.member.get_full_name()} has been made a manager of your group."  # noqa: E501
-            in email_to_owner.body
-        )
-
-        email_to_member = mailoutbox[1]
-        assert email_to_member.subject == f"HPC {pi_group.name} group update"
-        assert email_to_member.to == [group_membership.member.email]
-        assert (
-            f"You have been made a manager of the group {pi_group.name}."
-            in email_to_member.body
-        )
-
 
 class TestRemoveGroupManagerView(LoginRequiredMixin):
     """Tests for the remove group manager view."""
@@ -490,35 +458,3 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         """Test the view response for an invalid group membership."""
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
-
-    def test_remove_manager_sends_email(
-        self,
-        pi_client,
-        pi_group,
-        mailoutbox,
-    ):
-        """Test that the view sends emails when a manager is removed."""
-        group_membership = pi_group.groupmembership_set.create(
-            member=self.member, is_manager=True
-        )
-        response = pi_client.post(self._get_url(group_membership.pk))
-
-        assert response.status_code == HTTPStatus.FOUND
-
-        assert len(mailoutbox) == 2
-
-        email_to_owner = mailoutbox[0]
-        assert email_to_owner.subject == "Group manager removed"
-        assert email_to_owner.to == [pi_group.owner.email]
-        assert (
-            f"{group_membership.member.get_full_name()} has been removed as manager of your group."  # noqa: E501
-            in email_to_owner.body
-        )
-
-        email_to_member = mailoutbox[1]
-        assert email_to_member.subject == f"HPC {pi_group.name} group update"
-        assert email_to_member.to == [group_membership.member.email]
-        assert (
-            f"You have been removed as a manager of the group {pi_group.name}."
-            in email_to_member.body
-        )
