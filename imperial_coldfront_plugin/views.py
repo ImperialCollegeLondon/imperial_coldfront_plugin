@@ -60,7 +60,18 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
         return render(request, "no_group.html", {"message": "You do not own a group."})
 
     group_members = GroupMembership.objects.filter(group__owner=user)
-    return render(request, "group_members.html", {"group_members": group_members})
+    is_manager = GroupMembership.objects.filter(
+        group__owner=user, member=request.user, is_manager=True
+    ).exists()
+
+    return render(
+        request,
+        "group_members.html",
+        {
+            "group_members": group_members,
+            "is_manager": is_manager,
+        },
+    )
 
 
 @login_required
