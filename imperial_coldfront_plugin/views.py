@@ -61,7 +61,18 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
         return render(request, "no_group.html", {"message": "You do not own a group."})
 
     group_members = GroupMembership.objects.filter(group__owner=user)
-    return render(request, "group_members.html", {"group_members": group_members})
+    is_manager = GroupMembership.objects.filter(
+        group__owner=user, member=request.user, is_manager=True
+    ).exists()
+
+    return render(
+        request,
+        "group_members.html",
+        {
+            "group_members": group_members,
+            "is_manager": is_manager,
+        },
+    )
 
 
 @login_required
@@ -271,3 +282,61 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
         )
 
     return HttpResponse(passwd)
+
+
+@login_required
+def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpResponse:
+    """Make a group member a manager.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+        group_membership_pk: The primary key of the group membership to be updated.
+    """
+    group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
+    group = group_membership.group
+
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user
+        ).exists()
+    ):
+        return HttpResponseForbidden("Permission denied")
+
+    group_membership.is_manager = True
+    group_membership.save()
+
+    return redirect(
+        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
+    )
+
+
+@login_required
+def remove_group_manager(
+    request: HttpRequest, group_membership_pk: int
+) -> HttpResponse:
+    """Remove a group manager.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+        group_membership_pk: The primary key of the group membership to be updated.
+    """
+    group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
+    group = group_membership.group
+
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user
+        ).exists()
+    ):
+        return HttpResponseForbidden("Permission denied")
+
+    group_membership.is_manager = False
+    group_membership.save()
+
+    return redirect(
+        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
+    )
