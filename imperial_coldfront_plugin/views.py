@@ -13,11 +13,11 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from .emails import send_group_access_granted_email, send_group_invite_email, send_member_promotion_to_manager_email, send_manager_removed_email
 from .forms import GroupMembershipForm, TermsAndConditionsForm, UserSearchForm
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
 from .policy import user_eligible_for_hpc_access
-from .utils import send_email_in_background
 
 User = get_user_model()
 
@@ -158,13 +158,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             invite_url = request.build_absolute_uri(
                 reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             )
-            send_email_in_background(
-                [invitee_email],
-                "HPC Access Invitation",
-                "You've been invited to join the access group of "
-                f"{request.user.get_full_name()} ({request.user.email})\n\n"
-                f"Click the following link to accept the invitation:\n{invite_url}",
-            )
+            send_group_invite_email(invitee_email, request.user, invite_url)
             return render(
                 request,
                 "imperial_coldfront_plugin/invite_sent.html",
@@ -211,6 +205,7 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
             GroupMembership.objects.get_or_create(
                 group=group, member=request.user, expiration=expiration
             )
+            send_group_access_granted_email(request.user, group.owner)
             return render(
                 request=request,
                 template_name="imperial_coldfront_plugin/accept_group_invite.html",
@@ -313,16 +308,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     group_membership.is_manager = True
     group_membership.save()
 
-    send_email_in_background(
-        [group.owner.email],
-        "New group manager",
-        f"{group_membership.member.get_full_name()} has been made a manager of your group.",  # noqa: E501
-    )
-    send_email_in_background(
-        [(group_membership.member.email)],
-        f"HPC {group.name} group update",
-        f"You have been made a manager of the group {group.name}.",
-    )
+    send_member_promotion_to_manager_email(group_membership.member, group.owner)
 
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
@@ -354,16 +340,8 @@ def remove_group_manager(
     group_membership.is_manager = False
     group_membership.save()
 
-    send_email_in_background(
-        [group.owner.email],
-        "Group manager removed",
-        f"{group_membership.member.get_full_name()} has been removed as manager of your group.",  # noqa: E501
-    )
-    send_email_in_background(
-        [(group_membership.member.email)],
-        f"HPC {group.name} group update",
-        f"You have been removed as a manager of the group {group.name}.",
-    )
+    send_manager_removed_email(group_membership.member, group.owner)
+
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
