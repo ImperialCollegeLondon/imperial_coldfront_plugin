@@ -178,7 +178,7 @@ def parsed_profile():
         company_name="company",
         department="dept",
         job_family="job family",
-        employment_status="employment status",
+        entity_type="entity type",
         job_title=None,
         name="a name",
         email="email",
@@ -193,7 +193,7 @@ def profile(parsed_profile):
     return dict(
         onPremisesExtensionAttributes=dict(
             extensionAttribute14=parsed_profile["job_family"],
-            extensionAttribute6=parsed_profile["employment_status"],
+            extensionAttribute6=parsed_profile["entity_type"],
             extensionAttribute5=parsed_profile["record_status"],
         ),
         userType=parsed_profile["user_type"],
