@@ -6,7 +6,7 @@
       <li>
         {{ member.member.get_full_name }} -
         <a href="{% url 'imperial_coldfront_plugin:remove_group_member' member.pk %}">Remove access</a>
-        {% if is_manager == False %}
+        {% if is_manager == False and member.is_manager == False %}
           | <a href="{% url 'imperial_coldfront_plugin:make_manager' member.pk %}">Make manager</a>
         {% endif %}
         {% if member.is_manager and is_manager == False %}
