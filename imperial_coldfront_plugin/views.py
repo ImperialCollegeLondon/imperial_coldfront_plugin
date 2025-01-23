@@ -300,12 +300,10 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     group_membership.is_manager = True
     group_membership.save()
 
-    group_owner_email = group.owner.email
-
     send_email_in_background(
-        [group_owner_email],
+        [group.owner.email],
         "New group manager",
-        f"{group_membership.member.get_full_name()} has been made a manager of your group.",  # noqa
+        f"{group_membership.member.get_full_name()} has been made a manager of your group.",  # noqa: E501
     )
 
     return redirect(
@@ -337,6 +335,12 @@ def remove_group_manager(
 
     group_membership.is_manager = False
     group_membership.save()
+
+    send_email_in_background(
+        [group.owner.email],
+        "Group manager removed",
+        f"{group_membership.member.get_full_name()} has been removed as manager of your group.",  # noqa: E501
+    )
 
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
