@@ -8,8 +8,7 @@ def add_prune_groups_task(apps, schema_editor):
     schedule(
         "django.core.management.call_command",
         "prune_groups",
-        schedule_type="I",
-        minutes=1,
+        schedule_type="D",
     )
 
 
