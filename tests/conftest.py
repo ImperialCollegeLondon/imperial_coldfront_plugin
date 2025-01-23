@@ -29,6 +29,7 @@ def pytest_configure():
             "mozilla_django_oidc",
             "coldfront.core.user",
             "imperial_coldfront_plugin",
+            "django_q",
         ],
         SECRET_KEY="123",
         TEMPLATES=[
