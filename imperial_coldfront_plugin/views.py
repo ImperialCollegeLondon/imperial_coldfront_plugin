@@ -300,6 +300,14 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     group_membership.is_manager = True
     group_membership.save()
 
+    group_owner_email = group.owner.email
+
+    send_email_in_background(
+        [group_owner_email],
+        "New group manager",
+        f"{group_membership.member.get_full_name()} has been made a manager of your group.",  # noqa
+    )
+
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
