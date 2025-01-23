@@ -4,10 +4,13 @@
   <ul>
     {% for member in group_members %}
       <li>
-        {{ member.member.get_full_name }} - <a href="{% url 'imperial_coldfront_plugin:remove_group_member' member.pk %}">Remove access</a>
-        {% if request.user.userprofile.is_pi %}
-          <a href="{% url 'imperial_coldfront_plugin:make_manager' member.pk %}">Make manager</a>
-          <a href="{% url 'imperial_coldfront_plugin:remove_manager' member.pk %}">Remove manager</a>
+        {{ member.member.get_full_name }} -
+        <a href="{% url 'imperial_coldfront_plugin:remove_group_member' member.pk %}">Remove access</a>
+        {% if request.user.userprofile.is_pi or request.user == member.group_owner %}
+          | <a href="{% url 'imperial_coldfront_plugin:make_manager' member.pk %}">Make manager</a>
+        {% endif %}
+        {% if member.is_manager and request.user.userprofile.is_pi or member.group_owner %}
+          | <a href="{% url 'imperial_coldfront_plugin:remove_manager' member.pk %}">Remove manager</a>
         {% endif %}
       </li>
     {% endfor %}
