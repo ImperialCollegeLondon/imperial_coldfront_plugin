@@ -317,7 +317,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
         f"HPC {group.name} group update",
         f"You have been made a manager of the group {group.name}.",
     )
-    
+
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
