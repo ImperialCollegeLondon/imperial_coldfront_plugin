@@ -290,6 +290,22 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
     return HttpResponse(passwd)
 
 
+def get_group_data(request: HttpRequest) -> HttpResponse:
+    """Get the group data in unix etc/group format.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+    """
+    groups = ""
+    format_str = "{group.name}:x:{group.gid}:{users}\n"
+    qs = ResearchGroup.objects.all()
+    for group in qs:
+        users = group.groupmembership_set.values_list("member__username", flat=True)
+        groups += format_str.format(group=group, users=",".join(users))
+
+    return HttpResponse(groups)
+
+
 @login_required
 def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpResponse:
     """Make a group member a manager.
