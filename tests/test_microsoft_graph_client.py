@@ -10,41 +10,6 @@ from imperial_coldfront_plugin.microsoft_graph_client import (
 )
 
 
-@pytest.fixture
-def parsed_profile():
-    """Return a dictionary of profile data as structured by the graph client."""
-    return dict(
-        user_type="Member",
-        company_name="company",
-        department="dept",
-        job_family="job family",
-        employment_status="employment status",
-        job_title=None,
-        name="a name",
-        email="email",
-        username="username",
-        record_status="Live",
-    )
-
-
-@pytest.fixture
-def profile(parsed_profile):
-    """Return a dictionary of profile data as returned by the graph API."""
-    return dict(
-        onPremisesExtensionAttributes=dict(
-            extensionAttribute14=parsed_profile["job_family"],
-            extensionAttribute6=parsed_profile["employment_status"],
-            extensionAttribute5=parsed_profile["record_status"],
-        ),
-        userType=parsed_profile["user_type"],
-        companyName=parsed_profile["company_name"],
-        department=parsed_profile["department"],
-        displayName=parsed_profile["name"],
-        mail=parsed_profile["email"],
-        userPrincipalName=parsed_profile["username"] + "@ic.ac.uk",
-    )
-
-
 def test_parse_profile_data(profile, parsed_profile):
     """Test that the profile data is correctly parsed."""
     api_response = MagicMock()

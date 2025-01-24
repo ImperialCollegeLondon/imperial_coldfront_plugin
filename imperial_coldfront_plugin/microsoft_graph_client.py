@@ -32,7 +32,7 @@ def _transform_profile_data(data):
         "company_name": data.get("companyName"),
         "user_type": data.get("userType"),
         "job_family": extension_attributes.get("extensionAttribute14"),
-        "employment_status": extension_attributes.get("extensionAttribute6"),
+        "entity_type": extension_attributes.get("extensionAttribute6"),
         "record_status": extension_attributes.get("extensionAttribute5"),
         "name": data.get("displayName"),
         "email": data.get("mail"),

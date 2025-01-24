@@ -98,6 +98,21 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert response.context["search_results"] == []
 
+    def test_search_filter(
+        self, get_graph_api_client_mock, user_client, parsed_profile
+    ):
+        """Test that the search results are filtered correctly."""
+        invalid_profile = parsed_profile.copy()
+        invalid_profile["record_status"] = "Dead"
+
+        get_graph_api_client_mock().user_search.return_value = [
+            parsed_profile,
+            invalid_profile,
+        ]
+        response = user_client.post(self._get_url(), data={"search": "foo"})
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == [parsed_profile]
+
 
 @pytest.fixture
 def get_graph_api_client_mock(mocker, parsed_profile):
@@ -154,6 +169,18 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             + reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             in email.body
         )
+
+    def test_post_ineligible_user(
+        self, get_graph_api_client_mock, pi, pi_group, pi_client, mocker
+    ):
+        """Check that specified user is checked for eligibility."""
+        user_filter_mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
+        )
+        user_filter_mock.return_value = False
+        response = pi_client.post(self._get_url(), data={"username": "username"})
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"User not found or not eligible"
 
     @pytest.mark.parametrize(
         "email,error",

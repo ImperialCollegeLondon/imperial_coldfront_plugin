@@ -16,6 +16,7 @@ from django.urls import reverse
 from .forms import GroupMembershipForm, TermsAndConditionsForm, UserSearchForm
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
+from .policy import user_eligible_for_hpc_access
 from .utils import send_email_in_background
 
 User = get_user_model()
@@ -106,10 +107,13 @@ def user_search(request: HttpRequest) -> HttpResponse:
             search_query = form.cleaned_data["search"]
             graph_client = get_graph_api_client()
             search_results = graph_client.user_search(search_query)
+            filtered_results = [
+                user for user in search_results if user_eligible_for_hpc_access(user)
+            ]
             return render(
                 request,
                 "imperial_coldfront_plugin/user_search.html",
-                dict(form=form, search_results=search_results),
+                dict(form=form, search_results=filtered_results),
             )
     else:
         form = UserSearchForm()
@@ -137,6 +141,9 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             username = form.cleaned_data["username"]
             graph_client = get_graph_api_client()
             user_profile = graph_client.user_profile(username)
+
+            if not user_eligible_for_hpc_access(user_profile):
+                return HttpResponseBadRequest("User not found or not eligible")
 
             invitee_email = user_profile["email"]
 
@@ -310,7 +317,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
         f"HPC {group.name} group update",
         f"You have been made a manager of the group {group.name}.",
     )
-
+    
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
@@ -351,7 +358,6 @@ def remove_group_manager(
         f"HPC {group.name} group update",
         f"You have been removed as a manager of the group {group.name}.",
     )
-
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
