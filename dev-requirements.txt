@@ -14,7 +14,7 @@ asgiref==3.7.2
     #   django
     #   django-simple-history
     #   django-stubs
-attrs==24.3.0
+attrs==25.1.0
     # via pytest-mypy
 bibtexparser==1.4.1
     # via
@@ -94,7 +94,7 @@ django-sslserver==0.22
     # via coldfront
 django-stubs==5.0.0
     # via imperial_coldfront_plugin (pyproject.toml)
-django-stubs-ext==5.1.1
+django-stubs-ext==5.1.2
     # via
     #   django-stubs
     #   imperial_coldfront_plugin (pyproject.toml)
@@ -108,7 +108,7 @@ faker==24.1.0
     # via
     #   coldfront
     #   factory-boy
-filelock==3.16.1
+filelock==3.17.0
     # via
     #   pytest-mypy
     #   virtualenv
@@ -122,7 +122,7 @@ future==1.0.0
     #   doi2bib
 humanize==4.9.0
     # via coldfront
-identify==2.6.5
+identify==2.6.6
     # via pre-commit
 idna==3.6
     # via
@@ -130,7 +130,7 @@ idna==3.6
     #   requests
 iniconfig==2.0.0
     # via pytest
-josepy==1.14.0
+josepy==1.15.0
     # via mozilla-django-oidc
 mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
@@ -152,11 +152,11 @@ platformdirs==4.3.6
     # via virtualenv
 pluggy==1.5.0
     # via pytest
-pre-commit==4.0.1
+pre-commit==4.1.0
     # via imperial_coldfront_plugin (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyopenssl==24.3.0
+pyopenssl==25.0.0
     # via josepy
 pyparsing==3.1.2
     # via
@@ -203,7 +203,7 @@ requests==2.31.0
     #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
     #   uplink
-ruff==0.8.6
+ruff==0.9.3
     # via imperial_coldfront_plugin (pyproject.toml)
 six==1.16.0
     # via
@@ -229,6 +229,7 @@ typing-extensions==4.10.0
     #   django-stubs
     #   django-stubs-ext
     #   mypy
+    #   pyopenssl
 uplink==0.9.7
     # via imperial_coldfront_plugin (pyproject.toml)
 uritemplate==4.1.1
@@ -237,7 +238,7 @@ urllib3==2.2.1
     # via
     #   coldfront
     #   requests
-virtualenv==20.28.1
+virtualenv==20.29.1
     # via pre-commit
 wcwidth==0.2.13
     # via
