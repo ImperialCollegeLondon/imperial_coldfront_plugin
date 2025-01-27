@@ -80,13 +80,19 @@ def user_factory(django_user_model):
     """
 
     def create_user(
-        username=None, is_pi=False, is_superuser=False, first_name=None, last_name=None
+        username=None,
+        is_pi=False,
+        is_superuser=False,
+        first_name=None,
+        last_name=None,
+        email=None,
     ):
         user = django_user_model.objects.create_user(
             username=username or random_string(),
             is_superuser=is_superuser,
             first_name=first_name or random_string(),
             last_name=last_name or random_string(),
+            email=f"{random_string()}@example.com",
         )
         user.userprofile.is_pi = is_pi
         user.userprofile.save()
