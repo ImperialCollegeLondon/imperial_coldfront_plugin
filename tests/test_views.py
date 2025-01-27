@@ -450,9 +450,7 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    def test_successful_manager_promotion(
-        self, pi_client, pi_group, mailoutbox, mocker
-    ):
+    def test_successful_manager_promotion(self, pi_client, pi_group, mailoutbox):
         """Test successful promotion of group member to manager."""
         group_membership = pi_group.groupmembership_set.first()
 
