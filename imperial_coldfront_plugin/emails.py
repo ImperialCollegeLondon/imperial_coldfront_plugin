@@ -45,7 +45,7 @@ def send_group_access_granted_email(user, owner):
 
 
 def send_member_promotion_to_manager_email(user, owner):
-    """Notification email that a user has been promoted to manager in a ResearchGroup."""
+    """Notification email that a user has been made a to manager in a ResearchGroup."""
     send_email_in_background(
         [user.email, owner.email],
         "HPC Access Manager Added",
