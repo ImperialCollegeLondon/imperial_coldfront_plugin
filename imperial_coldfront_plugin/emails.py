@@ -43,6 +43,7 @@ def send_group_access_granted_email(user, owner):
         f"granted access to the HPC access group of {owner.get_full_name()}.",
     )
 
+
 def send_member_promotion_to_manager_email(user, owner):
     """Notification email that a user has been promoted to manager in a ResearchGroup."""
     send_email_in_background(
@@ -51,6 +52,7 @@ def send_member_promotion_to_manager_email(user, owner):
         f"This email is to confirm that {user.get_full_name()} ({user.email}) has been "
         f"made a manager in the HPC access group of {owner.get_full_name()}.",
     )
+
 
 def send_manager_removed_email(user, owner):
     """Notification email that a user has been removed as manager in a ResearchGroup."""

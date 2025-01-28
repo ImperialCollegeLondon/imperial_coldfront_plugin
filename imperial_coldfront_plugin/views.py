@@ -13,7 +13,12 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .emails import send_group_access_granted_email, send_group_invite_email, send_member_promotion_to_manager_email, send_manager_removed_email
+from .emails import (
+    send_group_access_granted_email,
+    send_group_invite_email,
+    send_manager_removed_email,
+    send_member_promotion_to_manager_email,
+)
 from .forms import GroupMembershipForm, TermsAndConditionsForm, UserSearchForm
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup

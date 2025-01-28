@@ -486,8 +486,6 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         assert pi.get_full_name() in email.body
 
 
-
-
 class TestRemoveGroupManagerView(LoginRequiredMixin):
     """Tests for the remove group manager view."""
 
