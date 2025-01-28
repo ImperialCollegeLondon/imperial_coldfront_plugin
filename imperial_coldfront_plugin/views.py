@@ -199,12 +199,18 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
 
     group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
 
+    from django.utils import timezone
+
     if request.method == "POST":
         form = TermsAndConditionsForm(request.POST)
         # Check if the user has accepted the terms and conditions.
         if form.is_valid():
             # Update group membership in the database.
-            GroupMembership.objects.get_or_create(group=group, member=request.user)
+            # TODO: Temp hack: Get expiration from UI.
+            expiration = timezone.datetime.max
+            GroupMembership.objects.get_or_create(
+                group=group, member=request.user, expiration=expiration
+            )
             return render(
                 request=request,
                 template_name="imperial_coldfront_plugin/accept_group_invite.html",
