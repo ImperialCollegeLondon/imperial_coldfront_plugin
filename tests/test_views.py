@@ -135,7 +135,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.content == b"You are not a group owner."
 
     def test_manager_can_access(
-        self, manager_in_group, auth_client_factory, get_graph_api_client_mock
+        self, manager_in_group, auth_client_factory, get_graph_api_client_mock, settings
     ):
         """Test that a group manager can access the view."""
         manager, group = manager_in_group
@@ -252,14 +252,21 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
             "accept": ["You must accept the terms and conditions"]
         }
 
-    def test_post_valid(self, user_client, pi_group, user):
+    def test_post_valid(self, user_client, pi_group, user, mailoutbox):
         """Test that the view adds the user to the group when valid data is posted."""
         token = self._get_token(user.email, pi_group.owner.pk)
+
         response = user_client.post(self._get_url(token), data={"accept": True})
         assert response.status_code == HTTPStatus.OK
         assertTemplateUsed(
             response, "imperial_coldfront_plugin/accept_group_invite.html"
         )
+        email = mailoutbox[0]
+        assert email.subject == "HPC Access Granted"
+        assert email.to == [user.email, pi_group.owner.email]
+        assert user.get_full_name() in email.body
+        assert user.email in email.body
+        assert pi_group.owner.get_full_name() in email.body
 
     def test_post_valid_already_member(self, user_client, pi_group, user):
         """Test that the view doesn't duplicate group memberships."""
@@ -453,6 +460,8 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
     def test_successful_manager_promotion(self, pi_client, pi_group, mailoutbox):
         """Test successful promotion of group member to manager."""
         group_membership = pi_group.groupmembership_set.first()
+        pi = pi_group.owner
+        member = group_membership.member
 
         response = pi_client.get(self._get_url(group_membership.pk))
 
@@ -460,30 +469,21 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[group_membership.group.owner.pk],
+                args=[pi.pk],
             ),
         )
 
         group_membership.refresh_from_db()
         assert group_membership.is_manager is True
 
-        assert len(mailoutbox) == 2
-        owner_email = mailoutbox[0]
-        member_email = mailoutbox[1]
+        assert len(mailoutbox) == 1
+        email = mailoutbox[0]
 
-        assert owner_email.subject == "New group manager"
-        assert owner_email.to == [pi_group.owner.email]
-        assert (
-            f"{group_membership.member.get_full_name()} has been made a manager of your group."  # noqa: E501
-            in owner_email.body
-        )
-
-        assert member_email.subject == f"HPC {pi_group.name} group update"
-        assert member_email.to == [group_membership.member.email]
-        assert (
-            f"You have been made a manager of the group {pi_group.name}."
-            in member_email.body
-        )
+        assert email.subject == "HPC Access Manager Added"
+        assert email.to == [member.email, pi.email]
+        assert member.email in email.body
+        assert member.get_full_name() in email.body
+        assert pi.get_full_name() in email.body
 
 
 class TestRemoveGroupManagerView(LoginRequiredMixin):
@@ -521,11 +521,12 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    def test_successful_manager_removal(self, pi_client, pi_group, mailoutbox):
+    def test_successful_manager_removal(self, pi, pi_client, pi_group, mailoutbox):
         """Test successful removal of group manager."""
         group_membership = pi_group.groupmembership_set.first()
         group_membership.is_manager = True
         group_membership.save()
+        member = group_membership.member
 
         response = pi_client.get(self._get_url(group_membership.pk))
 
@@ -533,27 +534,18 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[group_membership.group.owner.pk],
+                args=[pi_group.owner.pk],
             ),
         )
 
         group_membership.refresh_from_db()
         assert group_membership.is_manager is False
 
-        assert len(mailoutbox) == 2
-        owner_email = mailoutbox[0]
-        member_email = mailoutbox[1]
+        assert len(mailoutbox) == 1
+        email = mailoutbox[0]
 
-        assert owner_email.subject == "Group manager removed"
-        assert owner_email.to == [pi_group.owner.email]
-        assert (
-            f"{group_membership.member.get_full_name()} has been removed as manager of your group."  # noqa: E501
-            in owner_email.body
-        )
-
-        assert member_email.subject == f"HPC {pi_group.name} group update"
-        assert member_email.to == [group_membership.member.email]
-        assert (
-            f"You have been removed as a manager of the group {pi_group.name}."
-            in member_email.body
-        )
+        assert email.subject == "HPC Access Manager Removed"
+        assert email.to == [member.email, pi_group.owner.email]
+        assert member.email in email.body
+        assert member.get_full_name() in email.body
+        assert pi.get_full_name() in email.body
