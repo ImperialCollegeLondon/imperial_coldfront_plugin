@@ -6,6 +6,7 @@ from string import ascii_lowercase
 import pytest
 from django.conf import settings
 from django.test import Client
+from django.utils import timezone
 
 
 def pytest_configure():
@@ -29,6 +30,7 @@ def pytest_configure():
             "mozilla_django_oidc",
             "coldfront.core.user",
             "imperial_coldfront_plugin",
+            "django_q",
         ],
         SECRET_KEY="123",
         TEMPLATES=[
@@ -113,7 +115,9 @@ def research_group_factory(user_factory):
             name=random_string(),
         )
         memberships = [
-            GroupMembership.objects.create(member=user_factory(), group=group)
+            GroupMembership.objects.create(
+                member=user_factory(), group=group, expiration=timezone.now()
+            )
             for _ in range(number_of_members)
         ]
         return group, memberships
@@ -171,7 +175,9 @@ def manager_in_group(user_factory, research_group_factory):
 
     manager = user_factory()
     group, memberships = research_group_factory(number_of_members=0)
-    GroupMembership.objects.create(group=group, member=manager, is_manager=True)
+    GroupMembership.objects.create(
+        group=group, member=manager, is_manager=True, expiration=timezone.now()
+    )
     return manager, group
 
 
