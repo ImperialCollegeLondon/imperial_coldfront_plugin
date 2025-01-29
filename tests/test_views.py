@@ -422,6 +422,27 @@ class TestGetActiveUsersView:
         assert b"" == response.content
 
 
+class TestGetGroupDataView:
+    """Tests for the get group data view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:get_group_data")
+
+    def test_user(self, client, research_group_factory):
+        """Test the get_group_data view returns the right data."""
+        group, memberships = research_group_factory(number_of_members=2)
+        user1 = memberships[0].member
+        user2 = memberships[1].member
+
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        expected = bytes(
+            f"{group.name}:x:{group.gid}:{user1},{user2}\n",
+            "utf-8",
+        )
+        assert response.content == expected
+
+
 class TestMakeGroupManagerView(LoginRequiredMixin):
     """Tests for the make group manager view."""
 

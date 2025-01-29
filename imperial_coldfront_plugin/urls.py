@@ -29,6 +29,7 @@ urlpatterns = [
         name="remove_group_member",
     ),
     path("active_users/", views.get_active_users, name="get_active_users"),
+    path("groups/", views.get_group_data, name="get_group_data"),
     path("user_search/", views.user_search, name="user_search"),
     path(
         "make_manager/<int:group_membership_pk>/",
