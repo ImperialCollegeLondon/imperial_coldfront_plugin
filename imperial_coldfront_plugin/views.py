@@ -367,10 +367,11 @@ def remove_group_manager(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
 
+
 @login_required
 def group_membership_extend(
     request: HttpRequest, group_membership_pk: int
-    ) -> HttpResponse:
+) -> HttpResponse:
     """Extend the membership of a group member.
 
     Args:
@@ -379,3 +380,15 @@ def group_membership_extend(
     """
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
+
+    # Check if the accessing user is an owner/manager of the group in question
+    # (or a superadmin).
+
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user
+        ).exists()
+    ):
+        return HttpResponseForbidden("Permission denied")
