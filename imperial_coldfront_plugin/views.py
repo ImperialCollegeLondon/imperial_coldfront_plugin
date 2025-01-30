@@ -367,10 +367,11 @@ def remove_group_manager(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
 
+
 @login_required
 def group_membership_extend(
     request: HttpRequest, group_membership_pk: int
-    ) -> HttpResponse:
+) -> HttpResponse:
     """Extend the membership of a group member.
 
     Args:
