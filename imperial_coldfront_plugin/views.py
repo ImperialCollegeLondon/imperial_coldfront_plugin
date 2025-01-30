@@ -366,3 +366,16 @@ def remove_group_manager(
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
     )
+
+@login_required
+def group_membership_extend(
+    request: HttpRequest, group_membership_pk: int
+    ) -> HttpResponse:
+    """Extend the membership of a group member.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+        group_membership_pk: The primary key of the group membership to be updated.
+    """
+    group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
+    group = group_membership.group
