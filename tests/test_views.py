@@ -48,7 +48,7 @@ class TestGroupMembersView(LoginRequiredMixin):
     def test_not_group_owner_or_manager(
         self, auth_client_factory, research_group_factory, user_factory
     ):
-        """A user who is neither the group owner nor a manager should be forbidden."""
+        """Test that a user who is not the group owner cannot access the view."""
         owner = user_factory(is_pi=True)
         group, memberships = research_group_factory(owner=owner)
         not_owner = user_factory(is_pi=True)
@@ -60,7 +60,7 @@ class TestGroupMembersView(LoginRequiredMixin):
     def test_superuser_can_access(
         self, auth_client_factory, research_group_factory, user_factory
     ):
-        """A superuser can always access the view."""
+        """Test that a superuser can access the view for any group."""
         owner = user_factory(is_pi=True)
         group, memberships = research_group_factory(owner=owner)
         superuser = user_factory(is_superuser=True)
@@ -81,8 +81,8 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert "message" in response.context
         assert response.context["message"] == "You do not own a group."
 
-    def test_pi_owner_access(self, auth_client_factory, research_group_factory):
-        """A PI who owns the group should see all members."""
+    def test_owner(self, auth_client_factory, research_group_factory):
+        """Test that the pi that owns a group can access the view."""
         group, memberships = research_group_factory(number_of_members=3)
         response = auth_client_factory(group.owner).get(self._get_url(group.gid))
         assert response.status_code == HTTPStatus.OK
