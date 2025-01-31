@@ -69,10 +69,8 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert set(response.context["group_members"]) == set(memberships)
 
-    def test_not_pi_owner(
-        self, auth_client_factory, research_group_factory, user_factory
-    ):
-        """If the group owner is not a PI, the user sees 'You do not own a group.'."""
+    def test_not_pi(self, auth_client_factory, research_group_factory, user_factory):
+        """Test that a user who is not a PI cannot access the view."""
         owner = user_factory(is_pi=False)
         group, memberships = research_group_factory(owner=owner)
 
