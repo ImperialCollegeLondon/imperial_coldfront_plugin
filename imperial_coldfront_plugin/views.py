@@ -39,7 +39,7 @@ def group_members_view(request: HttpRequest, group_gid: int) -> HttpResponse:
     """Display the members of a research group for a specific user.
 
     This view retrieves and displays all members associated with a research group
-    where the specified user (identified by `grou_gid`) is the owner. Access is
+    where the specified user (identified by `group_gid`) is the owner. Access is
     restricted to either the group owner, an administrator, or a manager.
     Unauthorised users will receive a permission denied response.
     The view also checks if the specified user has Principal Investigator (PI) status
