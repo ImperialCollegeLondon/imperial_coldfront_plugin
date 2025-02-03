@@ -41,4 +41,9 @@ urlpatterns = [
         views.remove_group_manager,
         name="remove_manager",
     ),
+    path(
+        "extend_membership/<int:group_membership_pk>/",
+        views.group_membership_extend,
+        name="extend_membership",
+    ),
 ]
