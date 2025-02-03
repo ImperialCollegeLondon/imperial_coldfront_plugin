@@ -570,3 +570,39 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         assert member.email in email.body
         assert member.get_full_name() in email.body
         assert pi.get_full_name() in email.body
+
+
+class TestGroupMembershipExtendView(LoginRequiredMixin):
+    """Tests for the group membership extend view."""
+
+    def _get_url(self, group_membership_pk=1):
+        return reverse(
+            "imperial_coldfront_plugin:extend_membership", args=[group_membership_pk]
+        )
+
+    def test_not_group_owner(
+        self, research_group_factory, auth_client_factory, user_client, pi_group
+    ):
+        """Test non group owner or manager cannot access the view."""
+        group, memberships = research_group_factory(number_of_members=1)
+        client = auth_client_factory(group.owner)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
+    def test_group_owner(self, pi_client, pi_group):
+        """Test that the group owner can extend a group membership."""
+        group_membership = pi_group.groupmembership_set.first()
+        response = pi_client.get(self._get_url(group_membership.pk))
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                args=[group_membership.group.owner.pk],
+            ),
+        )
+
+    def test_invalid_groupmembership(self, user_client):
+        """Test the view response for an invalid group membership."""
+        response = user_client.get(self._get_url(1))
+        assert response.status_code == HTTPStatus.NOT_FOUND
