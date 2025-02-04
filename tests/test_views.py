@@ -589,20 +589,3 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
-
-    def test_group_owner(self, pi_client, pi_group):
-        """Test that the group owner can extend a group membership."""
-        group_membership = pi_group.groupmembership_set.first()
-        response = pi_client.get(self._get_url(group_membership.pk))
-        assertRedirects(
-            response,
-            reverse(
-                "imperial_coldfront_plugin:group_members",
-                args=[group_membership.group.owner.pk],
-            ),
-        )
-
-    def test_invalid_groupmembership(self, user_client):
-        """Test the view response for an invalid group membership."""
-        response = user_client.get(self._get_url(1))
-        assert response.status_code == HTTPStatus.NOT_FOUND

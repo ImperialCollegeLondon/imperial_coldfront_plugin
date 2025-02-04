@@ -1,0 +1,9 @@
+{% extends "common/base.html" %}
+{% block content %}
+  <p>Your current membership is due to expire on {{ expiry_date }}.</p>
+  Would you like to extend it?
+  <form method="post">
+    {% csrf_token %} {{ form.as_p }}
+    <button type="submit">Extend Membership</button>
+  </form>
+{% endblock content %}

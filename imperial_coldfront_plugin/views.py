@@ -392,3 +392,35 @@ def group_membership_extend(
         ).exists()
     ):
         return HttpResponseForbidden("Permission denied")
+
+    # on GET request - display the user's information and the current expiry
+    # date as well as a form allowing them to specify the length of an
+    # extension.
+
+    if request.method == "GET":
+        return render(
+            request,
+            "imperial_coldfront_plugin/extend_membership.html",
+            {
+                "group_membership": group_membership,
+                "group": group,
+            },
+        )
+
+    # on POST request - updates the expiry date of the GroupMembership based on the
+    # form data and redirects to group_members_view.
+
+    if request.method == "POST":
+        form = GroupMembershipForm(request.POST)
+        if form.is_valid():
+            expiration = form.cleaned_data["expiration"]
+            group_membership.expiration = expiration
+            group_membership.save()
+            return redirect(
+                reverse(
+                    "imperial_coldfront_plugin:group_members", args=[group.owner.pk]
+                )
+            )
+        else:
+            return HttpResponseBadRequest("Invalid data")
+    return HttpResponseBadRequest("Invalid data")
