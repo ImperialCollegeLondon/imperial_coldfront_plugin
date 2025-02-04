@@ -10,6 +10,7 @@ from django.shortcuts import reverse
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
+    GroupMembershipExtendForm,
     TermsAndConditionsForm,
     UserSearchForm,
 )
@@ -589,3 +590,10 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
+
+    def test_group_owner(self, pi_client, pi_group):
+        """Test that the group owner can extend a group membership."""
+        group_membership = pi_group.groupmembership_set.first()
+        response = pi_client.get(self._get_url(group_membership.pk))
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], GroupMembershipExtendForm)
