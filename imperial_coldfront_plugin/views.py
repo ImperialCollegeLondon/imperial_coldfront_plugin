@@ -422,10 +422,5 @@ def group_membership_extend(
         form = GroupMembershipExtendForm()
 
     return render(
-        request,
-        "imperial_coldfront_plugin/extend_membership.html",
-        {
-            "form": form,
-            "group_membership": group_membership,
-        },
+        request, "imperial_coldfront_plugin/extend_membership.html", dict(form=form)
     )
