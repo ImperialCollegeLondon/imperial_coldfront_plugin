@@ -383,8 +383,7 @@ def group_membership_extend(
 
     Args:
         request: The HTTP request object containing metadata about the request.
-        group_membership_pk: The primary key of the group membership to be
-        updated.
+        group_membership_pk: The primary key of the group membership to be updated.
     """
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
