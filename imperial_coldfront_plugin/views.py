@@ -74,7 +74,13 @@ def group_members_view(request: HttpRequest, group_gid: int) -> HttpResponse:
     ):
         return HttpResponseForbidden("Permission denied")
 
-    if not group.owner.userprofile.is_pi:
+    if (
+        request.user is not group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user, is_manager=True
+        ).exists()
+    ):
         return render(request, "no_group.html", {"message": "You do not own a group."})
 
     group_members = GroupMembership.objects.filter(group=group)
