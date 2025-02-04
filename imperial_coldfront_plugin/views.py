@@ -257,7 +257,7 @@ def remove_group_member(request: HttpRequest, group_membership_pk: int) -> HttpR
     group_membership.delete()
 
     return redirect(
-        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
+        reverse("imperial_coldfront_plugin:group_members", args=[group.gid])
     )
 
 
