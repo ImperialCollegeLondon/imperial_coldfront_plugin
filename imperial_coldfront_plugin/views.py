@@ -400,6 +400,9 @@ def group_membership_extend(
     ):
         return HttpResponseForbidden("Permission denied")
 
+    if group_membership.member == request.user:
+        return HttpResponseForbidden("You cannot extend your own membership.")
+
     # on GET request - display the user's information and the current expiry
     # date as well as a form allowing them to specify the length of an
     # extension.
