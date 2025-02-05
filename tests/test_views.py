@@ -1,5 +1,6 @@
 """Tests for the views of the plugin."""
 
+import datetime
 from http import HTTPStatus
 from random import randint
 
@@ -597,3 +598,27 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
         response = pi_client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], GroupMembershipExtendForm)
+
+    def test_successful_membership_extension(self, pi_client, pi_group):
+        """Test successful extension of group membership."""
+        group_membership = pi_group.groupmembership_set.first()
+
+        response = pi_client.post(
+            self._get_url(group_membership.pk), data={"extend_length": 120}
+        )
+
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                args=[pi_group.owner.pk],
+            ),
+        )
+
+        current_expiration = group_membership.expiration
+
+        group_membership.refresh_from_db()
+
+        assert group_membership.expiration == current_expiration + datetime.timedelta(
+            days=120
+        )
