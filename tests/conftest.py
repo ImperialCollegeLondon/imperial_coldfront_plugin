@@ -214,3 +214,15 @@ def profile(parsed_profile):
         mail=parsed_profile["email"],
         userPrincipalName=parsed_profile["username"] + "@ic.ac.uk",
     )
+
+
+@pytest.fixture
+def pi_user_profile():
+    """Valid user data for a PI."""
+    return {
+        "record_status": "Live",
+        "department": "Department of Computing",
+        "entity_type": "Staff",
+        "username": "test_user",
+        "job_title": "Professor of Computing",
+    }
