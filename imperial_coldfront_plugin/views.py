@@ -14,6 +14,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from .emails import (
     send_group_access_granted_email,
@@ -148,6 +149,11 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
         form = GroupMembershipForm(request.POST)
 
         if form.is_valid():
+            expiration = form.cleaned_data["expiration"]
+
+            if expiration < timezone.now():
+                return HttpResponseBadRequest("Expiration date should be in the future")
+
             username = form.cleaned_data["username"]
             graph_client = get_graph_api_client()
             user_profile = graph_client.user_profile(username)
@@ -161,6 +167,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             signer = TimestampSigner()
             token = signer.sign_object(
                 {
+                    "expiration": expiration.isoformat(),
                     "inviter_pk": request.user.pk,
                     "invitee_email": invitee_email,
                 }
