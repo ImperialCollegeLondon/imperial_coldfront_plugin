@@ -585,10 +585,15 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
     def test_not_group_owner(
         self, research_group_factory, auth_client_factory, user_client, pi_group
     ):
-        """Test non group owner or manager cannot access the view."""
+        """Test non group owner or non group manager cannot access the view."""
         group, memberships = research_group_factory(number_of_members=1)
         client = auth_client_factory(group.owner)
         response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
+        group_membership = pi_group.groupmembership_set.first()
+        response = user_client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
