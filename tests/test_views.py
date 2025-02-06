@@ -85,6 +85,7 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert set(response.context["group_members"]) == set(
             group.groupmembership_set.all()
         )
+        assert response.context["is_manager"]
 
 
 class TestUserSearchView(LoginRequiredMixin):
