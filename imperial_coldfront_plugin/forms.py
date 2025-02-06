@@ -23,3 +23,12 @@ class UserSearchForm(forms.Form):
     """Form for searching users."""
 
     search = forms.CharField(label="Search")
+
+
+class GroupMembershipExtendForm(forms.Form):
+    """Form for extending group membership."""
+
+    extend_length = forms.IntegerField(
+        label="Extend by (in days)",
+        min_value=1,
+    )

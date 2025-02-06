@@ -1,5 +1,6 @@
 """Tests for the views of the plugin."""
 
+import datetime
 from http import HTTPStatus
 from random import randint
 
@@ -10,6 +11,7 @@ from django.shortcuts import reverse
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
+    GroupMembershipExtendForm,
     TermsAndConditionsForm,
     UserSearchForm,
 )
@@ -570,3 +572,70 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         assert member.email in email.body
         assert member.get_full_name() in email.body
         assert pi.get_full_name() in email.body
+
+
+class TestGroupMembershipExtendView(LoginRequiredMixin):
+    """Tests for the group membership extend view."""
+
+    def _get_url(self, group_membership_pk=1):
+        return reverse(
+            "imperial_coldfront_plugin:extend_membership", args=[group_membership_pk]
+        )
+
+    def test_not_group_owner(
+        self, research_group_factory, auth_client_factory, user_client, pi_group
+    ):
+        """Test non group owner or non group manager cannot access the view."""
+        group, memberships = research_group_factory(number_of_members=1)
+        client = auth_client_factory(group.owner)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
+        group_membership = pi_group.groupmembership_set.first()
+        response = user_client.get(self._get_url(group_membership.pk))
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"Permission denied"
+
+    def test_group_owner(self, pi_client, pi_group):
+        """Test that the group owner can extend a group membership."""
+        group_membership = pi_group.groupmembership_set.first()
+        response = pi_client.get(self._get_url(group_membership.pk))
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], GroupMembershipExtendForm)
+        assert response.context["group_membership"] == group_membership
+
+    def test_manager_cannot_extend_own_membership(
+        self, manager_in_group, auth_client_factory
+    ):
+        """Test that a group manager cannot extend their own membership."""
+        manager, group = manager_in_group
+        group_membership = group.groupmembership_set.get(member=manager)
+        client = auth_client_factory(manager)
+        response = client.get(self._get_url(group_membership.pk))
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"You cannot extend your own membership."
+
+    def test_successful_membership_extension(self, pi_client, pi_group):
+        """Test successful extension of group membership."""
+        group_membership = pi_group.groupmembership_set.first()
+
+        response = pi_client.post(
+            self._get_url(group_membership.pk), data={"extend_length": 120}
+        )
+
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                args=[pi_group.owner.pk],
+            ),
+        )
+
+        current_expiration = group_membership.expiration
+
+        group_membership.refresh_from_db()
+
+        assert group_membership.expiration == current_expiration + datetime.timedelta(
+            days=120
+        )

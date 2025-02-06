@@ -1,5 +1,7 @@
 """Plugin views."""
 
+import datetime
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -19,7 +21,12 @@ from .emails import (
     send_manager_removed_email,
     send_member_promotion_to_manager_email,
 )
-from .forms import GroupMembershipForm, TermsAndConditionsForm, UserSearchForm
+from .forms import (
+    GroupMembershipExtendForm,
+    GroupMembershipForm,
+    TermsAndConditionsForm,
+    UserSearchForm,
+)
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
 from .policy import user_eligible_for_hpc_access
@@ -365,4 +372,60 @@ def remove_group_manager(
 
     return redirect(
         reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
+    )
+
+
+@login_required
+def group_membership_extend(
+    request: HttpRequest, group_membership_pk: int
+) -> HttpResponse:
+    """Extend the membership of a group member.
+
+    Args:
+        request: The HTTP request object containing metadata about the request.
+        group_membership_pk: The primary key of the group membership to be updated.
+    """
+    group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
+    group = group_membership.group
+
+    # Check if the accessing user is an owner/manager of the group in question
+    # (or a superadmin).
+
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user
+        ).exists()
+    ):
+        return HttpResponseForbidden("Permission denied")
+
+    if group_membership.member == request.user:
+        return HttpResponseForbidden("You cannot extend your own membership.")
+
+    # on GET request - display the user's information and the current expiry
+    # date as well as a form allowing them to specify the length of an
+    # extension.
+    # on POST request - updates the expiry date of the GroupMembership based
+    # on the form data and redirects to group_members_view.
+
+    if request.method == "POST":
+        form = GroupMembershipExtendForm(request.POST)
+        if form.is_valid():
+            extend_length = form.cleaned_data["extend_length"]
+            group_membership.expiration += datetime.timedelta(days=extend_length)
+            group_membership.save()
+            return redirect(
+                reverse(
+                    "imperial_coldfront_plugin:group_members", args=[group.owner.pk]
+                )
+            )
+
+    else:
+        form = GroupMembershipExtendForm()
+
+    return render(
+        request,
+        "imperial_coldfront_plugin/extend_membership.html",
+        dict(form=form, group_membership=group_membership),
     )

@@ -1,0 +1,12 @@
+{% extends "common/base.html" %}
+{% block content %}
+  <h1>Extend Membership</h1>
+  <p>User/member information:</p>
+  <p>Member name: {{ group_membership.member }}</p>
+  <p>Group name: {{ group_membership.group }}</p>
+  <p>Current expiry date: {{ group_membership.expiration }}</p>
+  <form method="post">
+    {% csrf_token %} {{ form.as_p }}
+    <button type="submit">Extend Membership</button>
+  </form>
+{% endblock content %}
