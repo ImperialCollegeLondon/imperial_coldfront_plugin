@@ -8,7 +8,7 @@ app_name = "imperial_coldfront_plugin"
 
 urlpatterns = [
     path(
-        "group/<int:group_gid>/members/",
+        "group/<int:group_pk>/members/",
         views.group_members_view,
         name="group_members",
     ),
