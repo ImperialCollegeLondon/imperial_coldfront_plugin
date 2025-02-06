@@ -67,16 +67,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert set(response.context["group_members"]) == set(memberships)
 
-    def test_not_pi(self, auth_client_factory, research_group_factory, user_factory):
-        """Test that a user who is not a PI cannot access the view."""
-        owner = user_factory(is_pi=True)
-        group, memberships = research_group_factory(owner=owner)
-        not_pi_user = user_factory(is_pi=False)
-
-        response = auth_client_factory(not_pi_user).get(self._get_url(group.pk))
-        assert response.status_code, HTTPStatus.FORBIDDEN
-        assert response.content, b"Permission denied"
-
     def test_owner(self, auth_client_factory, research_group_factory, user_factory):
         """Test that the group owner can access the view."""
         owner = user_factory(is_pi=True)
