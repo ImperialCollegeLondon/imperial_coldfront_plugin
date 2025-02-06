@@ -42,18 +42,18 @@ class LoginRequiredMixin:
 class TestGroupMembersView(LoginRequiredMixin):
     """Tests for the group members view."""
 
-    def _get_url(self, user_pk=1):
-        return reverse("imperial_coldfront_plugin:group_members", args=[user_pk])
+    def _get_url(self, group_pk=1):
+        return reverse("imperial_coldfront_plugin:group_members", args=[group_pk])
 
     def test_not_group_owner_or_manager(
         self, auth_client_factory, research_group_factory, user_factory
     ):
         """Test that a user who is not the group owner cannot access the view."""
         owner = user_factory(is_pi=True)
-        research_group_factory(owner=owner)
+        group, memberships = research_group_factory(owner=owner)
         not_owner = user_factory(is_pi=True)
 
-        response = auth_client_factory(not_owner).get(self._get_url(owner.pk))
+        response = auth_client_factory(not_owner).get(self._get_url(group.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
@@ -63,22 +63,29 @@ class TestGroupMembersView(LoginRequiredMixin):
         group, memberships = research_group_factory(owner=owner)
         superuser = user_factory(is_superuser=True)
 
-        response = auth_client_factory(superuser).get(self._get_url(owner.pk))
+        response = auth_client_factory(superuser).get(self._get_url(group.pk))
         assert response.status_code == HTTPStatus.OK
         assert set(response.context["group_members"]) == set(memberships)
 
-    def test_not_pi(self, user_client):
-        """Test that a user who is not a PI cannot access the view."""
-        response = user_client.get(self._get_url(1))
-        assert response.status_code == HTTPStatus.OK
-        assert response.context["message"] == "You do not own a group."
+    def test_owner(self, auth_client_factory, research_group_factory, user_factory):
+        """Test that the group owner can access the view."""
+        owner = user_factory(is_pi=True)
+        group, memberships = research_group_factory(owner=owner)
 
-    def test_owner(self, auth_client_factory, research_group_factory):
-        """Test that the pi that owns a group can access the view."""
-        group, memberships = research_group_factory(number_of_members=3)
-        response = auth_client_factory(group.owner).get(self._get_url(group.owner.pk))
+        response = auth_client_factory(owner).get(self._get_url(group.pk))
         assert response.status_code == HTTPStatus.OK
         assert set(response.context["group_members"]) == set(memberships)
+
+    def test_manager(self, auth_client_factory, manager_in_group):
+        """Test that a group manager can access the view."""
+        manager, group = manager_in_group
+        client = auth_client_factory(manager)
+        response = client.get(self._get_url(group.pk))
+        assert response.status_code == HTTPStatus.OK
+        assert set(response.context["group_members"]) == set(
+            group.groupmembership_set.all()
+        )
+        assert response.context["is_manager"]
 
 
 class TestUserSearchView(LoginRequiredMixin):
@@ -353,7 +360,7 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[group_membership.group.owner.pk],
+                args=[group_membership.group.pk],
             ),
         )
 
@@ -362,13 +369,19 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    @pytest.mark.xfail
-    def test_manager_can_access(self, manager_in_group, auth_client_factory):
-        """Test that a group manager can access the view."""
+    def test_manager(self, auth_client_factory, manager_in_group):
+        """Test that a group manager can remove a group member."""
         manager, group = manager_in_group
+        group_membership = group.groupmembership_set.first()
         client = auth_client_factory(manager)
-        response = client.get(self._get_url())
-        assert response.status_code == 200
+        response = client.get(self._get_url(group_membership.pk))
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                args=[group_membership.group.pk],
+            ),
+        )
 
 
 class TestGetActiveUsersView:
@@ -471,7 +484,7 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[group_membership.group.owner.pk],
+                args=[group_membership.group.pk],
             ),
         )
 
@@ -492,7 +505,7 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[pi.pk],
+                args=[pi_group.pk],
             ),
         )
 
@@ -506,7 +519,7 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         assert email.to == [member.email, pi.email]
         assert member.email in email.body
         assert member.get_full_name() in email.body
-        assert pi.get_full_name() in email.body
+        assert pi_group.owner.get_full_name() in email.body
 
 
 class TestRemoveGroupManagerView(LoginRequiredMixin):
@@ -535,7 +548,7 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[group_membership.group.owner.pk],
+                args=[group_membership.group.pk],
             ),
         )
 
@@ -544,7 +557,7 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    def test_successful_manager_removal(self, pi, pi_client, pi_group, mailoutbox):
+    def test_successful_manager_removal(self, pi_client, pi_group, mailoutbox):
         """Test successful removal of group manager."""
         group_membership = pi_group.groupmembership_set.first()
         group_membership.is_manager = True
@@ -557,7 +570,7 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[pi_group.owner.pk],
+                args=[pi_group.pk],
             ),
         )
 
@@ -571,7 +584,6 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         assert email.to == [member.email, pi_group.owner.email]
         assert member.email in email.body
         assert member.get_full_name() in email.body
-        assert pi.get_full_name() in email.body
 
 
 class TestGroupMembershipExtendView(LoginRequiredMixin):

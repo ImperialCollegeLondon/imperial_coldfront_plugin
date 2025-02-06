@@ -174,7 +174,7 @@ def manager_in_group(user_factory, research_group_factory):
     from imperial_coldfront_plugin.models import GroupMembership
 
     manager = user_factory()
-    group, memberships = research_group_factory(number_of_members=0)
+    group, memberships = research_group_factory(number_of_members=3)
     GroupMembership.objects.create(
         group=group, member=manager, is_manager=True, expiration=timezone.now()
     )

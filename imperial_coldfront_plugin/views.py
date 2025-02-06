@@ -35,14 +35,13 @@ User = get_user_model()
 
 
 @login_required
-def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
+def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
     """Display the members of a research group for a specific user.
 
     This view retrieves and displays all members associated with a research group
-    where the specified user (identified by `user_pk`) is the owner. Access is
+    where the specified user (identified by `group_pk`) is the owner. Access is
     restricted to either the group owner, an administrator, or a manager.
     Unauthorised users will receive a permission denied response.
-
     The view also checks if the specified user has Principal Investigator (PI) status
     (via the `is_pi` attribute). If the user is not a PI, the view will render a
     message indicating that the user does not own a group.
@@ -50,32 +49,31 @@ def group_members_view(request: HttpRequest, user_pk: int) -> HttpResponse:
     Args:
         request (HttpRequest): The HTTP request object containing metadata about the
             request.
-        user_pk (int): The primary key of the user who owns the research group to be
+        group_pk (int): The primary key of the research group to be
             displayed.
 
     Returns:
         HttpResponse: If access is permitted, renders `group_members.html`
-                      displaying the group members.
-                      If the logged-in user is unauthorised, returns a
-                      `HttpResponseForbidden`.
-                      If the user is not a PI, renders `no_group.html` with an
-                      appropriate message.
+                        displaying the group members.
+                        If the logged-in user is unauthorised, returns a
+                        `HttpResponseForbidden`.
 
     Raises:
-        Http404: If no user is found with the provided `user_pk`.
+        Http404: If no group is found with the provided `group_pk`.
     """
-    user = get_object_or_404(User, pk=user_pk)
+    group = get_object_or_404(ResearchGroup, pk=group_pk)
 
-    if request.user != user and not request.user.is_superuser:
+    if (
+        request.user != group.owner
+        and not request.user.is_superuser
+        and not GroupMembership.objects.filter(
+            group=group, member=request.user, is_manager=True
+        ).exists()
+    ):
         return HttpResponseForbidden("Permission denied")
 
-    if not user.userprofile.is_pi:
-        return render(request, "no_group.html", {"message": "You do not own a group."})
-
-    group_members = GroupMembership.objects.filter(group__owner=user)
-    is_manager = GroupMembership.objects.filter(
-        group__owner=user, member=request.user, is_manager=True
-    ).exists()
+    group_members = GroupMembership.objects.filter(group=group)
+    is_manager = group_members.filter(member=request.user, is_manager=True).exists()
 
     return render(
         request,
@@ -256,9 +254,7 @@ def remove_group_member(request: HttpRequest, group_membership_pk: int) -> HttpR
 
     group_membership.delete()
 
-    return redirect(
-        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
-    )
+    return redirect(reverse("imperial_coldfront_plugin:group_members", args=[group.pk]))
 
 
 def get_active_users(request: HttpRequest) -> HttpResponse:
@@ -338,9 +334,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
 
     send_member_promotion_to_manager_email(group_membership.member, group.owner)
 
-    return redirect(
-        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
-    )
+    return redirect(reverse("imperial_coldfront_plugin:group_members", args=[group.pk]))
 
 
 @login_required
@@ -370,9 +364,7 @@ def remove_group_manager(
 
     send_manager_removed_email(group_membership.member, group.owner)
 
-    return redirect(
-        reverse("imperial_coldfront_plugin:group_members", args=[group.owner.pk])
-    )
+    return redirect(reverse("imperial_coldfront_plugin:group_members", args=[group.pk]))
 
 
 @login_required
