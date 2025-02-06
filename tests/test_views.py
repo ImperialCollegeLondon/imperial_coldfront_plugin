@@ -599,6 +599,17 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], GroupMembershipExtendForm)
 
+    def test_manager_cannot_extend_own_membership(
+        self, manager_in_group, auth_client_factory
+    ):
+        """Test that a group manager cannot extend their own membership."""
+        manager, group = manager_in_group
+        group_membership = group.groupmembership_set.get(member=manager)
+        client = auth_client_factory(manager)
+        response = client.get(self._get_url(group_membership.pk))
+        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.content == b"You cannot extend your own membership."
+
     def test_successful_membership_extension(self, pi_client, pi_group):
         """Test successful extension of group membership."""
         group_membership = pi_group.groupmembership_set.first()
