@@ -14,6 +14,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from .emails import (
     send_group_access_granted_email,
@@ -148,6 +149,11 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
         form = GroupMembershipForm(request.POST)
 
         if form.is_valid():
+            expiration = form.cleaned_data["expiration"]
+
+            if expiration < timezone.now():
+                return HttpResponseBadRequest("Expiration date should be in the future")
+
             username = form.cleaned_data["username"]
             graph_client = get_graph_api_client()
             user_profile = graph_client.user_profile(username)
@@ -161,6 +167,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             signer = TimestampSigner()
             token = signer.sign_object(
                 {
+                    "expiration": expiration.isoformat(),
                     "inviter_pk": request.user.pk,
                     "invitee_email": invitee_email,
                 }
@@ -202,16 +209,13 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         )
 
     group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
-
-    from django.utils import timezone
+    expiration = timezone.datetime.fromisoformat(invite["expiration"])
 
     if request.method == "POST":
         form = TermsAndConditionsForm(request.POST)
         # Check if the user has accepted the terms and conditions.
         if form.is_valid():
             # Update group membership in the database.
-            # TODO: Temp hack: Get expiration from UI.
-            expiration = timezone.datetime.max
             GroupMembership.objects.get_or_create(
                 group=group, member=request.user, expiration=expiration
             )

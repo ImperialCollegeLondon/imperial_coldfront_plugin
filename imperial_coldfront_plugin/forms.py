@@ -7,6 +7,7 @@ class GroupMembershipForm(forms.Form):
     """Form for inviting a user to a research group."""
 
     username = forms.CharField()
+    expiration = forms.DateTimeField()
 
 
 class TermsAndConditionsForm(forms.Form):

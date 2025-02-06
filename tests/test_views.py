@@ -8,6 +8,7 @@ import pytest
 from django.conf import settings
 from django.core.signing import TimestampSigner
 from django.shortcuts import reverse
+from django.utils import timezone
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
@@ -149,7 +150,8 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         """Test that a group manager can access the view."""
         manager, group = manager_in_group
         client = auth_client_factory(manager)
-        response = client.post(self._get_url(), data={"username": "username"})
+        data = {"username": "username", "expiration": timezone.datetime.max}
+        response = client.post(self._get_url(), data=data)
         assert response.status_code == 200
 
     def test_post_valid(
@@ -163,9 +165,9 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         timestamp_signer_mock,
     ):
         """Test that the view sends an email when a POST request is made."""
-        username = "username"
         invitee_email = parsed_profile["email"]
-        response = pi_client.post(self._get_url(), data={"username": username})
+        data = {"username": "username", "expiration": timezone.datetime.max}
+        response = pi_client.post(self._get_url(), data=data)
         assert response.status_code == HTTPStatus.OK
         assert f"Invitation sent to {invitee_email}" in response.content.decode()
 
@@ -187,9 +189,19 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
         )
         user_filter_mock.return_value = False
-        response = pi_client.post(self._get_url(), data={"username": "username"})
+        data = {"username": "username", "expiration": timezone.datetime.max}
+        response = pi_client.post(self._get_url(), data=data)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"User not found or not eligible"
+
+    def test_group_expiration_in_past(
+        self, get_graph_api_client_mock, pi, pi_group, pi_client
+    ):
+        """Check that a group expiration in the past is rejected."""
+        data = {"username": "username", "expiration": timezone.datetime.min}
+        response = pi_client.post(self._get_url(), data=data)
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"Expiration date should be in the future"
 
     @pytest.mark.parametrize(
         "email,error",
@@ -215,7 +227,11 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
     def _get_token(self, invitee_email, inviter_pk):
         ts = TimestampSigner()
         return ts.sign_object(
-            {"invitee_email": invitee_email, "inviter_pk": inviter_pk}
+            {
+                "invitee_email": invitee_email,
+                "inviter_pk": inviter_pk,
+                "expiration": timezone.datetime.max.isoformat(),
+            }
         )
 
     def test_get_invalid_token(self, user_client):
