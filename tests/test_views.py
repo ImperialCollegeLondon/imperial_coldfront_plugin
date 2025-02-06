@@ -598,6 +598,7 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
         response = pi_client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], GroupMembershipExtendForm)
+        assert response.context["group_membership"] == group_membership
 
     def test_manager_cannot_extend_own_membership(
         self, manager_in_group, auth_client_factory
