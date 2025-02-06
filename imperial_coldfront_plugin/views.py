@@ -209,16 +209,13 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         )
 
     group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
-
-    from django.utils import timezone
+    expiration = timezone.datetime.fromisoformat(invite["expiration"])
 
     if request.method == "POST":
         form = TermsAndConditionsForm(request.POST)
         # Check if the user has accepted the terms and conditions.
         if form.is_valid():
             # Update group membership in the database.
-            # TODO: Temp hack: Get expiration from UI.
-            expiration = timezone.datetime.max
             GroupMembership.objects.get_or_create(
                 group=group, member=request.user, expiration=expiration
             )
