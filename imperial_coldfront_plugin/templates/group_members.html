@@ -12,6 +12,7 @@
         {% if member.is_manager and is_manager == False %}
           | <a href="{% url 'imperial_coldfront_plugin:remove_manager' member.pk %}">Remove manager</a>
         {% endif %}
+        Membership expires on {{ member.expiration }}
       </li>
     {% endfor %}
   </ul>
