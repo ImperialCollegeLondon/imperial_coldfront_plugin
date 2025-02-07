@@ -151,7 +151,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
         if form.is_valid():
             expiration = form.cleaned_data["expiration"]
 
-            if expiration < timezone.now():
+            if expiration < timezone.now().date():
                 return HttpResponseBadRequest("Expiration date should be in the future")
 
             username = form.cleaned_data["username"]
