@@ -150,7 +150,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         """Test that a group manager can access the view."""
         manager, group = manager_in_group
         client = auth_client_factory(manager)
-        data = {"username": "username", "expiration": timezone.datetime.max}
+        data = {"username": "username", "expiration": timezone.datetime.max.date()}
         response = client.post(self._get_url(), data=data)
         assert response.status_code == 200
 
@@ -166,7 +166,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
     ):
         """Test that the view sends an email when a POST request is made."""
         invitee_email = parsed_profile["email"]
-        data = {"username": "username", "expiration": timezone.datetime.max}
+        data = {"username": "username", "expiration": timezone.datetime.max.date()}
         response = pi_client.post(self._get_url(), data=data)
         assert response.status_code == HTTPStatus.OK
         assert f"Invitation sent to {invitee_email}" in response.content.decode()
@@ -189,7 +189,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
         )
         user_filter_mock.return_value = False
-        data = {"username": "username", "expiration": timezone.datetime.max}
+        data = {"username": "username", "expiration": timezone.datetime.max.date()}
         response = pi_client.post(self._get_url(), data=data)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"User not found or not eligible"
@@ -198,7 +198,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         self, get_graph_api_client_mock, pi, pi_group, pi_client
     ):
         """Check that a group expiration in the past is rejected."""
-        data = {"username": "username", "expiration": timezone.datetime.min}
+        data = {"username": "username", "expiration": timezone.datetime.min.date()}
         response = pi_client.post(self._get_url(), data=data)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"Expiration date should be in the future"
