@@ -13,7 +13,7 @@ asgiref==3.7.2
     #   coldfront
     #   django
     #   django-simple-history
-babel==2.16.0
+babel==2.17.0
     # via mkdocs-material
 bibtexparser==1.4.1
     # via
@@ -36,9 +36,7 @@ charset-normalizer==3.3.2
     #   coldfront
     #   requests
 click==8.1.8
-    # via
-    #   mkdocs
-    #   mkdocstrings
+    # via mkdocs
 coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
 colorama==0.4.6
@@ -88,7 +86,7 @@ django-split-settings==1.3.0
     # via coldfront
 django-sslserver==0.22
     # via coldfront
-django-stubs-ext==5.1.1
+django-stubs-ext==5.1.3
     # via imperial_coldfront_plugin (pyproject.toml)
 django-su==1.0.0
     # via coldfront
@@ -110,7 +108,7 @@ future==1.0.0
     #   doi2bib
 ghp-import==2.1.0
     # via mkdocs
-griffe==1.5.4
+griffe==1.5.6
     # via mkdocstrings-python
 humanize==4.9.0
     # via coldfront
@@ -123,7 +121,7 @@ jinja2==3.1.5
     #   mkdocs
     #   mkdocs-material
     #   mkdocstrings
-josepy==1.14.0
+josepy==1.15.0
     # via mozilla-django-oidc
 markdown==3.7
     # via
@@ -151,27 +149,29 @@ mkdocs==1.6.1
     #   mkdocs-material
     #   mkdocs-section-index
     #   mkdocstrings
-mkdocs-autorefs==1.2.0
+mkdocs-autorefs==1.3.0
     # via
     #   mkdocstrings
     #   mkdocstrings-python
 mkdocs-gen-files==0.5.0
     # via imperial_coldfront_plugin (pyproject.toml)
 mkdocs-get-deps==0.2.0
-    # via mkdocs
+    # via
+    #   mkdocs
+    #   mkdocstrings
 mkdocs-literate-nav==0.6.1
     # via imperial_coldfront_plugin (pyproject.toml)
-mkdocs-material==9.5.49
+mkdocs-material==9.6.3
     # via imperial_coldfront_plugin (pyproject.toml)
 mkdocs-material-extensions==1.3.1
     # via mkdocs-material
 mkdocs-section-index==0.3.9
     # via imperial_coldfront_plugin (pyproject.toml)
-mkdocstrings==0.27.0
+mkdocstrings==0.28.0
     # via
     #   imperial_coldfront_plugin (pyproject.toml)
     #   mkdocstrings-python
-mkdocstrings-python==1.13.0
+mkdocstrings-python==1.14.6
     # via imperial_coldfront_plugin (pyproject.toml)
 mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
@@ -182,18 +182,16 @@ paginate==0.5.7
 pathspec==0.12.1
     # via mkdocs
 platformdirs==4.3.6
-    # via
-    #   mkdocs-get-deps
-    #   mkdocstrings
+    # via mkdocs-get-deps
 pycparser==2.22
     # via cffi
-pygments==2.19.0
+pygments==2.19.1
     # via mkdocs-material
-pymdown-extensions==10.13
+pymdown-extensions==10.14.3
     # via
     #   mkdocs-material
     #   mkdocstrings
-pyopenssl==24.3.0
+pyopenssl==25.0.0
     # via josepy
 pyparsing==3.1.2
     # via
@@ -251,6 +249,7 @@ typing-extensions==4.10.0
     # via
     #   coldfront
     #   django-stubs-ext
+    #   pyopenssl
 uplink==0.9.7
     # via imperial_coldfront_plugin (pyproject.toml)
 uritemplate==4.1.1
