@@ -1,11 +1,45 @@
 """Plugin views."""
 
+from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
-from .models import GroupMembership
+from .forms import ResearchGroupForm
+from .models import GroupMembership, ResearchGroup
+
+
+@login_required
+@permission_required(
+    "imperial_coldfront_plugin.add_researchgroup", raise_exception=True
+)
+def research_group_terms_view(request):
+    """View for accepting T&Cs and creating a ResearchGroup."""
+    if request.method == "POST":
+        form = ResearchGroupForm(request.POST)
+        if form.is_valid():
+            group_name = form.cleaned_data["name"]
+            gid = generate_unique_gid()
+
+            ResearchGroup.objects.create(owner=request.user, gid=gid, name=group_name)
+
+            messages.success(request, "Research group created successfully.")
+            return redirect(reverse("imperial_coldfront_plugin:group_members"))
+    else:
+        form = ResearchGroupForm()
+
+    return render(
+        request, "imperial_coldfront_plugin/research_group_terms.html", {"form": form}
+    )
+
+
+def generate_unique_gid():
+    """Generate a unique GID for the ResearchGroup."""
+    last_gid = ResearchGroup.objects.order_by("-gid").first()
+    return (last_gid.gid + 1) if last_gid else 1000  # Start at 1000 if no groups exist
+
 
 User = get_user_model()
 
