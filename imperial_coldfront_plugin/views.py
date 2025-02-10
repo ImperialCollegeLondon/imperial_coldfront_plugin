@@ -1,20 +1,11 @@
 """Plugin views."""
 
-from django.contrib import messages
-from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required, permission_required
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
-
-from .forms import ResearchGroupForm
-from .models import GroupMembership, ResearchGroup
-
 import datetime
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.http import (
     HttpRequest,
@@ -35,6 +26,7 @@ from .emails import (
 from .forms import (
     GroupMembershipExtendForm,
     GroupMembershipForm,
+    ResearchGroupForm,
     TermsAndConditionsForm,
     UserSearchForm,
 )
@@ -43,6 +35,7 @@ from .models import GroupMembership, ResearchGroup
 from .policy import user_eligible_for_hpc_access
 
 User = get_user_model()
+
 
 @login_required
 @permission_required(
@@ -72,6 +65,7 @@ def generate_unique_gid():
     """Generate a unique GID for the ResearchGroup."""
     last_gid = ResearchGroup.objects.order_by("-gid").first()
     return (last_gid.gid + 1) if last_gid else 1000  # Start at 1000 if no groups exist
+
 
 @login_required
 def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
