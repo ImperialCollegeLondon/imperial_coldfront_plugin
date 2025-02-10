@@ -5,7 +5,8 @@
     <input type="submit" value="Search" />
   </form>
   {% if search_results %}
-    <form action="{% url 'imperial_coldfront_plugin:send_group_invite' %}" method="post"">
+    <form action="{% url 'imperial_coldfront_plugin:send_group_invite' %}"
+          method="post">
       {% csrf_token %}
       <table>
         <tr>
@@ -27,7 +28,22 @@
           </tr>
         {% endfor %}
       </table>
+      <label for="expiration">Expiration date (within 5 years):</label>
+      <input type="date" id="expiration" name="expiration">
       <input type="submit" value="Invite" />
     </form>
   {% endif %}
+  <script>
+    const dateInput = document.getElementById('expiration');
+
+    // Get formatted date for today and the future limit.
+    const date = new Date();
+    const formattedToday = date.toISOString().split('T')[0];
+    date.setFullYear(date.getFullYear() + 5);
+    const formattedLimit = date.toISOString().split('T')[0];
+
+    // Set min and max attribute to restrict date selection.
+    dateInput.setAttribute('min', formattedToday);
+    dateInput.setAttribute('max', formattedLimit);
+  </script>
 {% endblock content %}
