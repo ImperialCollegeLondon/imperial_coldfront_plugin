@@ -57,7 +57,7 @@ def user_eligible_to_be_pi(user_profile):
         (
             user_profile["record_status"] != "Live",
             user_profile["department"] in PI_DISALLOWED_DEPARTMENTS,
-            user_profile["employment_status"] not in ["Staff", "Employee"],
+            user_profile["entity_type"] not in ["Staff", "Employee"],
             not job_title,
         )
     ):

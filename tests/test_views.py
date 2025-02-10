@@ -7,7 +7,8 @@ from random import randint
 import pytest
 from django.conf import settings
 from django.core.signing import TimestampSigner
-from django.shortcuts import reverse
+from django.shortcuts import render, reverse
+from django.template.loader import render_to_string
 from django.utils import timezone
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
@@ -601,7 +602,6 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         assert member.email in email.body
         assert member.get_full_name() in email.body
 
-
 class TestGroupMembershipExtendView(LoginRequiredMixin):
     """Tests for the group membership extend view."""
 
@@ -667,3 +667,70 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
         assert group_membership.expiration == current_expiration + datetime.timedelta(
             days=120
         )
+
+
+class TestHomeView:
+    """Test rendering of the home view.
+
+    This set of tests does not call the view function for the home page directly as
+    that is a Coldfront view. Instead, it checks the rendering logic of the template
+    that we override from the plugin.
+    """
+
+    @pytest.fixture
+    def get_graph_api_client_mock(self, mocker, parsed_profile):
+        """Mock out get_graph_api_client for home_tags.py."""
+        mock = mocker.patch(
+            "imperial_coldfront_plugin.templatetags.home_tags.get_graph_api_client"
+        )
+        mock().user_profile.return_value = parsed_profile
+        return mock
+
+    @pytest.fixture
+    def eligible_html(self):
+        """The html rendered when a user is eligible to create a HPC access group."""
+        return render_to_string("imperial_coldfront_plugin/eligible_pi.html")
+
+    @pytest.fixture
+    def request_(self, rf, user):
+        """A request object with a user."""
+        request = rf.get("/")
+        request.user = user
+        return request
+
+    def test_get_standard_user(
+        self, request_, get_graph_api_client_mock, eligible_html
+    ):
+        """Test that the home view renders correctly for a standard user."""
+        response = render(request_, "imperial_coldfront_plugin/home.html")
+
+        assert response.status_code == 200
+        assert eligible_html not in response.content.decode()
+
+    def test_get_pi(
+        self, request_, get_graph_api_client_mock, eligible_html, pi_user_profile
+    ):
+        """Test rendering for a user eligible to create a HPC access group."""
+        get_graph_api_client_mock().user_profile.return_value = pi_user_profile
+
+        response = render(request_, "imperial_coldfront_plugin/home.html")
+
+        assert response.status_code == 200
+        assert eligible_html in response.content.decode()
+
+    def test_get_pi_group_member(
+        self,
+        request_,
+        pi_group,
+        get_graph_api_client_mock,
+        eligible_html,
+        pi_user_profile,
+    ):
+        """Test rendering for user ineligible because of another group membership."""
+        get_graph_api_client_mock().user_profile.return_value = pi_user_profile
+        request_.user = pi_group.groupmembership_set.first().member
+
+        response = render(request_, "imperial_coldfront_plugin/home.html")
+
+        assert response.status_code == 200
+        assert eligible_html not in response.content.decode()
