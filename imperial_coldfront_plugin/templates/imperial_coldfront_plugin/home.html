@@ -1,0 +1,14 @@
+{% load home_tags %}
+<h1 class="display-4">Welcome to Coldfront</h1>
+<p>
+  This system is used to manage the resources provided by the Research Computing
+  Service including High Performance Computing (HPC) and the Research Data Facility.
+</p>
+{% owns_a_group request.user as does_own %}
+{% if not does_own %}
+  {% is_eligible_to_own_a_group request.user as can_own %}
+  {% is_a_group_member request.user as is_member %}
+  {% if can_own and not is_member %}
+    {% include "imperial_coldfront_plugin/eligible_pi.html" %}
+  {% endif %}
+{% endif %}

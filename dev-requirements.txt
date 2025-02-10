@@ -14,7 +14,7 @@ asgiref==3.7.2
     #   django
     #   django-simple-history
     #   django-stubs
-attrs==24.2.0
+attrs==24.3.0
     # via pytest-mypy
 bibtexparser==1.4.1
     # via
@@ -40,15 +40,15 @@ charset-normalizer==3.3.2
     # via
     #   coldfront
     #   requests
-click==8.1.7
+click==8.1.8
     # via pip-tools
 coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
-coverage[toml]==7.6.4
+coverage[toml]==7.6.10
     # via pytest-cov
 crispy-bootstrap4==2024.1
     # via coldfront
-cryptography==43.0.3
+cryptography==44.0.0
     # via
     #   josepy
     #   mozilla-django-oidc
@@ -122,7 +122,7 @@ future==1.0.0
     #   doi2bib
 humanize==4.9.0
     # via coldfront
-identify==2.6.1
+identify==2.6.5
     # via pre-commit
 idna==3.6
     # via
@@ -134,7 +134,7 @@ josepy==1.14.0
     # via mozilla-django-oidc
 mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
-mypy==1.13.0
+mypy==1.14.1
     # via
     #   imperial_coldfront_plugin (pyproject.toml)
     #   pytest-mypy
@@ -142,7 +142,7 @@ mypy-extensions==1.0.0
     # via mypy
 nodeenv==1.9.1
     # via pre-commit
-packaging==24.1
+packaging==24.2
     # via
     #   build
     #   pytest
@@ -156,7 +156,7 @@ pre-commit==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyopenssl==24.2.1
+pyopenssl==24.3.0
     # via josepy
 pyparsing==3.1.2
     # via
@@ -166,7 +166,7 @@ pyproject-hooks==1.2.0
     # via
     #   build
     #   pip-tools
-pytest==8.3.3
+pytest==8.3.4
     # via
     #   imperial_coldfront_plugin (pyproject.toml)
     #   pytest-cov
@@ -200,14 +200,17 @@ requests==2.31.0
     # via
     #   coldfront
     #   doi2bib
+    #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
-ruff==0.7.2
+    #   uplink
+ruff==0.8.6
     # via imperial_coldfront_plugin (pyproject.toml)
 six==1.16.0
     # via
     #   blessed
     #   coldfront
     #   python-dateutil
+    #   uplink
 sqlparse==0.4.4
     # via
     #   coldfront
@@ -218,7 +221,7 @@ types-python-dateutil==2.8.19.20240106
     # via
     #   arrow
     #   coldfront
-types-pyyaml==6.0.12.20240917
+types-pyyaml==6.0.12.20241230
     # via django-stubs
 typing-extensions==4.10.0
     # via
@@ -226,17 +229,21 @@ typing-extensions==4.10.0
     #   django-stubs
     #   django-stubs-ext
     #   mypy
+uplink==0.9.7
+    # via imperial_coldfront_plugin (pyproject.toml)
+uritemplate==4.1.1
+    # via uplink
 urllib3==2.2.1
     # via
     #   coldfront
     #   requests
-virtualenv==20.27.1
+virtualenv==20.28.1
     # via pre-commit
 wcwidth==0.2.13
     # via
     #   blessed
     #   coldfront
-wheel==0.44.0
+wheel==0.45.1
     # via pip-tools
 
 # The following packages are considered to be unsafe in a requirements file:

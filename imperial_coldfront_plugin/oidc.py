@@ -5,9 +5,12 @@ from typing import Any
 from django.contrib.auth.models import User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
+from .microsoft_graph_client import get_graph_api_client
+from .models import UnixUID
+
 
 def _update_user(user: User, claims: dict[str, Any]) -> None:
-    user.username = claims["preferred_username"].rstrip("@ic.ac.uk")
+    user.username = claims["preferred_username"]
     user.email = claims["email"]
     user.first_name = claims["given_name"]
     user.last_name = claims["family_name"]
@@ -25,6 +28,7 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         """
         user = super().create_user(claims)
         _update_user(user, claims)
+        UnixUID.objects.create(user=user, identifier=claims["uid"])
         return user
 
     def update_user(self, user: User, claims: dict[str, Any]) -> User:
@@ -44,7 +48,7 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         We extend the superclass implementation of this method which provides data from
         the configured OIDC userinfo endpoint to include preferred_username from the
-        id_token.
+        id_token and the user's unix uid retrieved from the Microsoft Graph API.
 
         Args:
           access_token: for use with the Microsoft Entra graph API.
@@ -52,5 +56,9 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
           payload: decoded and verified claims from the id_token.
         """
         user_info = super().get_userinfo(access_token, id_token, payload)
-        user_info["preferred_username"] = payload["preferred_username"]
+        username = payload["preferred_username"].removesuffix("@ic.ac.uk")
+        user_info["preferred_username"] = username
+
+        graph_client = get_graph_api_client(access_token)
+        user_info["uid"] = graph_client.user_uid(username)
         return user_info

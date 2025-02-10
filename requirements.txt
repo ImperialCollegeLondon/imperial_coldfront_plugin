@@ -37,7 +37,7 @@ coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
 crispy-bootstrap4==2024.1
     # via coldfront
-cryptography==43.0.3
+cryptography==44.0.0
     # via
     #   josepy
     #   mozilla-django-oidc
@@ -110,7 +110,7 @@ mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyopenssl==24.2.1
+pyopenssl==24.3.0
     # via josepy
 pyparsing==3.1.2
     # via
@@ -133,12 +133,15 @@ requests==2.31.0
     # via
     #   coldfront
     #   doi2bib
+    #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
+    #   uplink
 six==1.16.0
     # via
     #   blessed
     #   coldfront
     #   python-dateutil
+    #   uplink
 sqlparse==0.4.4
     # via
     #   coldfront
@@ -153,6 +156,10 @@ typing-extensions==4.10.0
     # via
     #   coldfront
     #   django-stubs-ext
+uplink==0.9.7
+    # via imperial_coldfront_plugin (pyproject.toml)
+uritemplate==4.1.1
+    # via uplink
 urllib3==2.2.1
     # via
     #   coldfront

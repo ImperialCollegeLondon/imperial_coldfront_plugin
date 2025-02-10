@@ -1,7 +1,18 @@
 {% extends "common/base.html" %}
 {% block content %}
-    <h1>Group Members</h1>
-    <ul>
-        {% for member in group_members %}<li>{{ member.member.get_full_name }}</li>{% endfor %}
-    </ul>
+  <h1>Group Members</h1>
+  <ul>
+    {% for member in group_members %}
+      <li>
+        {{ member.member.get_full_name }} (expires {{ member.expiration }}) -
+        <a href="{% url 'imperial_coldfront_plugin:remove_group_member' member.pk %}">Remove access</a>
+        {% if is_manager == False and member.is_manager == False %}
+          | <a href="{% url 'imperial_coldfront_plugin:make_manager' member.pk %}">Make manager</a>
+        {% endif %}
+        {% if member.is_manager and is_manager == False %}
+          | <a href="{% url 'imperial_coldfront_plugin:remove_manager' member.pk %}">Remove manager</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
 {% endblock content %}

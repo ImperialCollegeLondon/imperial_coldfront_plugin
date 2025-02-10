@@ -1,0 +1,41 @@
+name: Upgrade Python Dependencies with pip-compile
+
+on:
+  schedule:
+    - cron: 0 0 * * 1   # midnight every Monday
+
+permissions:
+  contents: write
+  pull-requests: write # Needed if in a private repository
+
+jobs:
+  upgrade-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -U pip pip-tools
+
+      - name: Upgrade dependencies
+        run: |
+          pip-compile --upgrade
+          pip-compile --upgrade --extra=dev --output-file=dev-requirements.txt
+          pip-compile --upgrade --extra=doc --output-file=doc-requirements.txt
+
+      - name: Check file consistency
+        run: pip-sync requirements.txt dev-requirements.txt doc-requirements.txt
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7.0.6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: upgrade/python-dependencies
+          title: Upgrade python dependencies
+          commit-message: ':arrow_up: Upgrade Python dependencies with pip-compile'
+          body: Upgrade versions of Python dependencies to latest version using `pip-compile --upgrade`.
