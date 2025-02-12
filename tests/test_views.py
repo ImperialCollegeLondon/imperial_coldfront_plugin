@@ -602,6 +602,7 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         assert member.email in email.body
         assert member.get_full_name() in email.body
 
+
 class TestGroupMembershipExtendView(LoginRequiredMixin):
     """Tests for the group membership extend view."""
 
