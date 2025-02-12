@@ -223,13 +223,22 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
             return render(
                 request=request,
                 template_name="imperial_coldfront_plugin/accept_group_invite.html",
-                context={"inviter": group.owner, "group": group.name},
+                context={
+                    "inviter": group.owner,
+                    "group": group.name,
+                    "expiration": expiration,
+                },
             )
     else:
         form = TermsAndConditionsForm()
     return render(
         request=request,
-        context={"inviter": group.owner, "group": group.name, "form": form},
+        context={
+            "inviter": group.owner,
+            "group": group.name,
+            "expiration": expiration,
+            "form": form,
+        },
         template_name="imperial_coldfront_plugin/member_terms_and_conditions.html",
     )
 
