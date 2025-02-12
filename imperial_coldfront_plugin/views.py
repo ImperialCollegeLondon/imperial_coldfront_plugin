@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.db import IntegrityError
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -216,9 +217,14 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         # Check if the user has accepted the terms and conditions.
         if form.is_valid():
             # Update group membership in the database.
-            GroupMembership.objects.get_or_create(
-                group=group, member=request.user, expiration=expiration
-            )
+            try:
+                GroupMembership.objects.create(
+                    group=group,
+                    member=request.user,
+                    expiration=expiration,
+                )
+            except IntegrityError:
+                return HttpResponseBadRequest("User already in group")
             send_group_access_granted_email(request.user, group.owner)
             return render(
                 request=request,
@@ -291,7 +297,7 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
     )
     for user in qs:
         passwd += format_str.format(
-            user=user, uid=user.unixuid, group=user.groupmembership_set.get().group
+            user=user, uid=user.unixuid, group=user.groupmembership.group
         )
     for user in (
         User.objects.filter(userprofile__is_pi=True)
