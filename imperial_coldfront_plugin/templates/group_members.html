@@ -15,4 +15,21 @@
       </li>
     {% endfor %}
   </ul>
+  <h1>Membership Extension</h1>
+  <table>
+    <tr>
+      <th>Name</th>
+      <th>Expiration Date</th>
+      <th>Actions</th>
+    </tr>
+    {% for member in group_members %}
+      <tr>
+        <td>{{ member.member.get_full_name }}</td>
+        <td>{{ member.expiration }}</td>
+        <td>
+          <a href="{% url 'imperial_coldfront_plugin:extend_membership' member.pk %}">Extend Membership</a>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
 {% endblock content %}
