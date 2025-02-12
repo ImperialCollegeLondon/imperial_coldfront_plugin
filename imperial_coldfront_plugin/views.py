@@ -90,10 +90,10 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
 @login_required
 def check_access(request: HttpRequest):
     """Informational view displaying the user's current access to RCS resources."""
-    if request.user.userprofile.is_pi:
-        message = "You have access to RCS resources as a PI."
-    elif request.user.is_superuser:
-        message = "You have access to RCS resources as an administrator."
+    if request.user.is_superuser:
+        message = "You have access as an administrator."
+    elif ResearchGroup.objects.filter(owner=request.user):
+        message = "You have access as the owner of a HPC access group."
     else:
         try:
             group_membership = GroupMembership.objects.get(member=request.user)
