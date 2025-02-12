@@ -44,9 +44,6 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
     where the specified user (identified by `group_pk`) is the owner. Access is
     restricted to either the group owner, an administrator, or a manager.
     Unauthorised users will receive a permission denied response.
-    The view also checks if the specified user has Principal Investigator (PI) status
-    (via the `is_pi` attribute). If the user is not a PI, the view will render a
-    message indicating that the user does not own a group.
 
     Args:
         request (HttpRequest): The HTTP request object containing metadata about the
