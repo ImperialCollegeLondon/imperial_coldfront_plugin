@@ -1,11 +1,10 @@
+{% load navbar_tags %}
 <li id="navbar-project-menu" class="nav-item dropdown">
   <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">HPC Access Management</a>
   <div class="dropdown-menu">
     <a class="dropdown-item"
        href="{% url 'imperial_coldfront_plugin:check_access' %}">Check Access</a>
-    {% if request.user.userprofile.is_pi %}
-      <a class="dropdown-item"
-         href="{% url 'imperial_coldfront_plugin:group_members' request.user.pk %}">Manage Your Group</a>
-    {% endif %}
+    {% get_group_url request.user as group_url %}
+    {% if group_url %}<a class="dropdown-item" href="{{ group_url }}">Manage Your Group</a>{% endif %}
   </div>
 </li>
