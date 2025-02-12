@@ -300,7 +300,7 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
             user=user, uid=user.unixuid, group=user.groupmembership.group
         )
     for user in (
-        User.objects.filter(userprofile__is_pi=True)
+        User.objects.filter(researchgroup__isnull=False)
         .filter(unixuid__isnull=False)
         .distinct()
         .difference(qs)
