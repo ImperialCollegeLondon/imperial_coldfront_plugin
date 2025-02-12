@@ -175,7 +175,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             invite_url = request.build_absolute_uri(
                 reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             )
-            send_group_invite_email(invitee_email, request.user, invite_url)
+            send_group_invite_email(invitee_email, request.user, invite_url, expiration)
             return render(
                 request,
                 "imperial_coldfront_plugin/invite_sent.html",

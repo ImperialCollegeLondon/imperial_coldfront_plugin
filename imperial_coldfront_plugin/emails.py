@@ -23,14 +23,15 @@ def send_email_in_background(to_addresses: list[str], subject: str, body: str):
     )
 
 
-def send_group_invite_email(invitee_email, owner, invite_url):
+def send_group_invite_email(invitee_email, owner, invite_url, expiration):
     """Notify a user that they have been invited to join a ResearchGroup."""
     send_email_in_background(
         [invitee_email],
         "HPC Access Invitation",
         "You've been invited to join the access group of "
         f"{owner.get_full_name()} ({owner.email})\n\n"
-        f"Click the following link to accept the invitation:\n{invite_url}",
+        f"Click the following link to accept the invitation:\n{invite_url}.\n"
+        f"Your membership is due to expire on {expiration}.",
     )
 
 
@@ -40,7 +41,7 @@ def send_group_access_granted_email(user, owner):
         [user.email, owner.email],
         "HPC Access Granted",
         f"This email is to confirm that {user.get_full_name()} ({user.email}) has been"
-        f"granted access to the HPC access group of {owner.get_full_name()}.",
+        f"granted access to the HPC access group of {owner.get_full_name()}",
     )
 
 
