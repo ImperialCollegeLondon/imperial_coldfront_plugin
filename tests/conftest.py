@@ -240,3 +240,44 @@ def pi_user_profile():
         "username": "test_user",
         "job_title": "Professor of Computing",
     }
+
+
+@pytest.fixture
+def superuser(user_factory):
+    """Return a superuser."""
+    return user_factory(is_superuser=True)
+
+
+def _get_user_fixture(request):
+    """Return a user fixture."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["pi", "pi_group_manager", "superuser"])
+def pi_manager_or_superuser(request):
+    """Parametrized fixture providing a pi, manager or superuser."""
+    return _get_user_fixture(request)
+
+
+@pytest.fixture(params=["pi", "superuser"])
+def pi_or_superuser(request):
+    """Parametrized fixture providing a pi or superuser."""
+    return _get_user_fixture(request)
+
+
+@pytest.fixture(params=["pi_group_member", "pi_group_manager"])
+def member_or_manager(request):
+    """Parametrized fixture providing a member or manager."""
+    return _get_user_fixture(request)
+
+
+@pytest.fixture(params=["user", "pi_group_member"])
+def user_or_member(request):
+    """Parametrized fixture providing a user or member."""
+    return _get_user_fixture(request)
+
+
+@pytest.fixture(params=["user", "pi_group_member", "pi_group_manager"])
+def user_member_or_manager(request):
+    """Parametrized fixture providing a user, member or manager."""
+    return _get_user_fixture(request)
