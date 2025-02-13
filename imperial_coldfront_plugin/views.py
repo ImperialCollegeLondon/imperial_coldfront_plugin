@@ -44,9 +44,6 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
     where the specified user (identified by `group_pk`) is the owner. Access is
     restricted to either the group owner, an administrator, or a manager.
     Unauthorised users will receive a permission denied response.
-    The view also checks if the specified user has Principal Investigator (PI) status
-    (via the `is_pi` attribute). If the user is not a PI, the view will render a
-    message indicating that the user does not own a group.
 
     Args:
         request (HttpRequest): The HTTP request object containing metadata about the
@@ -90,10 +87,10 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
 @login_required
 def check_access(request: HttpRequest):
     """Informational view displaying the user's current access to RCS resources."""
-    if request.user.userprofile.is_pi:
-        message = "You have access to RCS resources as a PI."
-    elif request.user.is_superuser:
-        message = "You have access to RCS resources as an administrator."
+    if request.user.is_superuser:
+        message = "You have access as an administrator."
+    elif ResearchGroup.objects.filter(owner=request.user):
+        message = "You have access as the owner of a HPC access group."
     else:
         try:
             group_membership = GroupMembership.objects.get(member=request.user)
@@ -300,7 +297,7 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
             user=user, uid=user.unixuid, group=user.groupmembership.group
         )
     for user in (
-        User.objects.filter(userprofile__is_pi=True)
+        User.objects.filter(researchgroup__isnull=False)
         .filter(unixuid__isnull=False)
         .distinct()
         .difference(qs)

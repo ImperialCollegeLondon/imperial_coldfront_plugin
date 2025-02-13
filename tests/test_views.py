@@ -309,12 +309,13 @@ class TestCheckAccessView(LoginRequiredMixin):
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:check_access")
 
-    def test_pi(self, pi_client):
+    def test_pi(self, pi_client, pi_group):
         """Test that the view works for PIs."""
         response = pi_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert (
-            response.context["message"] == "You have access to RCS resources as a PI."
+            response.context["message"]
+            == "You have access as the owner of a HPC access group."
         )
 
     def test_superuser(self, auth_client_factory, user_factory):
@@ -323,10 +324,7 @@ class TestCheckAccessView(LoginRequiredMixin):
         client = auth_client_factory(superuser)
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
-        assert (
-            response.context["message"]
-            == "You have access to RCS resources as an administrator."
-        )
+        assert response.context["message"] == "You have access as an administrator."
 
     def test_group_member(self, pi, pi_group, auth_client_factory):
         """Test that the view works for members of a group."""
