@@ -157,6 +157,33 @@ def pi_group(research_group_factory, pi):
 
 
 @pytest.fixture
+def pi_group_member(pi_group):
+    """Provides the member of pi_group."""
+    return pi_group.groupmembership_set.first().member
+
+
+@pytest.fixture
+def pi_group_membership(pi_group_member):
+    """Provides the GroupMembership object for pi_group_member."""
+    return pi_group_member.groupmembership
+
+
+@pytest.fixture
+def pi_group_manager(pi_group, user_factory):
+    """Provides a manager for pi_group."""
+    from imperial_coldfront_plugin.models import GroupMembership
+
+    manager = user_factory(username="manager")
+    GroupMembership.objects.create(
+        group=pi_group,
+        member=manager,
+        is_manager=True,
+        expiration=timezone.datetime.max,
+    )
+    return manager
+
+
+@pytest.fixture
 def user_client(auth_client_factory, user):
     """Return an authenticated Django test client for `user`."""
     return auth_client_factory(user)
@@ -166,19 +193,6 @@ def user_client(auth_client_factory, user):
 def pi_client(auth_client_factory, pi):
     """Return an authenticated Django test client for a PI."""
     return auth_client_factory(pi)
-
-
-@pytest.fixture
-def manager_in_group(user_factory, research_group_factory):
-    """Return a user who is a manager in a research group."""
-    from imperial_coldfront_plugin.models import GroupMembership
-
-    manager = user_factory()
-    group, memberships = research_group_factory(number_of_members=3)
-    GroupMembership.objects.create(
-        group=group, member=manager, is_manager=True, expiration=timezone.now()
-    )
-    return manager, group
 
 
 @pytest.fixture

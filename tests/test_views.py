@@ -78,14 +78,13 @@ class TestGroupMembersView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert set(response.context["group_members"]) == set(memberships)
 
-    def test_manager(self, auth_client_factory, manager_in_group):
+    def test_manager(self, auth_client_factory, pi_group_manager, pi_group):
         """Test that a group manager can access the view."""
-        manager, group = manager_in_group
-        client = auth_client_factory(manager)
-        response = client.get(self._get_url(group.pk))
+        client = auth_client_factory(pi_group_manager)
+        response = client.get(self._get_url(pi_group.pk))
         assert response.status_code == HTTPStatus.OK
         assert set(response.context["group_members"]) == set(
-            group.groupmembership_set.all()
+            pi_group.groupmembership_set.all()
         )
         assert response.context["is_manager"]
 
@@ -146,11 +145,13 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.content == b"You are not a group owner."
 
     def test_manager_can_access(
-        self, manager_in_group, auth_client_factory, get_graph_api_client_mock, settings
+        self,
+        auth_client_factory,
+        get_graph_api_client_mock,
+        pi_group_manager,  # settings
     ):
         """Test that a group manager can access the view."""
-        manager, group = manager_in_group
-        client = auth_client_factory(manager)
+        client = auth_client_factory(pi_group_manager)
         data = {"username": "username", "expiration": timezone.datetime.max.date()}
         response = client.post(self._get_url(), data=data)
         assert response.status_code == 200
@@ -326,10 +327,9 @@ class TestCheckAccessView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert response.context["message"] == "You have access as an administrator."
 
-    def test_group_member(self, pi, pi_group, auth_client_factory):
+    def test_group_member(self, pi, pi_group, pi_group_member, auth_client_factory):
         """Test that the view works for members of a group."""
-        member = pi_group.groupmembership_set.first().member
-        response = auth_client_factory(member).get(self._get_url())
+        response = auth_client_factory(pi_group_member).get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert response.context["message"] == (
             "You have been granted access to the RCS compute cluster as a member "
@@ -355,7 +355,12 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         )
 
     def test_not_group_owner_or_manager(
-        self, research_group_factory, auth_client_factory, user_client, pi_group
+        self,
+        research_group_factory,
+        auth_client_factory,
+        user_client,
+        pi_group,
+        pi_group_member,
     ):
         """Test non group owner or manager cannot access the view."""
         group, memberships = research_group_factory(number_of_members=1)
@@ -364,14 +369,13 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-        group_membership = pi_group.groupmembership_set.first()
-        response = user_client.get(self._get_url(group_membership.pk))
+        response = user_client.get(self._get_url(pi_group_member.groupmembership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-    def test_group_owner(self, pi_client, pi_group):
+    def test_group_owner(self, pi_client, pi_group, pi_group_member):
         """Test that the group owner can remove a group member."""
-        group_membership = pi_group.groupmembership_set.first()
+        group_membership = pi_group_member.groupmembership
         response = pi_client.get(self._get_url(group_membership.pk))
         assertRedirects(
             response,
@@ -386,11 +390,12 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    def test_manager(self, auth_client_factory, manager_in_group):
+    def test_manager(
+        self, auth_client_factory, pi_group_manager, pi_group, pi_group_member
+    ):
         """Test that a group manager can remove a group member."""
-        manager, group = manager_in_group
-        group_membership = group.groupmembership_set.first()
-        client = auth_client_factory(manager)
+        group_membership = pi_group_member.groupmembership
+        client = auth_client_factory(pi_group_manager)
         response = client.get(self._get_url(group_membership.pk))
         assertRedirects(
             response,
@@ -493,9 +498,9 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-    def test_group_owner(self, pi_client, pi_group):
+    def test_group_owner(self, pi_client, pi_group, pi_group_member):
         """Test that the group owner can make a group member a manager."""
-        group_membership = pi_group.groupmembership_set.first()
+        group_membership = pi_group_member.groupmembership
         response = pi_client.get(self._get_url(group_membership.pk))
         assertRedirects(
             response,
@@ -510,13 +515,15 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    def test_successful_manager_promotion(self, pi_client, pi_group, mailoutbox):
+    def test_successful_manager_promotion(
+        self, pi, pi_client, pi_group, mailoutbox, pi_group_member, pi_group_membership
+    ):
         """Test successful promotion of group member to manager."""
-        group_membership = pi_group.groupmembership_set.first()
-        pi = pi_group.owner
-        member = group_membership.member
+        # group_membership = pi_group_member.groupmembership
+        # pi = pi_group.owner
+        # member = group_membership.member
 
-        response = pi_client.get(self._get_url(group_membership.pk))
+        response = pi_client.get(self._get_url(pi_group_membership.pk))
 
         assertRedirects(
             response,
@@ -526,16 +533,16 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
             ),
         )
 
-        group_membership.refresh_from_db()
-        assert group_membership.is_manager is True
+        pi_group_membership.refresh_from_db()
+        assert pi_group_membership.is_manager is True
 
         assert len(mailoutbox) == 1
         email = mailoutbox[0]
 
         assert email.subject == "HPC Access Manager Added"
-        assert email.to == [member.email, pi.email]
-        assert member.email in email.body
-        assert member.get_full_name() in email.body
+        assert email.to == [pi_group_member.email, pi.email]
+        assert pi_group_member.email in email.body
+        assert pi_group_member.get_full_name() in email.body
         assert pi_group.owner.get_full_name() in email.body
 
 
@@ -557,15 +564,14 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-    def test_group_owner(self, pi_client, pi_group):
-        """Test that the group owner can remove a group manager."""
-        group_membership = pi_group.groupmembership_set.first()
-        response = pi_client.get(self._get_url(group_membership.pk))
+    def test_group_owner(self, pi_client, pi_group_membership):
+        """Test that the pi_group_group owner can remove a group manager."""
+        response = pi_client.get(self._get_url(pi_group_membership.pk))
         assertRedirects(
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[group_membership.group.pk],
+                args=[pi_group_membership.group.pk],
             ),
         )
 
@@ -574,12 +580,11 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         response = user_client.get(self._get_url(1))
         assert response.status_code == HTTPStatus.NOT_FOUND
 
-    def test_successful_manager_removal(self, pi_client, pi_group, mailoutbox):
+    def test_successful_manager_removal(
+        self, pi_client, pi_group_manager, pi_group, mailoutbox
+    ):
         """Test successful removal of group manager."""
-        group_membership = pi_group.groupmembership_set.first()
-        group_membership.is_manager = True
-        group_membership.save()
-        member = group_membership.member
+        group_membership = pi_group_manager.groupmembership
 
         response = pi_client.get(self._get_url(group_membership.pk))
 
@@ -587,7 +592,7 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:group_members",
-                args=[pi_group.pk],
+                args=[group_membership.group.pk],
             ),
         )
 
@@ -598,9 +603,9 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         email = mailoutbox[0]
 
         assert email.subject == "HPC Access Manager Removed"
-        assert email.to == [member.email, pi_group.owner.email]
-        assert member.email in email.body
-        assert member.get_full_name() in email.body
+        assert email.to == [pi_group_manager.email, pi_group.owner.email]
+        assert pi_group_manager.email in email.body
+        assert pi_group_manager.get_full_name() in email.body
 
 
 class TestGroupMembershipExtendView(LoginRequiredMixin):
@@ -612,45 +617,47 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
         )
 
     def test_not_group_owner(
-        self, research_group_factory, auth_client_factory, user_client, pi_group
+        self,
+        research_group_factory,
+        auth_client_factory,
+        user_client,
+        pi_group,
+        pi_group_membership,
     ):
         """Test non group owner or non group manager cannot access the view."""
         group, memberships = research_group_factory(number_of_members=1)
         client = auth_client_factory(group.owner)
-        response = client.get(self._get_url())
+        response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-        group_membership = pi_group.groupmembership_set.first()
-        response = user_client.get(self._get_url(group_membership.pk))
+        response = user_client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
-    def test_group_owner(self, pi_client, pi_group):
+    def test_group_owner(self, pi_client, pi_group, pi_group_membership):
         """Test that the group owner can extend a group membership."""
-        group_membership = pi_group.groupmembership_set.first()
-        response = pi_client.get(self._get_url(group_membership.pk))
+        response = pi_client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], GroupMembershipExtendForm)
-        assert response.context["group_membership"] == group_membership
+        assert response.context["group_membership"] == pi_group_membership
 
     def test_manager_cannot_extend_own_membership(
-        self, manager_in_group, auth_client_factory
+        self, pi_group_manager, pi_group, auth_client_factory
     ):
         """Test that a group manager cannot extend their own membership."""
-        manager, group = manager_in_group
-        group_membership = group.groupmembership_set.get(member=manager)
-        client = auth_client_factory(manager)
+        group_membership = pi_group.groupmembership_set.get(member=pi_group_manager)
+        client = auth_client_factory(pi_group_manager)
         response = client.get(self._get_url(group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"You cannot extend your own membership."
 
-    def test_successful_membership_extension(self, pi_client, pi_group):
+    def test_successful_membership_extension(
+        self, pi_client, pi_group, pi_group_membership
+    ):
         """Test successful extension of group membership."""
-        group_membership = pi_group.groupmembership_set.first()
-
         response = pi_client.post(
-            self._get_url(group_membership.pk), data={"extend_length": 120}
+            self._get_url(pi_group_membership.pk), data={"extend_length": 120}
         )
 
         assertRedirects(
@@ -661,12 +668,13 @@ class TestGroupMembershipExtendView(LoginRequiredMixin):
             ),
         )
 
-        current_expiration = group_membership.expiration
+        current_expiration = pi_group_membership.expiration
 
-        group_membership.refresh_from_db()
+        pi_group_membership.refresh_from_db()
 
-        assert group_membership.expiration == current_expiration + datetime.timedelta(
-            days=120
+        assert (
+            pi_group_membership.expiration
+            == current_expiration + datetime.timedelta(days=120)
         )
 
 
@@ -726,10 +734,11 @@ class TestHomeView:
         get_graph_api_client_mock,
         eligible_html,
         pi_user_profile,
+        pi_group_member,
     ):
         """Test rendering for user ineligible because of another group membership."""
         get_graph_api_client_mock().user_profile.return_value = pi_user_profile
-        request_.user = pi_group.groupmembership_set.first().member
+        request_.user = pi_group_member
 
         response = render(request_, "imperial_coldfront_plugin/home.html")
 
