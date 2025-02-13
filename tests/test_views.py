@@ -40,6 +40,15 @@ class LoginRequiredMixin:
         assert response.url.startswith(settings.LOGIN_URL)
 
 
+class GroupMembershipPKMixin:
+    """Mixin for tests that require a group membership pk."""
+
+    def test_invalid_groupmembership(self, user_client):
+        """Test the view response for an invalid group membership."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.NOT_FOUND
+
+
 class TestGroupMembersView(LoginRequiredMixin):
     """Tests for the group members view."""
 
@@ -313,7 +322,7 @@ class TestCheckAccessView(LoginRequiredMixin):
         )
 
 
-class TestRemoveGroupMemberView(LoginRequiredMixin):
+class TestRemoveGroupMemberView(LoginRequiredMixin, GroupMembershipPKMixin):
     """Tests for the remove group member view."""
 
     def _get_url(self, group_membership_pk=1):
@@ -347,11 +356,6 @@ class TestRemoveGroupMemberView(LoginRequiredMixin):
                 args=[group_membership.group.pk],
             ),
         )
-
-    def test_invalid_groupmembership(self, user_client):
-        """Test the view response for an invalid group membership."""
-        response = user_client.get(self._get_url(1))
-        assert response.status_code == HTTPStatus.NOT_FOUND
 
 
 class TestGetActiveUsersView:
@@ -428,7 +432,7 @@ class TestGetGroupDataView:
         assert response.content == expected
 
 
-class TestMakeGroupManagerView(LoginRequiredMixin):
+class TestMakeGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
     """Tests for the make group manager view."""
 
     def _get_url(self, group_membership_pk=1):
@@ -444,11 +448,6 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
-
-    def test_invalid_groupmembership(self, user_client):
-        """Test the view response for an invalid group membership."""
-        response = user_client.get(self._get_url(1))
-        assert response.status_code == HTTPStatus.NOT_FOUND
 
     def test_get(
         self,
@@ -484,7 +483,7 @@ class TestMakeGroupManagerView(LoginRequiredMixin):
         assert pi_group.owner.get_full_name() in email.body
 
 
-class TestRemoveGroupManagerView(LoginRequiredMixin):
+class TestRemoveGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
     """Tests for the remove group manager view."""
 
     def _get_url(self, group_membership_pk=1):
@@ -501,11 +500,6 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         response = client.get(self._get_url(pi_group_manager.groupmembership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
-
-    def test_invalid_groupmembership(self, user_client):
-        """Test the view response for an invalid group membership."""
-        response = user_client.get(self._get_url(1))
-        assert response.status_code == HTTPStatus.NOT_FOUND
 
     def test_successful_manager_removal(
         self,
@@ -541,7 +535,7 @@ class TestRemoveGroupManagerView(LoginRequiredMixin):
         assert pi_group_manager.get_full_name() in email.body
 
 
-class TestGroupMembershipExtendView(LoginRequiredMixin):
+class TestGroupMembershipExtendView(LoginRequiredMixin, GroupMembershipPKMixin):
     """Tests for the group membership extend view."""
 
     def _get_url(self, group_membership_pk=1):
