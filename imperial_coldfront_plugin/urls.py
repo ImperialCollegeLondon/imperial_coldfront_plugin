@@ -17,7 +17,11 @@ urlpatterns = [
         views.check_access,
         name="check_access",
     ),
-    path("send_group_invite/", views.send_group_invite, name="send_group_invite"),
+    path(
+        "send_group_invite/<int:group_pk>",
+        views.send_group_invite,
+        name="send_group_invite",
+    ),
     path(
         "accept_group_invite/<str:token>/",
         views.accept_group_invite,
@@ -30,7 +34,7 @@ urlpatterns = [
     ),
     path("active_users/", views.get_active_users, name="get_active_users"),
     path("groups/", views.get_group_data, name="get_group_data"),
-    path("user_search/", views.user_search, name="user_search"),
+    path("user_search/<int:group_pk>", views.user_search, name="user_search"),
     path(
         "make_manager/<int:group_membership_pk>/",
         views.make_group_manager,

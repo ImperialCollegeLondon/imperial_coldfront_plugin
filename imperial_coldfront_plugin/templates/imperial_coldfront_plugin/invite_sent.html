@@ -2,6 +2,6 @@
 {% block content %}
   <p>Invitation sent to {{ invitee_email }}</p>
   <p>
-    <a href="{% url 'imperial_coldfront_plugin:user_search' %}">Invite another</a>
+    <a href="{% url 'imperial_coldfront_plugin:user_search' group_pk %}">Invite another</a>
   </p>
 {% endblock content %}
