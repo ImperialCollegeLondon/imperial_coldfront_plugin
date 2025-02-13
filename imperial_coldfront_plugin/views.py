@@ -112,8 +112,17 @@ def user_search(request: HttpRequest, group_pk: int) -> HttpResponse:
             search_query = form.cleaned_data["search"]
             graph_client = get_graph_api_client()
             search_results = graph_client.user_search(search_query)
+
+            group_memberships = GroupMembership.objects.filter(group__pk=group_pk)
+            group_members = [
+                membership.member.username for membership in group_memberships
+            ]
+
             filtered_results = [
-                user for user in search_results if user_eligible_for_hpc_access(user)
+                user
+                for user in search_results
+                if user_eligible_for_hpc_access(user)
+                and user["username"] not in group_members
             ]
             return render(
                 request,

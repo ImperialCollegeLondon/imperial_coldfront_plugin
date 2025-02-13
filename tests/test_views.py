@@ -85,12 +85,11 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], UserSearchForm)
 
-    def test_post(self, get_graph_api_client_mock, user_client):
+    def test_post(self, get_graph_api_client_mock, user_client, parsed_profile):
         """Test search form submission."""
-        get_graph_api_client_mock().user_search.return_value = []
         response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
-        assert response.context["search_results"] == []
+        assert response.context["search_results"] == [parsed_profile]
 
     def test_search_filter(
         self, get_graph_api_client_mock, user_client, parsed_profile
@@ -107,12 +106,27 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert response.context["search_results"] == [parsed_profile]
 
+    def test_existing_user(
+        self,
+        get_graph_api_client_mock,
+        pi_client,
+        pi_group,
+        pi_group_member,
+        parsed_profile,
+    ):
+        """Checking that the search results do not include existing group members."""
+        parsed_profile["username"] = pi_group_member.username
+        response = pi_client.post(self._get_url(pi_group.pk), data={"search": "foo"})
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == []
+
 
 @pytest.fixture
 def get_graph_api_client_mock(mocker, parsed_profile):
     """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
     mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
     mock().user_profile.return_value = parsed_profile
+    mock().user_search.return_value = [parsed_profile]
     return mock
 
 
