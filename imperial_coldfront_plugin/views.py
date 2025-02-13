@@ -153,6 +153,9 @@ def send_group_invite(request: HttpRequest, group_pk: int) -> HttpResponse:
                 return HttpResponseBadRequest("Expiration date should be in the future")
 
             username = form.cleaned_data["username"]
+            if GroupMembership.objects.filter(member__username=username):
+                return HttpResponseBadRequest("User already in a group")
+
             graph_client = get_graph_api_client()
             user_profile = graph_client.user_profile(username)
 

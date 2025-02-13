@@ -206,6 +206,17 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.content == b"Invalid data"
         assert len(mailoutbox) == 0
 
+    def test_user_already_in_group(self, pi_client, pi_group, research_group_factory):
+        """Test that a user who is already in the group cannot be invited."""
+        group, [membership] = research_group_factory(number_of_members=1)
+        data = {
+            "username": membership.member.username,
+            "expiration": timezone.datetime.max.date(),
+        }
+        response = pi_client.post(self._get_url(pi_group.pk), data=data)
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"User already in a group"
+
 
 class TestAcceptGroupInvite(LoginRequiredMixin):
     """Tests for the accept group invite view."""
