@@ -66,9 +66,8 @@ class TestNavbarTags:
             "imperial_coldfront_plugin:group_members", args=[pi_group.pk]
         )
 
-    def test_get_group_url_manager(self, manager_in_group):
+    def test_get_group_url_manager(self, pi_group, pi_group_manager):
         """Test get_group_url returns the correct URL for a group manager."""
-        manager, group = manager_in_group
-        assert get_group_url(manager) == reverse(
-            "imperial_coldfront_plugin:group_members", args=[group.pk]
+        assert get_group_url(pi_group_manager) == reverse(
+            "imperial_coldfront_plugin:group_members", args=[pi_group.pk]
         )

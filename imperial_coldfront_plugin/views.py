@@ -137,11 +137,12 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group."""
     if (
         not ResearchGroup.objects.filter(owner=request.user).exists()
+        and not request.user.is_superuser
         and not GroupMembership.objects.filter(
             member=request.user, is_manager=True
         ).exists()
     ):
-        return HttpResponseForbidden("You are not a group owner.")
+        return HttpResponseForbidden("Permission denied")
 
     if request.method == "POST":
         form = GroupMembershipForm(request.POST)
@@ -336,13 +337,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
 
-    if (
-        request.user != group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            group=group, member=request.user
-        ).exists()
-    ):
+    if request.user != group.owner and not request.user.is_superuser:
         return HttpResponseForbidden("Permission denied")
 
     group_membership.is_manager = True
@@ -366,13 +361,7 @@ def remove_group_manager(
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
 
-    if (
-        request.user != group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            group=group, member=request.user
-        ).exists()
-    ):
+    if request.user != group.owner and not request.user.is_superuser:
         return HttpResponseForbidden("Permission denied")
 
     group_membership.is_manager = False
@@ -403,7 +392,7 @@ def group_membership_extend(
         request.user != group.owner
         and not request.user.is_superuser
         and not GroupMembership.objects.filter(
-            group=group, member=request.user
+            group=group, member=request.user, is_manager=True
         ).exists()
     ):
         return HttpResponseForbidden("Permission denied")
@@ -424,9 +413,7 @@ def group_membership_extend(
             group_membership.expiration += datetime.timedelta(days=extend_length)
             group_membership.save()
             return redirect(
-                reverse(
-                    "imperial_coldfront_plugin:group_members", args=[group.owner.pk]
-                )
+                reverse("imperial_coldfront_plugin:group_members", args=[group.pk])
             )
 
     else:
