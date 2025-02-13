@@ -17,7 +17,7 @@ from imperial_coldfront_plugin.forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
-from imperial_coldfront_plugin.models import GroupMembership, UnixUID
+from imperial_coldfront_plugin.models import UnixUID
 
 
 @pytest.fixture
@@ -294,11 +294,13 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
         assert user.email in email.body
         assert pi_group.owner.get_full_name() in email.body
 
-    def test_post_valid_already_member(self, user_client, pi_group, user):
+    def test_post_valid_already_member(self, pi_group, auth_client_factory):
         """Test that the view doesn't duplicate group memberships."""
+        user = pi_group.groupmembership_set.first().member
+        client = auth_client_factory(user)
         token = self._get_token(user.email, pi_group.owner.pk)
-        user_client.post(self._get_url(token), data={"accept": True})
-        GroupMembership.objects.get(group=pi_group, member=user)
+        response = client.post(self._get_url(token), data={"accept": True})
+        assert response.status_code == HTTPStatus.BAD_REQUEST
 
 
 class TestCheckAccessView(LoginRequiredMixin):
