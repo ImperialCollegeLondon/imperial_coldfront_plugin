@@ -536,7 +536,6 @@ class TestRemoveGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
 
 
 class TestGroupMembershipExtendView(LoginRequiredMixin, GroupMembershipPKMixin):
-
     """Tests for the group membership extend view."""
 
     def _get_url(self, group_membership_pk=1):
