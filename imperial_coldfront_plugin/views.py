@@ -27,7 +27,6 @@ from .emails import (
 from .forms import (
     GroupMembershipExtendForm,
     GroupMembershipForm,
-    ResearchGroupForm,
     TermsAndConditionsForm,
     UserSearchForm,
 )
@@ -45,9 +44,9 @@ User = get_user_model()
 def research_group_terms_view(request):
     """View for accepting T&Cs and creating a ResearchGroup."""
     if request.method == "POST":
-        form = ResearchGroupForm(request.POST)
+        form = TermsAndConditionsForm(request.POST)  # use TermsAndConditionsForm
         if form.is_valid():
-            group_name = form.cleaned_data["name"]
+            group_name = f"Research Group {request.user.username}"  # Autogenerate name
             gid = generate_unique_gid()
 
             ResearchGroup.objects.create(owner=request.user, gid=gid, name=group_name)
@@ -55,7 +54,7 @@ def research_group_terms_view(request):
             messages.success(request, "Research group created successfully.")
             return redirect(reverse("imperial_coldfront_plugin:group_members"))
     else:
-        form = ResearchGroupForm()
+        form = TermsAndConditionsForm()  # use TermsAndConditionsForm
 
     return render(
         request, "imperial_coldfront_plugin/research_group_terms.html", {"form": form}
