@@ -91,7 +91,7 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert response.context["search_results"] == [parsed_profile]
 
-    def test_using_eligibility_filter(
+    def test_eligibility_filter(
         self, get_graph_api_client_mock, mocker, parsed_profile, user_client
     ):
         """Test that the user_eligible_for_hpc_access function is used."""
@@ -101,6 +101,7 @@ class TestUserSearchView(LoginRequiredMixin):
         filter_mock.return_value = False
         response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == []
         filter_mock.assert_called_once_with(parsed_profile)
 
     def test_using_existing_access_filter(
@@ -112,6 +113,7 @@ class TestUserSearchView(LoginRequiredMixin):
         )
         response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == []
         filter_mock.assert_called_once_with(parsed_profile["username"])
 
 
@@ -164,18 +166,33 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             in email.body
         )
 
-    def test_post_ineligible_user(
-        self, get_graph_api_client_mock, pi, pi_group, pi_client, mocker
-    ):
-        """Check that specified user is checked for eligibility."""
-        user_filter_mock = mocker.patch(
-            "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
-        )
-        user_filter_mock.return_value = False
+    def _test_filter(self, client, group):
         data = {"username": "username", "expiration": timezone.datetime.max.date()}
-        response = pi_client.post(self._get_url(pi_group.pk), data=data)
+        response = client.post(self._get_url(group.pk), data=data)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"User not found or not eligible"
+
+    def test_existing_access_filter(
+        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
+    ):
+        """Test that the user_already_has_hpc_access function is used."""
+        mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_already_has_hpc_access"
+        )
+        mock.return_value = True
+        self._test_filter(pi_client, pi_group)
+        mock.assert_called_once_with(parsed_profile["username"])
+
+    def test_eligibility_filter(
+        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
+    ):
+        """Test that the user_eligible_for_hpc_access function is used."""
+        mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
+        )
+        mock.return_value = False
+        self._test_filter(pi_client, pi_group)
+        mock.assert_called_once_with(parsed_profile)
 
     def test_group_expiration_in_past(
         self, get_graph_api_client_mock, pi, pi_group, pi_client
