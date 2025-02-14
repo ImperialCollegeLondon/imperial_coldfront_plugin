@@ -87,6 +87,7 @@ class TestCheckGroupOwnerOrSuperuser:
         with pytest.raises(PermissionDenied):
             check_group_owner_or_superuser(pi_group, user_member_or_manager)
 
+
 def test_user_already_has_hpc_access_no_user(db):
     """Test if non-existent user already has access."""
     assert not user_already_has_hpc_access("username")
