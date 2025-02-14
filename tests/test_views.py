@@ -91,34 +91,28 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert response.context["search_results"] == [parsed_profile]
 
-    def test_search_filter(
-        self, get_graph_api_client_mock, user_client, parsed_profile
+    def test_using_eligibility_filter(
+        self, get_graph_api_client_mock, mocker, parsed_profile, user_client
     ):
-        """Test that the search results are filtered correctly."""
-        invalid_profile = parsed_profile.copy()
-        invalid_profile["record_status"] = "Dead"
-
-        get_graph_api_client_mock().user_search.return_value = [
-            parsed_profile,
-            invalid_profile,
-        ]
+        """Test that the user_eligible_for_hpc_access function is used."""
+        filter_mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
+        )
+        filter_mock.return_value = False
         response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
-        assert response.context["search_results"] == [parsed_profile]
+        filter_mock.assert_called_once_with(parsed_profile)
 
-    def test_existing_user(
-        self,
-        get_graph_api_client_mock,
-        pi_client,
-        pi_group,
-        pi_group_member,
-        parsed_profile,
+    def test_using_existing_access_filter(
+        self, get_graph_api_client_mock, mocker, user_client, parsed_profile
     ):
-        """Checking that the search results do not include existing group members."""
-        parsed_profile["username"] = pi_group_member.username
-        response = pi_client.post(self._get_url(pi_group.pk), data={"search": "foo"})
+        """Test that the user_already_in_group function is used."""
+        filter_mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_already_has_hpc_access"
+        )
+        response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
-        assert response.context["search_results"] == []
+        filter_mock.assert_called_once_with(parsed_profile["username"])
 
 
 @pytest.fixture

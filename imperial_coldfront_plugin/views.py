@@ -34,6 +34,7 @@ from .models import GroupMembership, ResearchGroup
 from .policy import (
     check_group_owner_manager_or_superuser,
     check_group_owner_or_superuser,
+    user_already_has_hpc_access,
     user_eligible_for_hpc_access,
 )
 
@@ -113,16 +114,11 @@ def user_search(request: HttpRequest, group_pk: int) -> HttpResponse:
             graph_client = get_graph_api_client()
             search_results = graph_client.user_search(search_query)
 
-            group_memberships = GroupMembership.objects.filter(group__pk=group_pk)
-            group_members = [
-                membership.member.username for membership in group_memberships
-            ]
-
             filtered_results = [
                 user
                 for user in search_results
                 if user_eligible_for_hpc_access(user)
-                and user["username"] not in group_members
+                and not user_already_has_hpc_access(user["username"])
             ]
             return render(
                 request,
@@ -159,7 +155,9 @@ def send_group_invite(request: HttpRequest, group_pk: int) -> HttpResponse:
             graph_client = get_graph_api_client()
             user_profile = graph_client.user_profile(username)
 
-            if not user_eligible_for_hpc_access(user_profile):
+            if not user_eligible_for_hpc_access(
+                user_profile
+            ) or user_already_has_hpc_access(user_profile["username"]):
                 return HttpResponseBadRequest("User not found or not eligible")
 
             invitee_email = user_profile["email"]
