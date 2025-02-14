@@ -50,4 +50,9 @@ urlpatterns = [
         views.group_membership_extend,
         name="extend_membership",
     ),
+    path(
+        "research-group/create/",
+        views.research_group_terms_view,
+        name="research_group_create",
+    ),
 ]

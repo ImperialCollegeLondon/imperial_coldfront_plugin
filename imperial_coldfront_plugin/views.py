@@ -3,8 +3,9 @@
 import datetime
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import IntegrityError
 from django.http import (
@@ -39,6 +40,36 @@ from .policy import (
 )
 
 User = get_user_model()
+
+
+@login_required
+@permission_required(
+    "imperial_coldfront_plugin.add_researchgroup", raise_exception=True
+)
+def research_group_terms_view(request):
+    """View for accepting T&Cs and creating a ResearchGroup."""
+    if request.method == "POST":
+        form = TermsAndConditionsForm(request.POST)  # use TermsAndConditionsForm
+        if form.is_valid():
+            group_name = f"Research Group {request.user.username}"  # Autogenerate name
+            gid = generate_unique_gid()
+
+            ResearchGroup.objects.create(owner=request.user, gid=gid, name=group_name)
+
+            messages.success(request, "Research group created successfully.")
+            return redirect(reverse("imperial_coldfront_plugin:group_members"))
+    else:
+        form = TermsAndConditionsForm()  # use TermsAndConditionsForm
+
+    return render(
+        request, "imperial_coldfront_plugin/research_group_terms.html", {"form": form}
+    )
+
+
+def generate_unique_gid():
+    """Generate a unique GID for the ResearchGroup."""
+    last_gid = ResearchGroup.objects.order_by("-gid").first()
+    return (last_gid.gid + 1) if last_gid else 1000  # Start at 1000 if no groups exist
 
 
 @login_required
