@@ -48,7 +48,7 @@ class GroupMembership(models.Model):
         ResearchGroup,
         on_delete=models.CASCADE,
     )
-    member = models.ForeignKey(
+    member = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )

@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.db import IntegrityError
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -75,9 +76,6 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
     where the specified user (identified by `group_pk`) is the owner. Access is
     restricted to either the group owner, an administrator, or a manager.
     Unauthorised users will receive a permission denied response.
-    The view also checks if the specified user has Principal Investigator (PI) status
-    (via the `is_pi` attribute). If the user is not a PI, the view will render a
-    message indicating that the user does not own a group.
 
     Args:
         request (HttpRequest): The HTTP request object containing metadata about the
@@ -121,10 +119,10 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
 @login_required
 def check_access(request: HttpRequest):
     """Informational view displaying the user's current access to RCS resources."""
-    if request.user.userprofile.is_pi:
-        message = "You have access to RCS resources as a PI."
-    elif request.user.is_superuser:
-        message = "You have access to RCS resources as an administrator."
+    if request.user.is_superuser:
+        message = "You have access as an administrator."
+    elif ResearchGroup.objects.filter(owner=request.user):
+        message = "You have access as the owner of a HPC access group."
     else:
         try:
             group_membership = GroupMembership.objects.get(member=request.user)
@@ -171,11 +169,12 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
     """Invite an individual to a group."""
     if (
         not ResearchGroup.objects.filter(owner=request.user).exists()
+        and not request.user.is_superuser
         and not GroupMembership.objects.filter(
             member=request.user, is_manager=True
         ).exists()
     ):
-        return HttpResponseForbidden("You are not a group owner.")
+        return HttpResponseForbidden("Permission denied")
 
     if request.method == "POST":
         form = GroupMembershipForm(request.POST)
@@ -207,7 +206,7 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             invite_url = request.build_absolute_uri(
                 reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             )
-            send_group_invite_email(invitee_email, request.user, invite_url)
+            send_group_invite_email(invitee_email, request.user, invite_url, expiration)
             return render(
                 request,
                 "imperial_coldfront_plugin/invite_sent.html",
@@ -248,20 +247,34 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
         # Check if the user has accepted the terms and conditions.
         if form.is_valid():
             # Update group membership in the database.
-            GroupMembership.objects.get_or_create(
-                group=group, member=request.user, expiration=expiration
-            )
+            try:
+                GroupMembership.objects.create(
+                    group=group,
+                    member=request.user,
+                    expiration=expiration,
+                )
+            except IntegrityError:
+                return HttpResponseBadRequest("User already in group")
             send_group_access_granted_email(request.user, group.owner)
             return render(
                 request=request,
                 template_name="imperial_coldfront_plugin/accept_group_invite.html",
-                context={"inviter": group.owner, "group": group.name},
+                context={
+                    "inviter": group.owner,
+                    "group": group.name,
+                    "expiration": expiration,
+                },
             )
     else:
         form = TermsAndConditionsForm()
     return render(
         request=request,
-        context={"inviter": group.owner, "group": group.name, "form": form},
+        context={
+            "inviter": group.owner,
+            "group": group.name,
+            "expiration": expiration,
+            "form": form,
+        },
         template_name="imperial_coldfront_plugin/member_terms_and_conditions.html",
     )
 
@@ -314,10 +327,10 @@ def get_active_users(request: HttpRequest) -> HttpResponse:
     )
     for user in qs:
         passwd += format_str.format(
-            user=user, uid=user.unixuid, group=user.groupmembership_set.get().group
+            user=user, uid=user.unixuid, group=user.groupmembership.group
         )
     for user in (
-        User.objects.filter(userprofile__is_pi=True)
+        User.objects.filter(researchgroup__isnull=False)
         .filter(unixuid__isnull=False)
         .distinct()
         .difference(qs)
@@ -356,13 +369,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
 
-    if (
-        request.user != group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            group=group, member=request.user
-        ).exists()
-    ):
+    if request.user != group.owner and not request.user.is_superuser:
         return HttpResponseForbidden("Permission denied")
 
     group_membership.is_manager = True
@@ -386,13 +393,7 @@ def remove_group_manager(
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
 
-    if (
-        request.user != group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            group=group, member=request.user
-        ).exists()
-    ):
+    if request.user != group.owner and not request.user.is_superuser:
         return HttpResponseForbidden("Permission denied")
 
     group_membership.is_manager = False
@@ -423,7 +424,7 @@ def group_membership_extend(
         request.user != group.owner
         and not request.user.is_superuser
         and not GroupMembership.objects.filter(
-            group=group, member=request.user
+            group=group, member=request.user, is_manager=True
         ).exists()
     ):
         return HttpResponseForbidden("Permission denied")
@@ -444,9 +445,7 @@ def group_membership_extend(
             group_membership.expiration += datetime.timedelta(days=extend_length)
             group_membership.save()
             return redirect(
-                reverse(
-                    "imperial_coldfront_plugin:group_members", args=[group.owner.pk]
-                )
+                reverse("imperial_coldfront_plugin:group_members", args=[group.pk])
             )
 
     else:

@@ -1,12 +1,14 @@
 """Tests for template tags."""
 
 import pytest
+from django.urls import reverse
 
 from imperial_coldfront_plugin.templatetags.home_tags import (
     is_a_group_member,
     is_eligible_to_own_a_group,
     owns_a_group,
 )
+from imperial_coldfront_plugin.templatetags.navbar_tags import get_group_url
 
 
 @pytest.fixture
@@ -49,3 +51,23 @@ class TestHomeTags:
     def test_is_eligible_to_own_a_group_false(self, get_graph_api_client_mock, user):
         """Test false condition of is_eligible_to_own_a_group tag."""
         assert not is_eligible_to_own_a_group(user)
+
+
+class TestNavbarTags:
+    """Tests for the navbar_tags template tags."""
+
+    def test_get_group_url_none(self, user):
+        """Test get_group_url returns None for a user with no group."""
+        assert get_group_url(user) is None
+
+    def test_get_group_url_owner(self, pi, pi_group):
+        """Test get_group_url returns the correct URL for a group owner."""
+        assert get_group_url(pi) == reverse(
+            "imperial_coldfront_plugin:group_members", args=[pi_group.pk]
+        )
+
+    def test_get_group_url_manager(self, pi_group, pi_group_manager):
+        """Test get_group_url returns the correct URL for a group manager."""
+        assert get_group_url(pi_group_manager) == reverse(
+            "imperial_coldfront_plugin:group_members", args=[pi_group.pk]
+        )
