@@ -77,8 +77,8 @@ class TestGroupMembersView(LoginRequiredMixin):
 class TestUserSearchView(LoginRequiredMixin):
     """Tests for the user search view."""
 
-    def _get_url(self):
-        return reverse("imperial_coldfront_plugin:user_search")
+    def _get_url(self, group_pk=1):
+        return reverse("imperial_coldfront_plugin:user_search", args=[group_pk])
 
     def test_get(self, get_graph_api_client_mock, user_client):
         """Test view rendering."""
@@ -120,13 +120,13 @@ def get_graph_api_client_mock(mocker, parsed_profile):
 class TestSendGroupInviteView(LoginRequiredMixin):
     """Tests for the send group invite view."""
 
-    def _get_url(self):
-        return reverse("imperial_coldfront_plugin:send_group_invite")
+    def _get_url(self, group_pk=1):
+        return reverse("imperial_coldfront_plugin:send_group_invite", args=[group_pk])
 
-    def test_permission_denied(self, auth_client_factory, user_or_member):
+    def test_permission_denied(self, auth_client_factory, user_or_member, pi_group):
         """Test that the view sends an email when a POST request is made."""
         client = auth_client_factory(user_or_member)
-        response = client.post(self._get_url())
+        response = client.post(self._get_url(pi_group.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
         assert response.content == b"Permission denied"
 
@@ -143,7 +143,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         """Test successful group invitation."""
         client = auth_client_factory(pi_manager_or_superuser)
         data = {"username": "username", "expiration": timezone.datetime.max.date()}
-        response = client.post(self._get_url(), data=data)
+        response = client.post(self._get_url(pi_group.pk), data=data)
         assert response.status_code == HTTPStatus.OK
 
         invitee_email = parsed_profile["email"]
@@ -167,7 +167,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         )
         user_filter_mock.return_value = False
         data = {"username": "username", "expiration": timezone.datetime.max.date()}
-        response = pi_client.post(self._get_url(), data=data)
+        response = pi_client.post(self._get_url(pi_group.pk), data=data)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"User not found or not eligible"
 
@@ -176,7 +176,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
     ):
         """Check that a group expiration in the past is rejected."""
         data = {"username": "username", "expiration": timezone.datetime.min.date()}
-        response = pi_client.post(self._get_url(), data=data)
+        response = pi_client.post(self._get_url(pi_group.pk), data=data)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"Expiration date should be in the future"
 
@@ -189,7 +189,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
     )
     def test_post_invalid(self, pi_client, pi_group, mailoutbox, email, error):
         """Test the view renders the form with errors when invalid data is posted."""
-        response = pi_client.post(self._get_url())
+        response = pi_client.post(self._get_url(pi_group.pk))
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"Invalid data"
         assert len(mailoutbox) == 0
@@ -201,12 +201,12 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
     def _get_url(self, token="dummy_token"):
         return reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
 
-    def _get_token(self, invitee_email, inviter_pk):
+    def _get_token(self, invitee_email, group_pk):
         ts = TimestampSigner()
         return ts.sign_object(
             {
                 "invitee_email": invitee_email,
-                "inviter_pk": inviter_pk,
+                "group_pk": group_pk,
                 "expiration": timezone.datetime.max.isoformat(),
             }
         )
@@ -237,7 +237,7 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
 
     def test_get_valid_token(self, user_client, pi_group, user):
         """Test that the view accepts valid tokens."""
-        token = self._get_token(user.email, pi_group.owner.pk)
+        token = self._get_token(user.email, pi_group.pk)
         response = user_client.get(self._get_url(token))
         assert response.status_code == HTTPStatus.OK
         assertTemplateUsed(
@@ -247,7 +247,7 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
 
     def test_post_invalid(self, user_client, pi_group, user):
         """Test that view renders the form with errors when invalid data is posted."""
-        token = self._get_token(user.email, pi_group.owner.pk)
+        token = self._get_token(user.email, pi_group.pk)
         response = user_client.post(self._get_url(token), data={})
         assert response.status_code == HTTPStatus.OK
         assert response.context["form"].errors == {
@@ -256,7 +256,7 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
 
     def test_post_valid(self, user_client, pi_group, user, mailoutbox):
         """Test that the view adds the user to the group when valid data is posted."""
-        token = self._get_token(user.email, pi_group.owner.pk)
+        token = self._get_token(user.email, pi_group.pk)
 
         response = user_client.post(self._get_url(token), data={"accept": True})
         assert response.status_code == HTTPStatus.OK
@@ -275,7 +275,7 @@ class TestAcceptGroupInvite(LoginRequiredMixin):
     ):
         """Test that the view doesn't duplicate group memberships."""
         client = auth_client_factory(pi_group_member)
-        token = self._get_token(pi_group_member.email, pi_group.owner.pk)
+        token = self._get_token(pi_group_member.email, pi_group.pk)
         response = client.post(self._get_url(token), data={"accept": True})
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
