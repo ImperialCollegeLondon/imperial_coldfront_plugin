@@ -31,7 +31,11 @@ from .forms import (
 )
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
-from .policy import user_eligible_for_hpc_access
+from .policy import (
+    check_group_owner_manager_or_superuser,
+    check_group_owner_or_superuser,
+    user_eligible_for_hpc_access,
+)
 
 User = get_user_model()
 
@@ -61,15 +65,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
         Http404: If no group is found with the provided `group_pk`.
     """
     group = get_object_or_404(ResearchGroup, pk=group_pk)
-
-    if (
-        request.user != group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            group=group, member=request.user, is_manager=True
-        ).exists()
-    ):
-        return HttpResponseForbidden("Permission denied")
+    check_group_owner_manager_or_superuser(group, request.user)
 
     group_members = GroupMembership.objects.filter(group=group)
     is_manager = group_members.filter(member=request.user, is_manager=True).exists()
@@ -136,14 +132,7 @@ def user_search(request: HttpRequest, group_pk: int) -> HttpResponse:
 def send_group_invite(request: HttpRequest, group_pk: int) -> HttpResponse:
     """Invite an individual to a group."""
     group = get_object_or_404(ResearchGroup, pk=group_pk)
-    if (
-        not request.user == group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            member=request.user, is_manager=True
-        ).exists()
-    ):
-        return HttpResponseForbidden("Permission denied")
+    check_group_owner_manager_or_superuser(group, request.user)
 
     if request.method == "POST":
         form = GroupMembershipForm(request.POST)
@@ -257,15 +246,7 @@ def remove_group_member(request: HttpRequest, group_membership_pk: int) -> HttpR
     """
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
-
-    if (
-        request.user != group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            group=group, member=request.user, is_manager=True
-        ).exists()
-    ):
-        return HttpResponseForbidden("Permission denied")
+    check_group_owner_manager_or_superuser(group, request.user)
 
     if group_membership.member == request.user:
         return HttpResponseForbidden("You cannot remove yourself from the group.")
@@ -337,9 +318,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     """
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
-
-    if request.user != group.owner and not request.user.is_superuser:
-        return HttpResponseForbidden("Permission denied")
+    check_group_owner_or_superuser(group, request.user)
 
     group_membership.is_manager = True
     group_membership.save()
@@ -361,9 +340,7 @@ def remove_group_manager(
     """
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
-
-    if request.user != group.owner and not request.user.is_superuser:
-        return HttpResponseForbidden("Permission denied")
+    check_group_owner_or_superuser(group, request.user)
 
     group_membership.is_manager = False
     group_membership.save()
@@ -386,17 +363,7 @@ def group_membership_extend(
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
 
-    # Check if the accessing user is an owner/manager of the group in question
-    # (or a superadmin).
-
-    if (
-        request.user != group.owner
-        and not request.user.is_superuser
-        and not GroupMembership.objects.filter(
-            group=group, member=request.user, is_manager=True
-        ).exists()
-    ):
-        return HttpResponseForbidden("Permission denied")
+    check_group_owner_manager_or_superuser(group, request.user)
 
     if group_membership.member == request.user:
         return HttpResponseForbidden("You cannot extend your own membership.")

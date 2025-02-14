@@ -59,7 +59,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         """Test that unauthorised users cannot access the view."""
         response = auth_client_factory(user_or_member).get(self._get_url(pi_group.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_get(self, auth_client_factory, pi_manager_or_superuser, pi_group):
         """Test the view for authorised users."""
@@ -128,7 +127,6 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         client = auth_client_factory(user_or_member)
         response = client.post(self._get_url(pi_group.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_post(
         self,
@@ -340,7 +338,6 @@ class TestRemoveGroupMemberView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_or_member)
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_get(
         self, auth_client_factory, pi_manager_or_superuser, pi_group, pi_group_member
@@ -447,7 +444,6 @@ class TestMakeGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_member_or_manager)
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_get(
         self,
@@ -499,7 +495,6 @@ class TestRemoveGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_member_or_manager)
         response = client.get(self._get_url(pi_group_manager.groupmembership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_successful_manager_removal(
         self,
@@ -550,7 +545,6 @@ class TestGroupMembershipExtendView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_or_member)
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_manager_cannot_extend_own_membership(
         self, pi_group_manager, auth_client_factory
