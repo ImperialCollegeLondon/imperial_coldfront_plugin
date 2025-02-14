@@ -108,7 +108,7 @@ def check_access(request: HttpRequest):
 
 
 @login_required
-def user_search(request: HttpRequest) -> HttpResponse:
+def user_search(request: HttpRequest, group_pk: int) -> HttpResponse:
     """Simple search interface to find users eligible to join a ResearchGroup."""
     if request.method == "POST":
         form = UserSearchForm(request.POST)
@@ -122,7 +122,7 @@ def user_search(request: HttpRequest) -> HttpResponse:
             return render(
                 request,
                 "imperial_coldfront_plugin/user_search.html",
-                dict(form=form, search_results=filtered_results),
+                dict(form=form, search_results=filtered_results, group_pk=group_pk),
             )
     else:
         form = UserSearchForm()
@@ -133,10 +133,11 @@ def user_search(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def send_group_invite(request: HttpRequest) -> HttpResponse:
+def send_group_invite(request: HttpRequest, group_pk: int) -> HttpResponse:
     """Invite an individual to a group."""
+    group = get_object_or_404(ResearchGroup, pk=group_pk)
     if (
-        not ResearchGroup.objects.filter(owner=request.user).exists()
+        not request.user == group.owner
         and not request.user.is_superuser
         and not GroupMembership.objects.filter(
             member=request.user, is_manager=True
@@ -167,18 +168,18 @@ def send_group_invite(request: HttpRequest) -> HttpResponse:
             token = signer.sign_object(
                 {
                     "expiration": expiration.isoformat(),
-                    "inviter_pk": request.user.pk,
+                    "group_pk": group.pk,
                     "invitee_email": invitee_email,
                 }
             )
             invite_url = request.build_absolute_uri(
                 reverse("imperial_coldfront_plugin:accept_group_invite", args=[token])
             )
-            send_group_invite_email(invitee_email, request.user, invite_url, expiration)
+            send_group_invite_email(invitee_email, group.owner, invite_url, expiration)
             return render(
                 request,
                 "imperial_coldfront_plugin/invite_sent.html",
-                dict(invitee_email=invitee_email),
+                dict(invitee_email=invitee_email, group_pk=group_pk),
             )
     return HttpResponseBadRequest("Invalid data")
 
@@ -207,7 +208,7 @@ def accept_group_invite(request: HttpRequest, token: str) -> HttpResponse:
             "The invite token is not associated with this email address."
         )
 
-    group = ResearchGroup.objects.get(owner__pk=invite["inviter_pk"])
+    group = ResearchGroup.objects.get(pk=invite["group_pk"])
     expiration = timezone.datetime.fromisoformat(invite["expiration"])
 
     if request.method == "POST":
