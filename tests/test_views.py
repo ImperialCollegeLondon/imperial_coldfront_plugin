@@ -73,27 +73,26 @@ class TestGroupMembersView(LoginRequiredMixin):
         )
 
 
+@pytest.mark.usefixtures("get_graph_api_client_mock")
 class TestUserSearchView(LoginRequiredMixin):
     """Tests for the user search view."""
 
     def _get_url(self, group_pk=1):
         return reverse("imperial_coldfront_plugin:user_search", args=[group_pk])
 
-    def test_get(self, get_graph_api_client_mock, user_client):
+    def test_get(self, user_client):
         """Test view rendering."""
         response = user_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], UserSearchForm)
 
-    def test_post(self, get_graph_api_client_mock, user_client, parsed_profile):
+    def test_post(self, user_client, parsed_profile):
         """Test search form submission."""
         response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
         assert response.context["search_results"] == [parsed_profile]
 
-    def test_eligibility_filter(
-        self, get_graph_api_client_mock, mocker, parsed_profile, user_client
-    ):
+    def test_eligibility_filter(self, mocker, parsed_profile, user_client):
         """Test that the user_eligible_for_hpc_access function is used."""
         filter_mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
@@ -104,9 +103,7 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.context["search_results"] == []
         filter_mock.assert_called_once_with(parsed_profile)
 
-    def test_using_existing_access_filter(
-        self, get_graph_api_client_mock, mocker, user_client, parsed_profile
-    ):
+    def test_using_existing_access_filter(self, mocker, user_client, parsed_profile):
         """Test that the user_already_in_group function is used."""
         filter_mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_already_has_hpc_access"
@@ -126,6 +123,7 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     return mock
 
 
+@pytest.mark.usefixtures("get_graph_api_client_mock")
 class TestSendGroupInviteView(LoginRequiredMixin):
     """Tests for the send group invite view."""
 
@@ -144,7 +142,6 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         pi_manager_or_superuser,
         pi_group,
         parsed_profile,
-        get_graph_api_client_mock,
         mailoutbox,
         timestamp_signer_mock,
     ):
@@ -172,9 +169,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"User not found or not eligible"
 
-    def test_existing_access_filter(
-        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
-    ):
+    def test_existing_access_filter(self, pi_group, pi_client, parsed_profile, mocker):
         """Test that the user_already_has_hpc_access function is used."""
         mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_already_has_hpc_access"
@@ -183,9 +178,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         self._test_filter(pi_client, pi_group)
         mock.assert_called_once_with(parsed_profile["username"])
 
-    def test_eligibility_filter(
-        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
-    ):
+    def test_eligibility_filter(self, pi_group, pi_client, parsed_profile, mocker):
         """Test that the user_eligible_for_hpc_access function is used."""
         mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
