@@ -8,6 +8,7 @@ from imperial_coldfront_plugin.policy import (
     PI_DISALLOWED_TITLE_QUALIFIERS,
     check_group_owner_manager_or_superuser,
     check_group_owner_or_superuser,
+    user_already_has_hpc_access,
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
 )
@@ -85,3 +86,28 @@ class TestCheckGroupOwnerOrSuperuser:
         """Test the check fails for a other users."""
         with pytest.raises(PermissionDenied):
             check_group_owner_or_superuser(pi_group, user_member_or_manager)
+
+
+def test_user_already_has_hpc_access_no_user(db):
+    """Test if non-existent user already has access."""
+    assert not user_already_has_hpc_access("username")
+
+
+def test_user_already_has_hpc_access(user):
+    """Test if a user already has access."""
+    assert not user_already_has_hpc_access(user.username)
+
+
+def test_user_already_has_hpc_access_group_membership(pi_group_member):
+    """Test if a user with a group membership already has access."""
+    assert user_already_has_hpc_access(pi_group_member.username)
+
+
+def test_user_already_has_hpc_access_group_owner(pi_group):
+    """Test if a user with a group ownership already has access."""
+    assert user_already_has_hpc_access(pi_group.owner.username)
+
+
+def test_user_already_has_hpc_access_superuser(superuser):
+    """Test if a superuser already has access."""
+    assert user_already_has_hpc_access(superuser.username)
