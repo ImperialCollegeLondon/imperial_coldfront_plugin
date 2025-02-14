@@ -1,5 +1,11 @@
 """Policy functionality governing the eligibility of users access RCS systems."""
 
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
+from django.utils import timezone
+
+from .models import GroupMembership, ResearchGroup
+
 
 def _filter_entity_type(entity_type):
     """Capture complex sublogic for filtering entity types."""
@@ -28,6 +34,20 @@ def user_eligible_for_hpc_access(user_profile):
                 user_profile["department"],
             ),
         ]
+    )
+
+
+def user_already_has_hpc_access(username):
+    """Check if the user is already a member of a ResearchGroup."""
+    User = get_user_model()
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return False
+    return (
+        user.is_superuser
+        or GroupMembership.objects.filter(member=user).exists()
+        or ResearchGroup.objects.filter(owner=user).exists()
     )
 
 
@@ -70,3 +90,21 @@ def user_eligible_to_be_pi(user_profile):
         return False
 
     return True
+
+
+def check_group_owner_manager_or_superuser(group, user):
+    """Check if the user is the owner or manager of the group or a superuser."""
+    if not (
+        group.owner == user
+        or user.is_superuser
+        or GroupMembership.objects.filter(
+            group=group, member=user, is_manager=True, expiration__gt=timezone.now()
+        ).exists()
+    ):
+        raise PermissionDenied
+
+
+def check_group_owner_or_superuser(group, user):
+    """Check if the user is the owner of the group or a superuser."""
+    if not (group.owner == user or user.is_superuser):
+        raise PermissionDenied

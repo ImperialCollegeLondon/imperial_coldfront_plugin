@@ -59,7 +59,6 @@ class TestGroupMembersView(LoginRequiredMixin):
         """Test that unauthorised users cannot access the view."""
         response = auth_client_factory(user_or_member).get(self._get_url(pi_group.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_get(self, auth_client_factory, pi_manager_or_superuser, pi_group):
         """Test the view for authorised users."""
@@ -86,27 +85,36 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], UserSearchForm)
 
-    def test_post(self, get_graph_api_client_mock, user_client):
+    def test_post(self, get_graph_api_client_mock, user_client, parsed_profile):
         """Test search form submission."""
-        get_graph_api_client_mock().user_search.return_value = []
-        response = user_client.post(self._get_url(), data={"search": "foo"})
-        assert response.status_code == HTTPStatus.OK
-        assert response.context["search_results"] == []
-
-    def test_search_filter(
-        self, get_graph_api_client_mock, user_client, parsed_profile
-    ):
-        """Test that the search results are filtered correctly."""
-        invalid_profile = parsed_profile.copy()
-        invalid_profile["record_status"] = "Dead"
-
-        get_graph_api_client_mock().user_search.return_value = [
-            parsed_profile,
-            invalid_profile,
-        ]
         response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
         assert response.context["search_results"] == [parsed_profile]
+
+    def test_eligibility_filter(
+        self, get_graph_api_client_mock, mocker, parsed_profile, user_client
+    ):
+        """Test that the user_eligible_for_hpc_access function is used."""
+        filter_mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
+        )
+        filter_mock.return_value = False
+        response = user_client.post(self._get_url(), data={"search": "foo"})
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == []
+        filter_mock.assert_called_once_with(parsed_profile)
+
+    def test_using_existing_access_filter(
+        self, get_graph_api_client_mock, mocker, user_client, parsed_profile
+    ):
+        """Test that the user_already_in_group function is used."""
+        filter_mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_already_has_hpc_access"
+        )
+        response = user_client.post(self._get_url(), data={"search": "foo"})
+        assert response.status_code == HTTPStatus.OK
+        assert response.context["search_results"] == []
+        filter_mock.assert_called_once_with(parsed_profile["username"])
 
 
 @pytest.fixture
@@ -114,6 +122,7 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
     mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
     mock().user_profile.return_value = parsed_profile
+    mock().user_search.return_value = [parsed_profile]
     return mock
 
 
@@ -128,7 +137,6 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         client = auth_client_factory(user_or_member)
         response = client.post(self._get_url(pi_group.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_post(
         self,
@@ -158,18 +166,33 @@ class TestSendGroupInviteView(LoginRequiredMixin):
             in email.body
         )
 
-    def test_post_ineligible_user(
-        self, get_graph_api_client_mock, pi, pi_group, pi_client, mocker
-    ):
-        """Check that specified user is checked for eligibility."""
-        user_filter_mock = mocker.patch(
-            "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
-        )
-        user_filter_mock.return_value = False
+    def _test_filter(self, client, group):
         data = {"username": "username", "expiration": timezone.datetime.max.date()}
-        response = pi_client.post(self._get_url(pi_group.pk), data=data)
+        response = client.post(self._get_url(group.pk), data=data)
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"User not found or not eligible"
+
+    def test_existing_access_filter(
+        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
+    ):
+        """Test that the user_already_has_hpc_access function is used."""
+        mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_already_has_hpc_access"
+        )
+        mock.return_value = True
+        self._test_filter(pi_client, pi_group)
+        mock.assert_called_once_with(parsed_profile["username"])
+
+    def test_eligibility_filter(
+        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
+    ):
+        """Test that the user_eligible_for_hpc_access function is used."""
+        mock = mocker.patch(
+            "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
+        )
+        mock.return_value = False
+        self._test_filter(pi_client, pi_group)
+        mock.assert_called_once_with(parsed_profile)
 
     def test_group_expiration_in_past(
         self, get_graph_api_client_mock, pi, pi_group, pi_client
@@ -193,6 +216,17 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"Invalid data"
         assert len(mailoutbox) == 0
+
+    def test_user_already_in_group(self, pi_client, pi_group, research_group_factory):
+        """Test that a user who is already in the group cannot be invited."""
+        group, [membership] = research_group_factory(number_of_members=1)
+        data = {
+            "username": membership.member.username,
+            "expiration": timezone.datetime.max.date(),
+        }
+        response = pi_client.post(self._get_url(pi_group.pk), data=data)
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.content == b"User already in a group"
 
 
 class TestAcceptGroupInvite(LoginRequiredMixin):
@@ -340,7 +374,6 @@ class TestRemoveGroupMemberView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_or_member)
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_get(
         self, auth_client_factory, pi_manager_or_superuser, pi_group, pi_group_member
@@ -447,7 +480,6 @@ class TestMakeGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_member_or_manager)
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_get(
         self,
@@ -499,7 +531,6 @@ class TestRemoveGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_member_or_manager)
         response = client.get(self._get_url(pi_group_manager.groupmembership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_successful_manager_removal(
         self,
@@ -550,7 +581,6 @@ class TestGroupMembershipExtendView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(user_or_member)
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.status_code == HTTPStatus.FORBIDDEN
-        assert response.content == b"Permission denied"
 
     def test_manager_cannot_extend_own_membership(
         self, pi_group_manager, auth_client_factory
