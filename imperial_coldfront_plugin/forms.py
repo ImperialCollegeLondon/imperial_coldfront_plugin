@@ -1,11 +1,10 @@
+"""Forms for the Imperial Coldfront Plugin.
+
+This module contains form classes used for research group management.
+"""
+
 from django import forms
 
-class ResearchGroupForm(forms.Form):
-    """Form with terms acceptance checkbox and group name input."""
-
-    name = forms.CharField(max_length=255, label="Research Group name", required=True)
-    accept_terms = forms.BooleanField(
-        required=True, label="I accept the terms and conditions"
 
 class GroupMembershipForm(forms.Form):
     """Form for inviting a user to a research group."""
@@ -36,5 +35,4 @@ class GroupMembershipExtendForm(forms.Form):
     extend_length = forms.IntegerField(
         label="Extend by (in days)",
         min_value=1,
-        main
     )
