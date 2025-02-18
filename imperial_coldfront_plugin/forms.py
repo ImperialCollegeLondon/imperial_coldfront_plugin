@@ -30,6 +30,8 @@ class UserSearchForm(forms.Form):
         label="Search",
         help_text="Provide the name or username of the user to look for. "
         "The search is not case sensitive",
+        required=True,
+        error_messages={"required": "You must include a search term."},
     )
 
 
