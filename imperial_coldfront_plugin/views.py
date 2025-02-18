@@ -5,7 +5,7 @@ import datetime
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.decorators import login_required
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import IntegrityError
 from django.http import (
@@ -32,27 +32,50 @@ from .forms import (
 )
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
-from .policy import user_eligible_for_hpc_access
+from .policy import user_eligible_for_hpc_access, user_eligible_to_be_pi
 
 User = get_user_model()
 
 
 @login_required
-@permission_required(
-    "imperial_coldfront_plugin.add_researchgroup", raise_exception=True
-)
-def research_group_terms_view(request):
-    """View for accepting T&Cs and creating a ResearchGroup."""
+def research_group_terms_view(request: HttpRequest) -> HttpResponse:
+    """View for accepting T&Cs and creating a ResearchGroup.
+
+    Args:
+        request: The Http request including the user information.
+
+    Returns:
+        The relevant Http response, depending on the permissions and the type of
+        request.
+    """
+    graph_client = get_graph_api_client()
+    user_profile = graph_client.user_profile(request.user.username)
+    if not user_eligible_to_be_pi(user_profile) and not request.user.is_superuser:
+        return HttpResponseForbidden("Permission denied")
+
     if request.method == "POST":
         form = TermsAndConditionsForm(request.POST)  # use TermsAndConditionsForm
         if form.is_valid():
-            group_name = f"Research Group {request.user.username}"  # Autogenerate name
-            gid = generate_unique_gid()
+            # Autogenerate name
+            group_name = f"Research Group {request.user.username}"
 
-            ResearchGroup.objects.create(owner=request.user, gid=gid, name=group_name)
+            # If the group already exist, we just return that one
+            if ResearchGroup.objects.filter(name=group_name).exists():
+                group = ResearchGroup.objects.get(name=group_name)
 
-            messages.success(request, "Research group created successfully.")
-            return redirect(reverse("imperial_coldfront_plugin:group_members"))
+            else:
+                gid = generate_unique_gid()
+                group = ResearchGroup.objects.create(
+                    owner=request.user, gid=gid, name=group_name
+                )
+                messages.success(request, "Research group created successfully.")
+
+            return redirect(
+                reverse(
+                    "imperial_coldfront_plugin:group_members",
+                    kwargs=dict(group_pk=group.pk),
+                )
+            )
     else:
         form = TermsAndConditionsForm()  # use TermsAndConditionsForm
 
