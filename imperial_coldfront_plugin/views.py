@@ -61,9 +61,17 @@ def research_group_terms_view(request: HttpRequest) -> HttpResponse:
 
             # If the group already exist, we just return that one
             if ResearchGroup.objects.filter(name=group_name).exists():
-                group = ResearchGroup.objects.get(name=group_name)
+                group = ResearchGroup.objects.get(owner=request.user, name=group_name)
+                messages.success(
+                    request, f"A research group named '{group_name}' already exist."
+                )
 
             else:
+                if not form.accept:
+                    return HttpResponseForbidden(
+                        "You must accept the T&C in order to create a research group."
+                    )
+
                 gid = generate_unique_gid()
                 group = ResearchGroup.objects.create(
                     owner=request.user, gid=gid, name=group_name
