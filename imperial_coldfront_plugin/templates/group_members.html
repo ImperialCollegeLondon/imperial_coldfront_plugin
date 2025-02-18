@@ -1,5 +1,8 @@
 {% extends "common/base.html" %}
 {% block content %}
+  <div class="card-body">
+    <a class="btn btn-primary" href="#" role="button"><i class="fas fa-plus" aria-hidden="true"></i> Add member</a>
+  </div>
   <h1>Group Members</h1>
   <ul>
     {% for member in group_members %}
