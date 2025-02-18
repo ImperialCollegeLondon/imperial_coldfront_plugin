@@ -26,7 +26,11 @@ class TermsAndConditionsForm(forms.Form):
 class UserSearchForm(forms.Form):
     """Form for searching users."""
 
-    search = forms.CharField(label="Search")
+    search = forms.CharField(
+        label="Search",
+        help_text="Provide the name or username of the user to look for. "
+        "The search is not case sensitive",
+    )
 
 
 class GroupMembershipExtendForm(forms.Form):
