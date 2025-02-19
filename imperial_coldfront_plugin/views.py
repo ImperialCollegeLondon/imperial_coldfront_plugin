@@ -47,6 +47,8 @@ User = get_user_model()
 def research_group_terms_view(request: HttpRequest) -> HttpResponse:
     """View for accepting T&Cs and creating a ResearchGroup.
 
+    TODO: Verify if superusers should be able to create research groups.
+
     Args:
         request: The Http request including the user information.
 
