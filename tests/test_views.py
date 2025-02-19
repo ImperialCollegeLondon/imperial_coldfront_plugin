@@ -16,7 +16,7 @@ from imperial_coldfront_plugin.forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
-from imperial_coldfront_plugin.models import UnixUID
+from imperial_coldfront_plugin.models import ResearchGroup, UnixUID
 
 
 @pytest.fixture
@@ -685,3 +685,110 @@ class TestHomeView:
 
         assert response.status_code == 200
         assert eligible_html not in response.content.decode()
+
+
+@pytest.fixture
+def eligible_pi_mock(mocker):
+    """Mock the user_eligible_to_be_pi function."""
+    return mocker.patch("imperial_coldfront_plugin.views.user_eligible_to_be_pi")
+
+
+@pytest.fixture
+def message_mock(mocker):
+    """Mock the message system, as it is not available in tests.
+
+    See https://stackoverflow.com/a/27300365/3778792 and other answers.
+    """
+    return mocker.patch("imperial_coldfront_plugin.views.messages")
+
+
+class TestCreateGroupView(LoginRequiredMixin):
+    """Tests for the research group creation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:research_group_create")
+
+    def test_not_pi_cannot_create_groups(
+        self,
+        auth_client_factory,
+        user_or_member,
+        get_graph_api_client_mock,
+        eligible_pi_mock,
+    ):
+        """Test a non-pi cannot create groups."""
+        client = auth_client_factory(user_or_member)
+        eligible_pi_mock.return_value = False
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_potential_pi_in_group_cannot_create_groups(
+        self,
+        auth_client_factory,
+        pi_group_member,
+        get_graph_api_client_mock,
+        eligible_pi_mock,
+    ):
+        """Test a potential pi already in a group cannot create groups."""
+        client = auth_client_factory(pi_group_member)
+        eligible_pi_mock.return_value = True
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_pi_get_the_terms_and_conditions_form(
+        self, auth_client_factory, pi, get_graph_api_client_mock, eligible_pi_mock
+    ):
+        """Test a pi is shown the T&C."""
+        client = auth_client_factory(pi)
+        eligible_pi_mock.return_value = True
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/research_group_terms.html"
+        )
+        assert isinstance(response.context["form"], TermsAndConditionsForm)
+
+    def test_group_exist_redirect_to_that_one(
+        self,
+        auth_client_factory,
+        pi_group,
+        get_graph_api_client_mock,
+        message_mock,
+        eligible_pi_mock,
+    ):
+        """Test a pi is shown the T&C."""
+        pi = pi_group.owner
+        client = auth_client_factory(pi)
+        eligible_pi_mock.return_value = True
+        response = client.post(self._get_url(), data={"accept": True})
+        assert response.status_code == HTTPStatus.FOUND
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                kwargs=dict(group_pk=pi_group.pk),
+            ),
+        )
+
+    def test_new_group_created(
+        self,
+        auth_client_factory,
+        pi,
+        get_graph_api_client_mock,
+        message_mock,
+        eligible_pi_mock,
+    ):
+        """Test a pi is shown the T&C."""
+        with pytest.raises(ResearchGroup.DoesNotExist):
+            ResearchGroup.objects.get(owner=pi)
+        client = auth_client_factory(pi)
+        eligible_pi_mock.return_value = True
+        response = client.post(self._get_url(), data={"accept": True})
+        group = ResearchGroup.objects.get(owner=pi)
+        assert response.status_code == HTTPStatus.FOUND
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                kwargs=dict(group_pk=group.pk),
+            ),
+        )
