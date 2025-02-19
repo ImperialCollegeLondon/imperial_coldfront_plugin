@@ -57,7 +57,14 @@ def research_group_terms_view(request: HttpRequest) -> HttpResponse:
     graph_client = get_graph_api_client()
     user_profile = graph_client.user_profile(request.user.username)
     if not user_eligible_to_be_pi(user_profile) and not request.user.is_superuser:
-        return HttpResponseForbidden("Permission denied")
+        messages.error(request, "You are not allowed to create a research group.")
+        return redirect(reverse("home"))
+    elif GroupMembership.objects.filter(member=request.user).exists():
+        messages.error(
+            request,
+            "You cannot create a research group while being a member of another one.",
+        )
+        return redirect(reverse("home"))
 
     if request.method == "POST":
         form = TermsAndConditionsForm(request.POST)  # use TermsAndConditionsForm
@@ -69,7 +76,8 @@ def research_group_terms_view(request: HttpRequest) -> HttpResponse:
             if (query := ResearchGroup.objects.filter(owner=request.user)).exists():
                 group = query.first()
                 messages.success(
-                    request, f"A research group for '{request.user}' already exist."
+                    request,
+                    f"A research group owned by '{request.user}' already exist.",
                 )
             else:
                 gid = generate_unique_gid()
