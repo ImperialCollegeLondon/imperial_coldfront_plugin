@@ -73,11 +73,6 @@ def research_group_terms_view(request: HttpRequest) -> HttpResponse:
                 )
 
             else:
-                if not form.accept:
-                    return HttpResponseForbidden(
-                        "You must accept the T&C in order to create a research group."
-                    )
-
                 gid = generate_unique_gid()
                 group = ResearchGroup.objects.create(
                     owner=request.user, gid=gid, name=group_name
