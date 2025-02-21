@@ -1,4 +1,7 @@
-"""Plugin forms."""
+"""Forms for the Imperial Coldfront plugin.
+
+This module contains form classes used for research group management.
+"""
 
 from django import forms
 
