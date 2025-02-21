@@ -70,20 +70,20 @@ def research_group_terms_view(request: HttpRequest) -> HttpResponse:
         if form.is_valid():
             # Autogenerate name
             group_name = f"Research Group {request.user.username}"
+            gid = generate_unique_gid()
 
             # If the group already exist, we just use that one
-            if (query := ResearchGroup.objects.filter(owner=request.user)).exists():
-                group = query.first()
+            group, created = ResearchGroup.objects.get_or_create(
+                owner=request.user, defaults={"gid": gid, "name": group_name}
+            )
+
+            if created:
+                messages.success(request, "Research group created successfully.")
+            else:
                 messages.success(
                     request,
                     f"A research group owned by '{request.user}' already exist.",
                 )
-            else:
-                gid = generate_unique_gid()
-                group = ResearchGroup.objects.create(
-                    owner=request.user, gid=gid, name=group_name
-                )
-                messages.success(request, "Research group created successfully.")
 
             return redirect(
                 reverse(
