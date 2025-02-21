@@ -702,6 +702,7 @@ def message_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.views.messages")
 
 
+@pytest.mark.usefixtures("get_graph_api_client_mock", "message_mock")
 class TestCreateGroupView(LoginRequiredMixin):
     """Tests for the research group creation view."""
 
@@ -712,7 +713,6 @@ class TestCreateGroupView(LoginRequiredMixin):
         self,
         auth_client_factory,
         user_or_member,
-        get_graph_api_client_mock,
         eligible_pi_mock,
     ):
         """Test a non-pi cannot create groups."""
@@ -725,7 +725,6 @@ class TestCreateGroupView(LoginRequiredMixin):
         self,
         auth_client_factory,
         pi_group_member,
-        get_graph_api_client_mock,
         eligible_pi_mock,
     ):
         """Test a potential pi already in a group cannot create groups."""
@@ -735,7 +734,7 @@ class TestCreateGroupView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.FORBIDDEN
 
     def test_pi_get_the_terms_and_conditions_form(
-        self, auth_client_factory, pi, get_graph_api_client_mock, eligible_pi_mock
+        self, auth_client_factory, pi, eligible_pi_mock
     ):
         """Test a pi is shown the T&C."""
         client = auth_client_factory(pi)
@@ -751,8 +750,6 @@ class TestCreateGroupView(LoginRequiredMixin):
         self,
         auth_client_factory,
         pi_group,
-        get_graph_api_client_mock,
-        message_mock,
         eligible_pi_mock,
     ):
         """Test a pi is shown the T&C."""
@@ -773,8 +770,6 @@ class TestCreateGroupView(LoginRequiredMixin):
         self,
         auth_client_factory,
         pi,
-        get_graph_api_client_mock,
-        message_mock,
         eligible_pi_mock,
     ):
         """Test a pi is shown the T&C."""
