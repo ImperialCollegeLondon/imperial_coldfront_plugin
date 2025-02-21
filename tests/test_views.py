@@ -733,13 +733,10 @@ class TestCreateGroupView(LoginRequiredMixin):
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
 
-    def test_pi_get_the_terms_and_conditions_form(
-        self, auth_client_factory, pi, eligible_pi_mock
-    ):
+    def test_pi_get_the_terms_and_conditions_form(self, pi_client, eligible_pi_mock):
         """Test a pi is shown the T&C."""
-        client = auth_client_factory(pi)
         eligible_pi_mock.return_value = True
-        response = client.get(self._get_url())
+        response = pi_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assertTemplateUsed(
             response, "imperial_coldfront_plugin/research_group_terms.html"
