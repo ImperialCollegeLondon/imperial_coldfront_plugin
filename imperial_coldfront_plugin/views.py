@@ -2,6 +2,7 @@
 
 import datetime
 
+from coldfront.core.user.utils import UserSearch
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -35,6 +36,23 @@ from .models import GroupMembership, ResearchGroup
 from .policy import user_eligible_for_hpc_access, user_eligible_to_be_pi
 
 User = get_user_model()
+
+
+class GraphAPISearch(UserSearch):
+    """Search for users using MS Graph API."""
+
+    def search_a_user(
+        self, user_search_string: str | None = None, search_by: str = "all_fields"
+    ) -> list[str]:
+        """Searchers for a single user.
+
+        Args:
+            user_search_string: The user string to look for.
+            search_by: (Unused) Fields to look into. This backend always looks into the
+                user's name or username.
+        """
+        graph_client = get_graph_api_client()
+        return graph_client.user_search(user_search_string)
 
 
 @login_required
@@ -177,8 +195,7 @@ def user_search(request: HttpRequest, group_pk: int) -> HttpResponse:
         form = UserSearchForm(request.POST)
         if form.is_valid():
             search_query = form.cleaned_data["search"]
-            graph_client = get_graph_api_client()
-            search_results = graph_client.user_search(search_query)
+            search_results = GraphAPISearch(search_query, "all_fields").search()
             filtered_results = [
                 user for user in search_results if user_eligible_for_hpc_access(user)
             ]
