@@ -36,7 +36,7 @@ def _transform_profile_data(data):
         "record_status": extension_attributes.get("extensionAttribute5"),
         "name": data.get("displayName"),
         "email": data.get("mail"),
-        "username": data.get("userPrincipalName").removesuffix("@ic.ac.uk"),
+        "username": data.get("userPrincipalName", "").removesuffix("@ic.ac.uk"),
     }
 
 
