@@ -141,6 +141,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
         {
             "group_members": group_members,
             "is_manager": is_manager,
+            "group_pk": group_pk,
         },
     )
 
