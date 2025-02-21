@@ -749,7 +749,7 @@ class TestCreateGroupView(LoginRequiredMixin):
         pi_group,
         eligible_pi_mock,
     ):
-        """Test a pi is shown the T&C."""
+        """Test that if group exists, it redirects to it."""
         pi = pi_group.owner
         client = auth_client_factory(pi)
         eligible_pi_mock.return_value = True
@@ -769,7 +769,7 @@ class TestCreateGroupView(LoginRequiredMixin):
         pi,
         eligible_pi_mock,
     ):
-        """Test a pi is shown the T&C."""
+        """Test that a new group is created."""
         with pytest.raises(ResearchGroup.DoesNotExist):
             ResearchGroup.objects.get(owner=pi)
         client = auth_client_factory(pi)
