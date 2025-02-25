@@ -507,6 +507,18 @@ class TestMakeGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
         assert pi_group_member.get_full_name() in email.body
         assert pi_group.owner.get_full_name() in email.body
 
+    def test_expired_membership(
+        self, auth_client_factory, pi_or_superuser, pi_group_membership
+    ):
+        """Test that an expired group membership cannot be made a manager."""
+        pi_group_membership.expiration = timezone.datetime.min.date()
+        pi_group_membership.save()
+
+        client = auth_client_factory(pi_or_superuser)
+        response = client.get(self._get_url(pi_group_membership.pk))
+        assert response.content == b"Membership has expired."
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
 
 class TestRemoveGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
     """Tests for the remove group manager view."""
