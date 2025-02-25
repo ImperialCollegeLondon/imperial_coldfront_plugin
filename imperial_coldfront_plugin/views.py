@@ -3,6 +3,7 @@
 import datetime
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
@@ -36,9 +37,72 @@ from .policy import (
     check_group_owner_or_superuser,
     user_already_has_hpc_access,
     user_eligible_for_hpc_access,
+    user_eligible_to_be_pi,
 )
 
 User = get_user_model()
+
+
+@login_required
+def research_group_terms_view(request: HttpRequest) -> HttpResponse:
+    """View for accepting T&Cs and creating a ResearchGroup.
+
+    TODO: Verify if superusers should be able to create research groups.
+
+    Args:
+        request: The Http request including the user information.
+
+    Returns:
+        The relevant Http response, depending on the permissions and the type of
+        request.
+    """
+    graph_client = get_graph_api_client()
+    user_profile = graph_client.user_profile(request.user.username)
+    if not user_eligible_to_be_pi(user_profile) and not request.user.is_superuser:
+        return HttpResponseForbidden("You are not allowed to create a research group.")
+    elif GroupMembership.objects.filter(member=request.user).exists():
+        return HttpResponseForbidden(
+            "You cannot create a research group while being a member of another one.",
+        )
+
+    if request.method == "POST":
+        form = TermsAndConditionsForm(request.POST)  # use TermsAndConditionsForm
+        if form.is_valid():
+            # Autogenerate name
+            group_name = f"Research Group {request.user.username}"
+            gid = generate_unique_gid()
+
+            # If the group already exist, we just use that one
+            group, created = ResearchGroup.objects.get_or_create(
+                owner=request.user, defaults={"gid": gid, "name": group_name}
+            )
+
+            if created:
+                messages.success(request, "Research group created successfully.")
+            else:
+                messages.success(
+                    request,
+                    f"A research group owned by '{request.user}' already exist.",
+                )
+
+            return redirect(
+                reverse(
+                    "imperial_coldfront_plugin:group_members",
+                    kwargs=dict(group_pk=group.pk),
+                )
+            )
+    else:
+        form = TermsAndConditionsForm()  # use TermsAndConditionsForm
+
+    return render(
+        request, "imperial_coldfront_plugin/research_group_terms.html", {"form": form}
+    )
+
+
+def generate_unique_gid():
+    """Generate a unique GID for the ResearchGroup."""
+    last_gid = ResearchGroup.objects.order_by("-gid").first()
+    return (last_gid.gid + 1) if last_gid else 1000  # Start at 1000 if no groups exist
 
 
 @login_required
@@ -77,6 +141,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
         {
             "group_members": group_members,
             "is_manager": is_manager,
+            "group_pk": group_pk,
         },
     )
 

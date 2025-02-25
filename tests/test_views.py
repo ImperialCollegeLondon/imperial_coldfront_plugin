@@ -16,7 +16,7 @@ from imperial_coldfront_plugin.forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
-from imperial_coldfront_plugin.models import UnixUID
+from imperial_coldfront_plugin.models import ResearchGroup, UnixUID
 
 
 @pytest.fixture
@@ -73,27 +73,26 @@ class TestGroupMembersView(LoginRequiredMixin):
         )
 
 
+@pytest.mark.usefixtures("get_graph_api_client_mock")
 class TestUserSearchView(LoginRequiredMixin):
     """Tests for the user search view."""
 
     def _get_url(self, group_pk=1):
         return reverse("imperial_coldfront_plugin:user_search", args=[group_pk])
 
-    def test_get(self, get_graph_api_client_mock, user_client):
+    def test_get(self, user_client):
         """Test view rendering."""
         response = user_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], UserSearchForm)
 
-    def test_post(self, get_graph_api_client_mock, user_client, parsed_profile):
+    def test_post(self, user_client, parsed_profile):
         """Test search form submission."""
         response = user_client.post(self._get_url(), data={"search": "foo"})
         assert response.status_code == HTTPStatus.OK
         assert response.context["search_results"] == [parsed_profile]
 
-    def test_eligibility_filter(
-        self, get_graph_api_client_mock, mocker, parsed_profile, user_client
-    ):
+    def test_eligibility_filter(self, mocker, parsed_profile, user_client):
         """Test that the user_eligible_for_hpc_access function is used."""
         filter_mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
@@ -104,9 +103,7 @@ class TestUserSearchView(LoginRequiredMixin):
         assert response.context["search_results"] == []
         filter_mock.assert_called_once_with(parsed_profile)
 
-    def test_using_existing_access_filter(
-        self, get_graph_api_client_mock, mocker, user_client, parsed_profile
-    ):
+    def test_using_existing_access_filter(self, mocker, user_client, parsed_profile):
         """Test that the user_already_in_group function is used."""
         filter_mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_already_has_hpc_access"
@@ -126,6 +123,7 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     return mock
 
 
+@pytest.mark.usefixtures("get_graph_api_client_mock")
 class TestSendGroupInviteView(LoginRequiredMixin):
     """Tests for the send group invite view."""
 
@@ -144,7 +142,6 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         pi_manager_or_superuser,
         pi_group,
         parsed_profile,
-        get_graph_api_client_mock,
         mailoutbox,
         timestamp_signer_mock,
     ):
@@ -172,9 +169,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.BAD_REQUEST
         assert response.content == b"User not found or not eligible"
 
-    def test_existing_access_filter(
-        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
-    ):
+    def test_existing_access_filter(self, pi_group, pi_client, parsed_profile, mocker):
         """Test that the user_already_has_hpc_access function is used."""
         mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_already_has_hpc_access"
@@ -183,9 +178,7 @@ class TestSendGroupInviteView(LoginRequiredMixin):
         self._test_filter(pi_client, pi_group)
         mock.assert_called_once_with(parsed_profile["username"])
 
-    def test_eligibility_filter(
-        self, get_graph_api_client_mock, pi_group, pi_client, parsed_profile, mocker
-    ):
+    def test_eligibility_filter(self, pi_group, pi_client, parsed_profile, mocker):
         """Test that the user_eligible_for_hpc_access function is used."""
         mock = mocker.patch(
             "imperial_coldfront_plugin.views.user_eligible_for_hpc_access"
@@ -685,3 +678,102 @@ class TestHomeView:
 
         assert response.status_code == 200
         assert eligible_html not in response.content.decode()
+
+
+@pytest.fixture
+def eligible_pi_mock(mocker):
+    """Mock the user_eligible_to_be_pi function."""
+    return mocker.patch("imperial_coldfront_plugin.views.user_eligible_to_be_pi")
+
+
+@pytest.fixture
+def message_mock(mocker):
+    """Mock the message system, as it is not available in tests.
+
+    See https://stackoverflow.com/a/27300365/3778792 and other answers.
+    """
+    return mocker.patch("imperial_coldfront_plugin.views.messages")
+
+
+@pytest.mark.usefixtures("get_graph_api_client_mock", "message_mock")
+class TestCreateGroupView(LoginRequiredMixin):
+    """Tests for the research group creation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:research_group_create")
+
+    def test_not_pi_cannot_create_groups(
+        self,
+        auth_client_factory,
+        user_or_member,
+        eligible_pi_mock,
+    ):
+        """Test a non-pi cannot create groups."""
+        client = auth_client_factory(user_or_member)
+        eligible_pi_mock.return_value = False
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_potential_pi_in_group_cannot_create_groups(
+        self,
+        auth_client_factory,
+        pi_group_member,
+        eligible_pi_mock,
+    ):
+        """Test a potential pi already in a group cannot create groups."""
+        client = auth_client_factory(pi_group_member)
+        eligible_pi_mock.return_value = True
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_pi_get_the_terms_and_conditions_form(self, pi_client, eligible_pi_mock):
+        """Test a pi is shown the T&C."""
+        eligible_pi_mock.return_value = True
+        response = pi_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/research_group_terms.html"
+        )
+        assert isinstance(response.context["form"], TermsAndConditionsForm)
+
+    def test_group_exist_redirect_to_that_one(
+        self,
+        auth_client_factory,
+        pi_group,
+        eligible_pi_mock,
+    ):
+        """Test that if group exists, it redirects to it."""
+        pi = pi_group.owner
+        client = auth_client_factory(pi)
+        eligible_pi_mock.return_value = True
+        response = client.post(self._get_url(), data={"accept": True})
+        assert response.status_code == HTTPStatus.FOUND
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                kwargs=dict(group_pk=pi_group.pk),
+            ),
+        )
+
+    def test_new_group_created(
+        self,
+        auth_client_factory,
+        pi,
+        eligible_pi_mock,
+    ):
+        """Test that a new group is created."""
+        with pytest.raises(ResearchGroup.DoesNotExist):
+            ResearchGroup.objects.get(owner=pi)
+        client = auth_client_factory(pi)
+        eligible_pi_mock.return_value = True
+        response = client.post(self._get_url(), data={"accept": True})
+        group = ResearchGroup.objects.get(owner=pi)
+        assert response.status_code == HTTPStatus.FOUND
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:group_members",
+                kwargs=dict(group_pk=group.pk),
+            ),
+        )

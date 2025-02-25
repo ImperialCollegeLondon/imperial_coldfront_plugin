@@ -31,7 +31,7 @@
       </table>
       <label for="expiration">Expiration date (within 5 years):</label>
       <input type="date" id="expiration" name="expiration">
-      <input type="submit" value="Invite" />
+      <input type="submit" disabled="disabled" id="invite" value="Invite" />
     </form>
   {% endif %}
   <script>
@@ -46,5 +46,13 @@
     // Set min and max attribute to restrict date selection.
     dateInput.setAttribute('min', formattedToday);
     dateInput.setAttribute('max', formattedLimit);
+
+    // Enable invite button
+    const invite = document.getElementById('invite');
+    $(function(){
+        $("input[type='radio']").change(function(){
+            invite.disabled = false;
+        });
+    });
   </script>
 {% endblock content %}
