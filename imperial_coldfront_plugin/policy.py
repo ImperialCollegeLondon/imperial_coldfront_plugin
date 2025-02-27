@@ -7,15 +7,6 @@ from django.utils import timezone
 from .models import GroupMembership, ResearchGroup
 
 
-def _filter_entity_type(entity_type):
-    """Capture complex sublogic for filtering entity types."""
-    if entity_type is None:
-        return False
-    if "Room" in entity_type or entity_type == "Shared Mailbox":
-        return False
-    return True
-
-
 def user_eligible_for_hpc_access(user_profile):
     """Assess the eligibility of a user to join a ResearchGroup.
 
@@ -26,14 +17,14 @@ def user_eligible_for_hpc_access(user_profile):
         [
             user_profile["user_type"] == "Member",
             user_profile["record_status"] == "Live",
-            _filter_entity_type(user_profile["entity_type"]),
+            user_profile["entity_type"] in HPC_ACCESS_ALLOWED_ENTITY_TYPE,
             None
             not in (
                 user_profile["email"],
                 user_profile["name"],
                 user_profile["department"],
             ),
-            user_profile["department"] not in HPC_ACCESS_DISSALLOWED_DEPARTMENTS,
+            user_profile["department"] not in HPC_ACCESS_DISALLOWED_DEPARTMENTS,
         ]
     )
 
@@ -69,7 +60,7 @@ PI_DISALLOWED_DEPARTMENTS = [
 ]
 PI_ALLOWED_TITLES = ["Fellow", "Lecturer", "Chair", "Professor", "Reader", "Director"]
 PI_DISALLOWED_TITLE_QUALIFIERS = ["Visiting", "Emeritus", "Honorary"]
-HPC_ACCESS_DISSALLOWED_DEPARTMENTS = [
+HPC_ACCESS_DISALLOWED_DEPARTMENTS = [
     "Registry",
     "ICT System Accounts",
     "Enterprise",
@@ -126,6 +117,22 @@ HPC_ACCESS_DISSALLOWED_DEPARTMENTS = [
     "ThinkSpace",
     "Union",
     "White City Development",
+]
+HPC_ACCESS_ALLOWED_ENTITY_TYPE = [
+    "Employee",
+    "Research Postgraduate",
+    "Undergraduate",
+    "Honorary",
+    "Casual & Bursary",
+    "Taught Postgraduate",
+    "Casual",
+    "Visiting Researcher",
+    "Academic Visitor (CWK)",
+    "Contingent Worker",
+    "MRC Employees",
+    "Emeritus",
+    "Sponsored Researcher",
+    "MRC Employees (CWK)",
 ]
 
 

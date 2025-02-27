@@ -203,7 +203,7 @@ def parsed_profile():
         company_name="company",
         department="dept",
         job_family="job family",
-        entity_type="entity type",
+        entity_type="Employee",
         job_title=None,
         name="a name",
         email="email",
