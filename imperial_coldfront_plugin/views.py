@@ -134,6 +134,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
 
     group_members = GroupMembership.objects.filter(group=group)
     is_manager = group_members.filter(member=request.user, is_manager=True).exists()
+    current_date = timezone.now()
 
     return render(
         request,
@@ -142,6 +143,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
             "group_members": group_members,
             "is_manager": is_manager,
             "group_pk": group_pk,
+            "current_date": current_date,
         },
     )
 
