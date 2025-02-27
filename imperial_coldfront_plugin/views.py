@@ -396,7 +396,7 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     check_group_owner_or_superuser(group, request.user)
 
     if group_membership.expiration.date() < timezone.now().date():
-        return HttpResponseForbidden("Membership has expired.")
+        return HttpResponseBadRequest("Membership has expired.")
 
     group_membership.is_manager = True
     group_membership.save()

@@ -517,7 +517,7 @@ class TestMakeGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
         client = auth_client_factory(pi_or_superuser)
         response = client.get(self._get_url(pi_group_membership.pk))
         assert response.content == b"Membership has expired."
-        assert response.status_code == HTTPStatus.FORBIDDEN
+        assert response.status_code == HTTPStatus.BAD_REQUEST
 
 
 class TestRemoveGroupManagerView(LoginRequiredMixin, GroupMembershipPKMixin):
