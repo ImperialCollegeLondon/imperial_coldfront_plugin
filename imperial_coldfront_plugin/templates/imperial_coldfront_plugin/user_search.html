@@ -5,6 +5,7 @@
     <input type="submit" value="Search" />
   </form>
   {% if search_results %}
+    <p>Please note that users that already a member of a</p>
     <form action="{% url 'imperial_coldfront_plugin:send_group_invite' group_pk %}"
           method="post">
       {% csrf_token %}
