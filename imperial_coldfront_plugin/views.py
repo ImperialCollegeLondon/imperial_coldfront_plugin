@@ -47,6 +47,8 @@ User = get_user_model()
 class GraphAPISearch(UserSearch):
     """Search for users using MS Graph API."""
 
+    search_source = "GraphAPI"
+
     def search_a_user(
         self, user_search_string: str | None = None, search_by: str = "all_fields"
     ) -> list[str]:
@@ -58,7 +60,10 @@ class GraphAPISearch(UserSearch):
                 user's name or username.
         """
         graph_client = get_graph_api_client()
-        return graph_client.user_search(user_search_string)
+        found = graph_client.user_search(user_search_string)
+        for user in found:
+            user["source"] = self.search_source
+        return found
 
 
 @login_required
