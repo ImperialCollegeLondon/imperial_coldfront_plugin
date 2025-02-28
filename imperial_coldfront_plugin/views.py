@@ -157,6 +157,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
 
     group_members = GroupMembership.objects.filter(group=group)
     is_manager = group_members.filter(member=request.user, is_manager=True).exists()
+    current_date = timezone.now()
 
     return render(
         request,
@@ -165,6 +166,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
             "group_members": group_members,
             "is_manager": is_manager,
             "group_pk": group_pk,
+            "current_date": current_date,
         },
     )
 
@@ -415,6 +417,9 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
     check_group_owner_or_superuser(group, request.user)
+
+    if group_membership.expiration.date() < timezone.now().date():
+        return HttpResponseBadRequest("Membership has expired.")
 
     group_membership.is_manager = True
     group_membership.save()
