@@ -63,7 +63,7 @@ class GraphAPISearch(UserSearch):
         found = graph_client.user_search(user_search_string)
         for user in found:
             user["source"] = self.search_source
-        return found
+        return list(filter(user_eligible_for_hpc_access, found))
 
 
 @login_required
