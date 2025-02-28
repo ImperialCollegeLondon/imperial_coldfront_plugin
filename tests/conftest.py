@@ -209,6 +209,8 @@ def parsed_profile():
         email="email",
         username="username",
         record_status="Live",
+        first_name="A",
+        last_name="Name",
     )
 
 
@@ -227,6 +229,8 @@ def profile(parsed_profile):
         displayName=parsed_profile["name"],
         mail=parsed_profile["email"],
         userPrincipalName=parsed_profile["username"] + "@ic.ac.uk",
+        givenName=parsed_profile["first_name"],
+        surname=parsed_profile["last_name"],
     )
 
 

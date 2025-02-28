@@ -37,6 +37,8 @@ def _transform_profile_data(data):
         "name": data.get("displayName"),
         "email": data.get("mail"),
         "username": data.get("userPrincipalName", "").removesuffix("@ic.ac.uk"),
+        "first_name": data.get("givenName"),
+        "last_name": data.get("surname"),
     }
 
 
@@ -60,7 +62,7 @@ def parse_profile_data_list(response):
 
 PROFILE_ATTRIBUTES = (
     "jobTitle,department,companyName,userType,onPremisesExtensionAttributes,displayName"
-    ",mail,userPrincipalName"
+    ",mail,userPrincipalName,givenName,surname"
 )
 """The attributes to request when fetching user profile data."""
 
