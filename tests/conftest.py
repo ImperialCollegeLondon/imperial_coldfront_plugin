@@ -203,12 +203,14 @@ def parsed_profile():
         company_name="company",
         department="dept",
         job_family="job family",
-        entity_type="entity type",
+        entity_type="Employee",
         job_title=None,
         name="a name",
         email="email",
         username="username",
         record_status="Live",
+        first_name="A",
+        last_name="Name",
     )
 
 
@@ -227,6 +229,8 @@ def profile(parsed_profile):
         displayName=parsed_profile["name"],
         mail=parsed_profile["email"],
         userPrincipalName=parsed_profile["username"] + "@ic.ac.uk",
+        givenName=parsed_profile["first_name"],
+        surname=parsed_profile["last_name"],
     )
 
 
