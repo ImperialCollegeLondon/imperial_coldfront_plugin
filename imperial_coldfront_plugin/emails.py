@@ -63,3 +63,14 @@ def send_manager_removed_email(user, owner):
         f"This email is to confirm that {user.get_full_name()} ({user.email}) has been "
         f"removed as a manager in the HPC access group of {owner.get_full_name()}.",
     )
+
+
+def send_expiration_alert_email(user, owner, expiration):
+    """Notification email that a user's access to a ResearchGroup is about to expire."""
+    send_email_in_background(
+        [user.email, owner.email],
+        "HPC Access Expiration Alert",
+        f"This email is to notify you that {user.get_full_name()} ({user.email})'s "
+        f"membership in the HPC access group of {owner.get_full_name()} is due "
+        f"to expire on {expiration}.",
+    )
