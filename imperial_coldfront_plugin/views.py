@@ -1,6 +1,6 @@
 """Plugin views."""
 
-import datetime
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -453,7 +453,7 @@ def group_membership_extend(
         form = GroupMembershipExtendForm(request.POST)
         if form.is_valid():
             extend_length = form.cleaned_data["extend_length"]
-            group_membership.expiration += datetime.timedelta(days=extend_length)
+            group_membership.expiration += timedelta(days=extend_length)
             group_membership.save()
             return redirect(
                 reverse("imperial_coldfront_plugin:group_members", args=[group.pk])

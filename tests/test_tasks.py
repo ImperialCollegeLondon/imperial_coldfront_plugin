@@ -1,7 +1,9 @@
 """Tests for the tasks of the Imperial Coldfront plugin."""
 
+import datetime
+
+import django.utils
 import pytest
-from django.utils import timezone
 
 from imperial_coldfront_plugin.models import GroupMembership
 from imperial_coldfront_plugin.tasks import send_expiration_notifications
@@ -12,7 +14,7 @@ def test_send_expiration_notifications(settings, mailoutbox):
     """Test the send_expiration_notifications task."""
     # Create a group membership that is about to expire.
     group_membership = GroupMembership(
-        expiration=timezone.now() + timezone.timedelta(days=1)
+        expiration=django.utils.timezone.now() + datetime.timedelta(days=1)
     )
 
     # Set the MEMBERSHIP_EXPIRATION_DAYS setting.
@@ -27,4 +29,4 @@ def test_send_expiration_notifications(settings, mailoutbox):
     assert email.subject == "HPC Access Expiration Alert"
     assert group_membership.user.email in email.to
     assert group_membership.group.owner.email in email.to
-    assert str(group_membership.expiration_date.date()) in email.body
+    assert str(group_membership.expiration.date()) in email.body
