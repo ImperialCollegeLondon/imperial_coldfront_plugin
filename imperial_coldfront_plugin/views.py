@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from coldfront.core.user.utils import UserSearch
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -41,6 +42,28 @@ from .policy import (
 )
 
 User = get_user_model()
+
+
+class GraphAPISearch(UserSearch):
+    """Search for users using MS Graph API."""
+
+    search_source = "GraphAPI"
+
+    def search_a_user(
+        self, user_search_string: str | None = None, search_by: str = "all_fields"
+    ) -> list[str]:
+        """Searchers for a single user.
+
+        Args:
+            user_search_string: The user string to look for.
+            search_by: (Unused) Fields to look into. This backend always looks into the
+                user's name or username.
+        """
+        graph_client = get_graph_api_client()
+        found = graph_client.user_search(user_search_string)
+        for user in found:
+            user["source"] = self.search_source
+        return list(filter(user_eligible_for_hpc_access, found))
 
 
 @login_required
@@ -134,6 +157,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
 
     group_members = GroupMembership.objects.filter(group=group)
     is_manager = group_members.filter(member=request.user, is_manager=True).exists()
+    current_date = timezone.now()
 
     return render(
         request,
@@ -142,6 +166,7 @@ def group_members_view(request: HttpRequest, group_pk: int) -> HttpResponse:
             "group_members": group_members,
             "is_manager": is_manager,
             "group_pk": group_pk,
+            "current_date": current_date,
         },
     )
 
@@ -176,9 +201,7 @@ def user_search(request: HttpRequest, group_pk: int) -> HttpResponse:
         form = UserSearchForm(request.POST)
         if form.is_valid():
             search_query = form.cleaned_data["search"]
-            graph_client = get_graph_api_client()
-            search_results = graph_client.user_search(search_query)
-
+            search_results = GraphAPISearch(search_query, "all_fields").search()
             filtered_results = [
                 user
                 for user in search_results
@@ -394,6 +417,9 @@ def make_group_manager(request: HttpRequest, group_membership_pk: int) -> HttpRe
     group_membership = get_object_or_404(GroupMembership, pk=group_membership_pk)
     group = group_membership.group
     check_group_owner_or_superuser(group, request.user)
+
+    if group_membership.expiration.date() < timezone.now().date():
+        return HttpResponseBadRequest("Membership has expired.")
 
     group_membership.is_manager = True
     group_membership.save()

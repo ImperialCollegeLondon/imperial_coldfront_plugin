@@ -7,15 +7,6 @@ from django.utils import timezone
 from .models import GroupMembership, ResearchGroup
 
 
-def _filter_entity_type(entity_type):
-    """Capture complex sublogic for filtering entity types."""
-    if entity_type is None:
-        return False
-    if "Room" in entity_type or entity_type == "Shared Mailbox":
-        return False
-    return True
-
-
 def user_eligible_for_hpc_access(user_profile):
     """Assess the eligibility of a user to join a ResearchGroup.
 
@@ -26,13 +17,14 @@ def user_eligible_for_hpc_access(user_profile):
         [
             user_profile["user_type"] == "Member",
             user_profile["record_status"] == "Live",
-            _filter_entity_type(user_profile["entity_type"]),
+            user_profile["entity_type"] in HPC_ACCESS_ALLOWED_ENTITY_TYPE,
             None
             not in (
                 user_profile["email"],
                 user_profile["name"],
                 user_profile["department"],
             ),
+            user_profile["department"] not in HPC_ACCESS_DISALLOWED_DEPARTMENTS,
         ]
     )
 
@@ -68,6 +60,80 @@ PI_DISALLOWED_DEPARTMENTS = [
 ]
 PI_ALLOWED_TITLES = ["Fellow", "Lecturer", "Chair", "Professor", "Reader", "Director"]
 PI_DISALLOWED_TITLE_QUALIFIERS = ["Visiting", "Emeritus", "Honorary"]
+HPC_ACCESS_DISALLOWED_DEPARTMENTS = [
+    "Registry",
+    "ICT System Accounts",
+    "Enterprise",
+    "Commercial Operations",
+    "Residential Services",
+    "Strategic Programmes & Change",
+    "Finance Division",
+    "Student Services",
+    "Division of the University Secretary",
+    "Sport and Leisure Services",
+    "Institute of Extended Learning",
+    "Student Union",
+    "Advancement",
+    "Campus Operations",
+    "Capital Projects and Estates Management",
+    "Careers Service",
+    "Catering and Events",
+    "Catering Services",
+    "Administration",
+    "Chaplaincy",
+    "College Headquarters",
+    "Commercial and Investment Activities Group",
+    "Communications and Public Affairs",
+    "Communications Division",
+    "Community Safety and Security",
+    "Division of the College Secretary",
+    "Early Years Education Centre",
+    "Endowment",
+    "Estates Division",
+    "External Users",
+    "Guest Access",
+    "Health and Safety Services",
+    "Human Resources Division",
+    "Investment Office",
+    "Marketing, Recruitment and Admissions",
+    "Office of the Provost",
+    "Other - NHS",
+    "Outreach",
+    "Property Division",
+    "Property Operations",
+    "Reach Out",
+    "Reactor Centre",
+    "Residential Services",
+    "Risk Management",
+    "Safety Department",
+    "School of Professional Development",
+    "Security Services",
+    "Sport and Leisure Services",
+    "Strategic Planning Division",
+    "Strategic Programmes & Change",
+    "Student Recruitment and Outreach",
+    "Student Services",
+    "Support Services",
+    "ThinkSpace",
+    "Union",
+    "White City Development",
+]
+HPC_ACCESS_ALLOWED_ENTITY_TYPE = [
+    "Employee",
+    "Research Postgraduate",
+    "Undergraduate",
+    "Honorary",
+    "Casual & Bursary",
+    "Taught Postgraduate",
+    "Casual",
+    "Visiting Researcher",
+    "Academic Visitor (CWK)",
+    "Contingent Worker",
+    "MRC Employees",
+    "Emeritus",
+    "Sponsored Researcher",
+    "MRC Employees (CWK)",
+]
 
 
 def user_eligible_to_be_pi(user_profile):
