@@ -1,6 +1,6 @@
 """Tests for the views of the plugin."""
 
-import datetime
+from datetime import timedelta
 from http import HTTPStatus
 from random import randint
 
@@ -618,9 +618,8 @@ class TestGroupMembershipExtendView(LoginRequiredMixin, GroupMembershipPKMixin):
 
         pi_group_membership.refresh_from_db()
 
-        assert (
-            pi_group_membership.expiration
-            == current_expiration + datetime.timedelta(days=120)
+        assert pi_group_membership.expiration == current_expiration + timedelta(
+            days=120
         )
 
 
