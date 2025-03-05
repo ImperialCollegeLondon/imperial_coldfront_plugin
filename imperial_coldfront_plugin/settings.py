@@ -13,3 +13,4 @@ ADDITIONAL_USER_SEARCH_CLASSES = ["imperial_coldfront_plugin.views.GraphAPISearc
 GPFS_API_URL = ENV.str("GPFS_API_URL", default="")
 GPFS_API_USERNAME = ENV.str("GPFS_API_USERNAME", default="")
 GPFS_API_PASSWORD = ENV.str("GPFS_API_PASSWORD", default="")
+GPFS_API_VERIFY = ENV.bool("GPFS_API_VERIFY", default=False)
