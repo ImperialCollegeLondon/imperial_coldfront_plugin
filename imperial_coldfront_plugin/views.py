@@ -60,7 +60,7 @@ class GraphAPISearch(UserSearch):
                 user's name or username.
         """
         graph_client = get_graph_api_client()
-        found = graph_client.user_search(user_search_string)
+        found = graph_client.user_search_by(user_search_string, search_by)
         for user in found:
             user["source"] = self.search_source
         return list(filter(user_eligible_for_hpc_access, found))

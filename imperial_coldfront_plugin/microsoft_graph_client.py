@@ -60,6 +60,27 @@ def parse_profile_data_list(response):
     return [_transform_profile_data(item) for item in data]
 
 
+def build_user_search_query(
+    term: str | None = None, search_by: str = "all_fields"
+) -> str:
+    """Builds the URL query string.
+
+    Args:
+        term: The search term to look for.
+        search_by: The fields to search into. If "all_fields", it will search in
+            "userPrincipalName", "displayName" and "email", otherwise it only searches
+            in "userPrincipalName".
+
+    Returns:
+        The query string.
+    """
+    return (
+        f'"displayName:{term}" OR ("userPrincipalName:{term}" OR "mail:{term}")'
+        if search_by == "all_fields"
+        else f'"userPrincipalName:{term}"'
+    )
+
+
 PROFILE_ATTRIBUTES = (
     "jobTitle,department,companyName,userType,onPremisesExtensionAttributes,displayName"
     ",mail,userPrincipalName,givenName,surname"
@@ -87,12 +108,24 @@ class MicrosoftGraphClient(Consumer):
 
     @response_handler(parse_profile_data_list)
     @headers(dict(ConsistencyLevel="eventual"))
-    @get(
-        'users?$search="displayName:{query}" OR "userPrincipalName:{query}"&$select='
-        + PROFILE_ATTRIBUTES
-    )
+    @get("users?$search={query}&$select=" + PROFILE_ATTRIBUTES)
     def user_search(self, query: str):
         """Search for a user by their display name or user principal name."""
+
+    def user_search_by(
+        self, user_search_string: str | None = None, search_by: str = "all_fields"
+    ) -> list[str]:
+        """Search within a specific field.
+
+        Args:
+            user_search_string: The search term to look for.
+            search_by: The fields to search into. Defaults to all fields.
+
+        Return:
+            List of users' information matching the query.
+        """
+        query = build_user_search_query(user_search_string, search_by)
+        return self.user_search(query)
 
 
 def get_graph_api_client(access_token=None):

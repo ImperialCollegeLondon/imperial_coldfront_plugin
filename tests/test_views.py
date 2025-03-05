@@ -119,7 +119,7 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
     mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
     mock().user_profile.return_value = parsed_profile
-    mock().user_search.return_value = [parsed_profile]
+    mock().user_search_by.return_value = [parsed_profile]
     return mock
 
 
