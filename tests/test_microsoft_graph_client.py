@@ -6,6 +6,7 @@ import requests
 from imperial_coldfront_plugin.microsoft_graph_client import (
     PROFILE_ATTRIBUTES,
     MicrosoftGraphClient,
+    build_user_search_query,
     parse_profile_data,
 )
 
@@ -65,3 +66,20 @@ def test_client_user_uid(missing, graph_client, send_mock):
     assert send_mock.call_args[0][0].url == BASE_URL + (
         f"/users/{username}@ic.ac.uk?$select=onPremisesExtensionAttributes"
     )
+
+
+@pytest.mark.parametrize(
+    "search_by,query",
+    [
+        (
+            "all_fields",
+            '"displayName:{term}" OR ("userPrincipalName:{term}" OR "mail:{term}")',
+        ),
+        ("something_else", '"userPrincipalName:{term}"'),
+    ],
+)
+def test_build_user_search_query(search_by, query):
+    """Tests that the search query is created correctly."""
+    term = "username"
+    actual = build_user_search_query(term, search_by)
+    assert actual == query.format(term=term)
