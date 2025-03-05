@@ -68,8 +68,8 @@ def build_user_search_query(
     Args:
         term: The search term to look for.
         search_by: The fields to search into. If "all_fields", it will search in
-        "userPrincipalName", "displayName" and "email", otherwise it only searches in
-        "userPrincipalName".
+            "userPrincipalName", "displayName" and "email", otherwise it only searches
+            in "userPrincipalName".
 
     Returns:
         The query string.
