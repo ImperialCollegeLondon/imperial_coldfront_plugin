@@ -60,51 +60,30 @@ def parse_profile_data_list(response):
     return [_transform_profile_data(item) for item in data]
 
 
-ATTRIBUTES_CONVERSION_TABLE = {
-    "job_title": "jobTitle",
-    "department": "department",
-    "company_name": "companyName",
-    "name": "displayName",
-    "email": "mail",
-    "username": "userPrincipalName",
-    "first_name": "givenName",
-    "last_name": "surname",
-}
-
-
 def build_user_search_query(
     term: str | None = None, search_by: str = "all_fields"
 ) -> str:
     """Builds the URL query string.
 
-    It will have the form "search_field:search_term" if only one field is chosen or:
-    '"search_field_1:search_term" OR "search_field_2:search_term" OR ...' if the search
-    is in all fields.
-
     Args:
         term: The search term to look for.
-        search_by: The fields to search into. Defaults to all fields.
+        search_by: The fields to search into. If "all_fields", it will search in
+        "userPrincipalName", "displayName" and "email", otherwise it only searches in
+        "userPrincipalName".
 
     Returns:
         The query string.
     """
-    if search_by == "all_fields":
-        query = ""
-        for field in ATTRIBUTES_CONVERSION_TABLE.values():
-            extra = f'"{field}:{term}"'
-            if query:
-                query = f"({extra} OR {query})"
-            else:
-                query = extra
-        query = query[1:-1]
-    else:
-        query = f'"displayName:{term}" OR "userPrincipalName:{term}"'
-    return query
+    return (
+        f'"displayName:{term}" OR ("userPrincipalName:{term}" OR "mail:{term}")'
+        if search_by == "all_fields"
+        else f'"userPrincipalName:{term}"'
+    )
 
 
 PROFILE_ATTRIBUTES = (
-    ",".join(ATTRIBUTES_CONVERSION_TABLE.values())
-    + ",userType,onPremisesExtensionAttributes"
+    "jobTitle,department,companyName,userType,onPremisesExtensionAttributes,displayName"
+    ",mail,userPrincipalName,givenName,surname"
 )
 """The attributes to request when fetching user profile data."""
 
