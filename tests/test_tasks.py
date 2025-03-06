@@ -4,93 +4,30 @@ import datetime
 
 import pytest
 
-from imperial_coldfront_plugin.emails import send_expiration_alert_email
 from imperial_coldfront_plugin.tasks import send_expiration_notifications
 
 
 class TestSendExpirationNotificationsTask:
     """Tests for the send_expiration_notifications task."""
 
-    @pytest.fixture
-    def test_notification_sent_one_day_before(self, mocker):
-        """Test that a notification is sent for memberships that expire tomorrow."""
-        mocker.patch(
-            "imperial_coldfront_plugin.tasks.GroupMembership.objects.filter",
-            return_value=[
-                mocker.Mock(
-                    expiration=datetime.date.today() + datetime.timedelta(days=1)
-                )
-            ],
+    @pytest.mark.parametrize("days", (1, 5, 30))
+    def test_notification_sent_before_expiry(
+        self, days, pi, pi_group_membership, mailoutbox
+    ):
+        """Test that a notification is sent for memberships expiring in the future."""
+        pi_group_membership.expiration = datetime.date.today() + datetime.timedelta(
+            days=days
         )
+        pi_group_membership.save()
 
         send_expiration_notifications()
 
-        assert send_expiration_alert_email.called
-        send_expiration_alert_email.assert_called_once_with(
-            mocker.ANY, mocker.ANY, mocker.ANY
+        email = mailoutbox[0]
+        email.subject == "HPC Access Expiration Alert"
+        email.to == [pi.email, pi_group_membership.group.owner.email]
+        email.body == (
+            f"This email is to notify you that {pi.get_full_name()} ({pi.email})'s "
+            f"membership in the HPC access group of "
+            f"{pi_group_membership.group.owner.get_full_name()} is due "
+            f"to expire on {pi_group_membership.expiration}."
         )
-
-    @pytest.fixture
-    def test_notification_sent_five_days_before(self, mocker):
-        """Test that a notification is sent for memberships that expire in five days."""
-        mocker.patch(
-            "imperial_coldfront_plugin.tasks.GroupMembership.objects.filter",
-            return_value=[
-                mocker.Mock(
-                    expiration=datetime.date.today() + datetime.timedelta(days=5)
-                )
-            ],
-        )
-
-        send_expiration_notifications()
-
-        assert send_expiration_alert_email.called
-        send_expiration_alert_email.assert_called_once_with(
-            mocker.ANY, mocker.ANY, mocker.ANY
-        )
-
-    @pytest.fixture
-    def test_notification_sent_thirty_days_before(self, mocker):
-        """Test that a notification is sent for memberships that expire in 30 days."""
-        mocker.patch(
-            "imperial_coldfront_plugin.tasks.GroupMembership.objects.filter",
-            return_value=[
-                mocker.Mock(
-                    expiration=datetime.date.today() + datetime.timedelta(days=30)
-                )
-            ],
-        )
-
-        send_expiration_notifications()
-
-        assert send_expiration_alert_email.called
-        send_expiration_alert_email.assert_called_once_with(
-            mocker.ANY, mocker.ANY, mocker.ANY
-        )
-
-    @pytest.fixture
-    def test_no_notifications_sent_expired_already(self, mocker):
-        """Test that no notifications sent for memberships that have expired already."""
-        mocker.patch(
-            "imperial_coldfront_plugin.tasks.GroupMembership.objects.filter",
-            return_value=[
-                mocker.Mock(expiration="2021-01-01"),
-                mocker.Mock(expiration="2021-01-02"),
-            ],
-        )
-
-        send_expiration_notifications()
-
-        assert not send_expiration_alert_email.called
-
-    @pytest.fixture
-    def test_no_notifications_sent_expire_today(self, mocker):
-        """Test that no notifications are sent for memberships that expire today."""
-        mocker.patch(
-            "imperial_coldfront_plugin.tasks.GroupMembership.objects.filter",
-            return_value=[mocker.Mock(expiration=datetime.date.today())],
-        )
-
-        send_expiration_notifications()
-
-        assert not send_expiration_alert_email.called
