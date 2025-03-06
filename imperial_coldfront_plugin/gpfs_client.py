@@ -2,7 +2,7 @@
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, get, post, retry, returns
+from uplink import Body, Consumer, delete, get, post, retry, returns
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -83,3 +83,7 @@ class GPFSClient(Consumer):
     @get("jobs/{jobId}")
     def _get_job_status(self, jobId: int):
         """Query the status of a job."""
+
+    @delete("jobs/{jobId}")
+    def cancel_job(self, jobId: int):
+        """Cancel an asynchronous job."""
