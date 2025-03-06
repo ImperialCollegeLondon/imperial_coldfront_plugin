@@ -5,6 +5,10 @@ urls.py. This ensures that the urls are correctly namespaced when looked up in
 templates.
 """
 
+import coldfront.core.portal.views as portal_views
 from django.urls import include, path
 
-urlpatterns = [path("icl/", include("imperial_coldfront_plugin.urls"))]
+urlpatterns = [
+    path("", portal_views.home, name="home"),
+    path("icl/", include("imperial_coldfront_plugin.urls")),
+]

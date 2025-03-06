@@ -4,6 +4,8 @@ This module contains form classes used for research group management.
 """
 
 from django import forms
+from django.core.validators import MinValueValidator
+from django.utils import timezone
 
 
 class GroupMembershipForm(forms.Form):
@@ -41,4 +43,28 @@ class GroupMembershipExtendForm(forms.Form):
     extend_length = forms.IntegerField(
         label="Extend by (in days)",
         min_value=1,
+    )
+
+
+def get_project_choices():
+    """Populate project choice field options from database."""
+    from coldfront.core.project.models import Project
+
+    projects = Project.objects.all()
+    return [
+        (project.pk, f"{project.pi.get_full_name()} - {project.title}")
+        for project in projects
+    ]
+
+
+class RDFAllocationForm(forms.Form):
+    """Form for creating a new RDF allocation."""
+
+    project = forms.ChoiceField(choices=get_project_choices)
+    end_date = forms.DateField(
+        widget=forms.SelectDateWidget,
+        validators=[MinValueValidator(timezone.now().date())],
+    )
+    size = forms.IntegerField(
+        validators=[MinValueValidator(1)], help_text="In gigabytes"
     )
