@@ -2,7 +2,7 @@
 
 import requests
 from django.conf import settings
-from uplink import Consumer, get, returns
+from uplink import Body, Consumer, get, post, returns
 from uplink.auth import BasicAuth
 
 
@@ -18,5 +18,10 @@ class GPFSClient(Consumer):
 
     @returns.json
     @get("filesystems")
-    def filesystems(self) -> str:
+    def filesystems(self) -> dict:
         """Return the information on the filesystems available."""
+
+    @returns.json
+    @post("filesystems/{filesystemName}/filesets")
+    def create_fileset(self, filesystemName: str, body: Body) -> dict:
+        """Creates a new fileset in the requested filesystem."""
