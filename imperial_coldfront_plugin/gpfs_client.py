@@ -25,3 +25,7 @@ class GPFSClient(Consumer):
     @post("filesystems/{filesystemName}/filesets")
     def create_fileset(self, filesystemName: str, body: Body) -> dict:
         """Creates a new fileset in the requested filesystem."""
+
+    @get("jobs/{jobId}")
+    def _get_job_status(self, jobId: int):
+        """Query the status of a job."""
