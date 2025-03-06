@@ -1,41 +1,51 @@
 """Interface for interacting with the GPFS API."""
 
-from functools import wraps
-
 import requests
 from django.conf import settings
 from uplink import Body, Consumer, get, post, retry, returns
 from uplink.auth import BasicAuth
+from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
-from uplink.retry.when import raises
+from uplink.retry.when import RetryPredicate, status_5xx
 
 
 class ErrorWhenProcessingJob(Exception):
     """Handles errors in asynchronous jobs."""
 
+    def __init__(self, value: dict):
+        """Initialises the exception with the error information."""
+        self.value = value
 
-class JobStillBeingProcessed(Exception):
-    """Indicates that a job is still being processed."""
+    def __str__(self) -> str:
+        """Builds the error string."""
+        return repr(self.value)
 
 
-def process_jobid_status_request(f):
-    """Process the jobid status check, raising custom exceptions if needed."""
+class JobRunning(RetryPredicate):
+    """Checks the job status to decide it there should be a retry."""
 
-    @wraps(f)
-    def wrapper(*args, **kwds):
-        response = f(*args, **kwds)
+    def should_retry_after_response(self, response: requests.Response) -> bool:
+        """Check the response to decide if it should retry.
+
+        Args:
+            response: The response to explore.
+
+        Raises:
+            ErrorWhenProcessingJob, if the job status is FAILED.
+
+        Returns:
+            True if the request should be retried, False otherwise.
+        """
         if not 200 <= response.status_code < 300:
-            raise response.raise_for_status()
+            return False
 
-        job_data = response.json()["jobs"][0]
+        job_data: dict = response.json()["jobs"][0]
         if job_data["status"] == "FAILED":
-            raise ErrorWhenProcessingJob()
+            raise ErrorWhenProcessingJob(job_data["result"])
         elif job_data["status"] == "RUNNING":
-            raise JobStillBeingProcessed()
+            return True
 
-        return response
-
-    return wrapper
+        return False
 
 
 class GPFSClient(Consumer):
@@ -58,8 +68,11 @@ class GPFSClient(Consumer):
     def create_fileset(self, filesystemName: str, body: Body) -> dict:
         """Creates a new fileset in the requested filesystem."""
 
-    @retry(when=raises(JobStillBeingProcessed), stop=after_delay(60))
-    @process_jobid_status_request
+    @retry(
+        when=JobRunning | status_5xx,
+        backoff=exponential,
+        stop=after_delay(settings.GPFS_API_TIMEOUT),
+    )
     @get("jobs/{jobId}")
     def _get_job_status(self, jobId: int):
         """Query the status of a job."""
