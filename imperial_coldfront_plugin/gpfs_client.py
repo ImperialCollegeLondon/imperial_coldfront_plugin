@@ -21,6 +21,10 @@ class ErrorWhenProcessingJob(Exception):
         return repr(self.value)
 
 
+class JobTimeout(Exception):
+    """Raises an exception when a job times out."""
+
+
 class JobRunning(RetryPredicate):
     """Checks the job status to decide it there should be a retry."""
 
@@ -32,6 +36,7 @@ class JobRunning(RetryPredicate):
 
         Raises:
             ErrorWhenProcessingJob, if the job status is FAILED.
+            JobTimeout, if the job status is TIMEOUT.
 
         Returns:
             True if the request should be retried, False otherwise.
@@ -42,6 +47,8 @@ class JobRunning(RetryPredicate):
         job_data: dict = response.json()["jobs"][0]
         if job_data["status"] == "FAILED":
             raise ErrorWhenProcessingJob(job_data["result"])
+        elif job_data["status"] == "TIMEOUT":
+            raise JobTimeout(job_data["result"])
         elif job_data["status"] == "RUNNING":
             return True
 
