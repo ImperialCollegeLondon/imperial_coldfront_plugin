@@ -31,3 +31,27 @@ class TestSendExpirationNotificationsTask:
             f"{pi_group_membership.group.owner.get_full_name()} is due "
             f"to expire on {pi_group_membership.expiration}."
         )
+
+    def test_no_notification_sent_for_expired_membership(
+        self, pi_group_membership, mailoutbox
+    ):
+        """Test that no notification is sent for memberships that have expired."""
+        pi_group_membership.expiration = datetime.date.today() - datetime.timedelta(
+            days=1
+        )
+        pi_group_membership.save()
+
+        send_expiration_notifications()
+
+        assert len(mailoutbox) == 0
+
+    def test_no_notification_sent_for_membership_expired_today(
+        self, pi_group_membership, mailoutbox
+    ):
+        """Test that no notification is sent for memberships expiring today."""
+        pi_group_membership.expiration = datetime.date.today()
+        pi_group_membership.save()
+
+        send_expiration_notifications()
+
+        assert len(mailoutbox) == 0
