@@ -25,6 +25,14 @@ class TestSendExpirationNotificationsTask:
         email = mailoutbox[0]
         assert email.subject == "HPC Access Expiration Alert"
         assert email.to == [pi_group_membership.member.email, pi.email]
+        assert email.body == (
+            f"This email is to notify you that "
+            f"{pi_group_membership.member.get_full_name()} "
+            f"({pi_group_membership.member.email})'s "
+            f"membership in the HPC access group of "
+            f"{pi.get_full_name()} is due "
+            f"to expire on {pi_group_membership.expiration}."
+        )
 
     def test_no_notification_sent_for_expired_membership(
         self, pi_group_membership, mailoutbox

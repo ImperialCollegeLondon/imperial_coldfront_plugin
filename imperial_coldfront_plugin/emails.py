@@ -72,5 +72,5 @@ def send_expiration_alert_email(user, owner, expiration):
         "HPC Access Expiration Alert",
         f"This email is to notify you that {user.get_full_name()} ({user.email})'s "
         f"membership in the HPC access group of {owner.get_full_name()} is due "
-        f"to expire on {expiration}.",
+        f"to expire on {expiration.date()}.",
     )
