@@ -29,6 +29,13 @@ def pytest_configure():
             "django.contrib.sessions",
             "mozilla_django_oidc",
             "coldfront.core.user",
+            "coldfront.core.field_of_science",
+            "coldfront.core.project",
+            "coldfront.core.resource",
+            "coldfront.core.allocation",
+            "coldfront.core.grant",
+            "coldfront.core.publication",
+            "coldfront.core.research_output",
             "imperial_coldfront_plugin",
             "django_q",
         ],
@@ -51,6 +58,7 @@ def pytest_configure():
         MIDDLEWARE=[
             "django.contrib.sessions.middleware.SessionMiddleware",
             "django.contrib.auth.middleware.AuthenticationMiddleware",
+            "django.contrib.messages.middleware.MessageMiddleware",
         ],
         TOKEN_TIMEOUT=60,
         Q_CLUSTER={"sync": True},
@@ -58,7 +66,10 @@ def pytest_configure():
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
             if key.isupper()
-        },
+        }
+        | dict(
+            LDAP_ENABLED=True,
+        ),  # override settings loaded by env var for tests
     )
 
 
@@ -252,6 +263,12 @@ def superuser(user_factory):
     return user_factory(is_superuser=True)
 
 
+@pytest.fixture
+def superuser_client(superuser, auth_client_factory):
+    """Return a client logged in as superuser."""
+    return auth_client_factory(superuser)
+
+
 def _get_user_fixture(request):
     """Return a user fixture."""
     return request.getfixturevalue(request.param)
@@ -285,3 +302,46 @@ def user_or_member(request):
 def user_member_or_manager(request):
     """Parametrized fixture providing a user, member or manager."""
     return _get_user_fixture(request)
+
+
+@pytest.fixture(autouse=True)
+def ldap_connection_mock(mocker):
+    """Block connections to LDAP server and return simple dummy data."""
+    mock = mocker.patch("imperial_coldfront_plugin.ldap.Connection")
+    mock().add.return_value = [True, None, None, None]
+    mock().search.return_value = [None, None, [dict(dn="username")], None]
+
+
+@pytest.fixture
+def pi_project(pi):
+    """Provides a Coldfront project owned by the pi user."""
+    from coldfront.core.field_of_science.models import FieldOfScience
+    from coldfront.core.project.models import Project, ProjectStatusChoice
+
+    project_active_status = ProjectStatusChoice.objects.create(name="Active")
+    field_of_science_other = FieldOfScience.objects.create(description="Other")
+
+    return Project.objects.create(
+        pi=pi,
+        title="project title",
+        status=project_active_status,
+        field_of_science=field_of_science_other,
+    )
+
+
+@pytest.fixture
+def rdf_allocation_dependencies(db):
+    """Provide the database dependencies needed for rdf allocation creation."""
+    from coldfront.core.allocation.models import (
+        AllocationAttributeType,
+        AllocationStatusChoice,
+        AllocationUserStatusChoice,
+        AttributeType,
+    )
+
+    text_type = AttributeType.objects.get(name="Text")
+    AllocationStatusChoice.objects.create(name="Active")
+    AllocationAttributeType.objects.create(
+        name="Storage Quota (GB)", attribute_type=text_type
+    )
+    AllocationUserStatusChoice.objects.create(name="Active")
