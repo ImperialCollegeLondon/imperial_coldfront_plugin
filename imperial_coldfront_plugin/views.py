@@ -522,11 +522,7 @@ def get_next_rdf_project_id():
         int(PROJECT_ID_REGEX.match(group_id).groupdict()["number"])
         for group_id in group_ids
     ]
-    try:
-        new_project_number = max(id_numbers) + 1
-    except ValueError:
-        # no results
-        new_project_number = 1
+    new_project_number = max(id_numbers) + 1 if id_numbers else 1
 
     return format_project_number_to_id(new_project_number)
 
@@ -577,9 +573,6 @@ def add_rdf_storage_allocation(request):
                 value=form.cleaned_data["size"],
             )
 
-            rdf_id_attribute_type = AllocationAttributeType.objects.get(
-                name="RDF Project ID"
-            )
             AllocationAttribute.objects.create(
                 allocation_attribute_type=rdf_id_attribute_type,
                 allocation=rdf_allocation,
