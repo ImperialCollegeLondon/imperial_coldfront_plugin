@@ -312,7 +312,14 @@ def ldap_connection_mock(mocker):
     """Block connections to LDAP server and return simple dummy data."""
     mock = mocker.patch("imperial_coldfront_plugin.ldap.Connection")
     mock().add.return_value = [True, None, None, None]
-    mock().search.return_value = [None, None, [dict(dn="username")], None]
+
+    def search_side_effect(ou, search_term):
+        return None, None, [dict(dn=search_term[4:-1])], None
+
+    mock().search.side_effect = search_side_effect
+
+    mock().modify.return_value = [True, None, None, None]
+    return mock
 
 
 @pytest.fixture
@@ -348,3 +355,65 @@ def rdf_allocation_dependencies(db):
         name="Storage Quota (GB)", attribute_type=text_type
     )
     AllocationUserStatusChoice.objects.create(name="Active")
+
+
+@pytest.fixture
+def rdf_allocation_project_number():
+    """Project number for generating an rdf project id."""
+    return 23
+
+
+@pytest.fixture
+def rdf_allocation_project_id(rdf_allocation_project_number):
+    """RDF project id built from rdf_allocation_project_number."""
+    from imperial_coldfront_plugin.views import format_project_number_to_id
+
+    return format_project_number_to_id(rdf_allocation_project_number)
+
+
+@pytest.fixture
+def rdf_allocation(pi_project, rdf_allocation_dependencies, rdf_allocation_project_id):
+    """A Coldfront allocation representing a rdf storage allocation."""
+    from coldfront.core.allocation.models import (
+        Allocation,
+        AllocationAttribute,
+        AllocationAttributeType,
+        AllocationStatusChoice,
+    )
+    from coldfront.core.resource.models import Resource
+
+    rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
+    rdf_id_attribute_type = AllocationAttributeType.objects.get(name="RDF Project ID")
+
+    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+    allocation = Allocation.objects.create(
+        project=pi_project, status=allocation_active_status
+    )
+    allocation.resources.add(rdf_resource)
+
+    AllocationAttribute.objects.create(
+        allocation_attribute_type=rdf_id_attribute_type,
+        allocation=allocation,
+        value=rdf_allocation_project_id,
+    )
+    return allocation
+
+
+@pytest.fixture
+def allocation_user_active_status(db):
+    """Create an AllocationUserStatusChoice with name='Active'."""
+    from coldfront.core.allocation.models import AllocationUserStatusChoice
+
+    return AllocationUserStatusChoice.objects.create(name="Active")
+
+
+@pytest.fixture
+def allocation_user(allocation_user_active_status, rdf_allocation, pi):
+    """Provides an active user for rdf_allocation fixture."""
+    from coldfront.core.allocation.models import AllocationUser
+
+    return AllocationUser.objects.create(
+        allocation=rdf_allocation,
+        user=pi,
+        status=allocation_user_active_status,
+    )

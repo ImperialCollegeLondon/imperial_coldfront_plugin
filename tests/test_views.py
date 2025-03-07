@@ -6,13 +6,6 @@ from random import randint
 from unittest.mock import patch
 
 import pytest
-from coldfront.core.allocation.models import (
-    Allocation,
-    AllocationAttribute,
-    AllocationAttributeType,
-    AllocationStatusChoice,
-)
-from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.core.signing import TimestampSigner
 from django.shortcuts import render, reverse
@@ -806,28 +799,10 @@ class TestCreateGroupView(LoginRequiredMixin):
 class TestGetNextRdfProjectId:
     """Tests for the get_next_rdf_project_id utility function."""
 
-    def test_next_id(self, pi_project, rdf_allocation_dependencies):
+    def test_next_id(self, pi_project, rdf_allocation, rdf_allocation_project_number):
         """Check correct next id is generated from existing id values."""
-        rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
-        rdf_id_attribute_type = AllocationAttributeType.objects.get(
-            name="RDF Project ID"
-        )
-
-        allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-        allocation = Allocation.objects.create(
-            project=pi_project, status=allocation_active_status
-        )
-        allocation.resources.add(rdf_resource)
-
-        last_project_number = 23
-        AllocationAttribute.objects.create(
-            allocation_attribute_type=rdf_id_attribute_type,
-            allocation=allocation,
-            value=format_project_number_to_id(last_project_number),
-        )
-
         assert get_next_rdf_project_id() == format_project_number_to_id(
-            last_project_number + 1
+            rdf_allocation_project_number + 1
         )
 
     def test_first(self, db):
@@ -854,8 +829,10 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         assert isinstance(response.context["form"], RDFAllocationForm)
 
     @patch("imperial_coldfront_plugin.views.ldap_create_group_in_background")
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group_in_background")
     def test_post(
         self,
+        ldap_add_member_mock,
         ldap_create_group_mock,
         pi_project,
         superuser_client,
@@ -898,3 +875,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             allocation=allocation, user=pi_project.pi, status__name="Active"
         )
         ldap_create_group_mock.assert_called_once_with(project_id)
+        ldap_add_member_mock.assert_called_once_with(
+            project_id, pi_project.pi.username, allow_already_present=True
+        )
