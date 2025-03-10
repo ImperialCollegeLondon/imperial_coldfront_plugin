@@ -55,4 +55,9 @@ urlpatterns = [
         views.research_group_terms_view,
         name="research_group_create",
     ),
+    path(
+        "create_rdf_allocation/",
+        views.add_rdf_storage_allocation,
+        name="add_rdf_storage_allocation",
+    ),
 ]
