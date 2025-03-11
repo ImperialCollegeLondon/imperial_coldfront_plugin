@@ -14,14 +14,6 @@ from uplink.retry.when import RetryPredicate, status_5xx
 class ErrorWhenProcessingJob(Exception):
     """Handles errors in asynchronous jobs."""
 
-    def __init__(self, value: dict):
-        """Initialises the exception with the error information."""
-        self.value = value
-
-    def __str__(self) -> str:
-        """Builds the error string."""
-        return repr(self.value)
-
 
 class JobTimeout(Exception):
     """Raises an exception when a job times out."""
