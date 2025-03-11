@@ -1,10 +1,10 @@
 """Interface for interacting with the GPFS API."""
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, get, post, retry, returns
+from uplink import Body, Consumer, get, post, retry
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -67,6 +67,46 @@ class TimeoutWithException(after_delay):
             yield False
 
 
+class CheckJobStatus:
+    """Run a request to an endpoint and checks the status until done."""
+
+    def __init__(self, func: Callable):  #  type: ignore
+        """Captures the function to run."""
+        self.func = func
+
+    def __call__(  #  type: ignore
+        self,
+        instance: "GPFSClient",
+        *args,
+        **kwargs,
+    ) -> requests.Response:
+        """Run the decorated method.
+
+        Args:
+            instance: Instance of the GPFSClient to run.
+            args: Positional arguments for the decorated method.
+            kwargs: Keyword arguments for the decorated method.
+
+        Raises:
+            TimeoutError: If executing the job takes too long.
+            ErrorWhenProcessingJob: If anything goes wrong when processing the job.
+
+        Returns:
+            The response after successfully completing the request.
+        """
+        try:
+            response: requests.Response = self.func(instance, *args, **kwargs)
+            data = response.json()
+            if not 200 <= response.status_code < 300:
+                raise ErrorWhenProcessingJob(data)
+
+            jobId = data["jobs"][0]["jobId"]
+            return instance._get_job_status(jobId)
+
+        except TimeoutError:
+            raise TimeoutError(f"JobID={jobId} failed to complete in time.")
+
+
 class GPFSClient(Consumer):
     """Client for interacting with the GPFS API."""
 
@@ -77,40 +117,20 @@ class GPFSClient(Consumer):
         auth = BasicAuth(settings.GPFS_API_USERNAME, settings.GPFS_API_PASSWORD)
         super().__init__(base_url=settings.GPFS_API_URL, auth=auth, client=session)
 
-    @returns.json
-    @get("filesystems")
-    def filesystems(self) -> dict:
-        """Return the information on the filesystems available."""
-
-    @returns.json
-    @post("filesystems/{filesystemName}/filesets")
-    def create_fileset(self, filesystemName: str, body: Body) -> dict:
-        """Creates a new fileset in the requested filesystem."""
-
     @retry(
         when=JobRunning() | status_5xx(),
         backoff=exponential(),
         stop=TimeoutWithException(settings.GPFS_API_TIMEOUT),
     )
     @get("jobs/{jobId}")
-    def _get_job_status(self, jobId: int):
+    def _get_job_status(self, jobId: int) -> requests.Response:
         """Query the status of a job."""
 
-    def get_job_status(self, jobId: int) -> requests.Response:
-        """Query the status of a job and handles the response.
+    @get("filesystems")
+    def filesystems(self) -> requests.Response:
+        """Return the information on the filesystems available."""
 
-        Captures the TimeoutError, adds the 'jobId' and raises them again.
-
-        Args:
-            jobId: The ID of the job to get the status for.
-
-        Raises:
-            TimeoutError including the jobId.
-
-        Return:
-            The full command response, if completed successfully.
-        """
-        try:
-            return self._get_job_status(jobId)
-        except TimeoutError:
-            raise TimeoutError(f"JobID={jobId} failed to complete in time.")
+    @CheckJobStatus
+    @post("filesystems/{filesystemName}/filesets")
+    def create_fileset(self, filesystemName: str, body: Body) -> requests.Response:
+        """Creates a new fileset in the requested filesystem."""
