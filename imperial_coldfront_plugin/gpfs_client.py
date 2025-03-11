@@ -48,6 +48,7 @@ class JobRunning(RetryPredicate):
 
         job_data: dict = response.json()["jobs"][0]
         if job_data["status"] == "FAILED":
+            job_data["result"]["jobId"] = job_data["jobId"]
             raise ErrorWhenProcessingJob(job_data["result"])
         elif job_data["status"] == "RUNNING":
             return True
@@ -110,15 +111,14 @@ class GPFSClient(Consumer):
     def get_job_status(self, jobId: int) -> requests.Response:
         """Query the status of a job and handles the response.
 
-        Captures the custom errors, adds the 'jobId' and raises them again. For the
-        case of `TimeoutError`, it also sends order to cancel the job.
+        Captures the TimeoutError, adds the 'jobId', sends order to cancel the job
+         and raises them again.
 
         Args:
             jobId: The ID of the job to get the status for.
 
         Raises:
-            TimeoutError or ErrorWhenProcessingJob including the jobId, depending on the
-            exception raised by the underlying method.
+            TimeoutError including the jobId.
 
         Return:
             The full command response, if completed successfully.
@@ -130,7 +130,3 @@ class GPFSClient(Consumer):
             raise TimeoutError(
                 f"JobID={jobId} failed to complete in time. Cancelling..."
             )
-        except ErrorWhenProcessingJob as err:
-            data = err.args[0]
-            data["jobID"] = jobId
-            raise ErrorWhenProcessingJob(data)
