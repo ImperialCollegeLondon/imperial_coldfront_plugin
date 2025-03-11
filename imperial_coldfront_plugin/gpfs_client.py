@@ -4,7 +4,7 @@ from collections.abc import Generator
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, delete, get, post, retry, returns
+from uplink import Body, Consumer, get, post, retry, returns
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -13,14 +13,6 @@ from uplink.retry.when import RetryPredicate, status_5xx
 
 class ErrorWhenProcessingJob(Exception):
     """Handles errors in asynchronous jobs."""
-
-    def __init__(self, value: dict):
-        """Initialises the exception with the error information."""
-        self.value = value
-
-    def __str__(self) -> str:
-        """Builds the error string."""
-        return repr(self.value)
 
 
 class JobTimeout(Exception):
@@ -104,15 +96,10 @@ class GPFSClient(Consumer):
     def _get_job_status(self, jobId: int):
         """Query the status of a job."""
 
-    @delete("jobs/{jobId}")
-    def _cancel_job(self, jobId: int):
-        """Cancel an asynchronous job."""
-
     def get_job_status(self, jobId: int) -> requests.Response:
         """Query the status of a job and handles the response.
 
-        Captures the TimeoutError, adds the 'jobId', sends order to cancel the job
-         and raises them again.
+        Captures the TimeoutError, adds the 'jobId' and raises them again.
 
         Args:
             jobId: The ID of the job to get the status for.
@@ -126,7 +113,4 @@ class GPFSClient(Consumer):
         try:
             return self._get_job_status(jobId)
         except TimeoutError:
-            self._cancel_job(jobId)
-            raise TimeoutError(
-                f"JobID={jobId} failed to complete in time. Cancelling..."
-            )
+            raise TimeoutError(f"JobID={jobId} failed to complete in time.")
