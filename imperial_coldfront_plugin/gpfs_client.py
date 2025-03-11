@@ -1,10 +1,10 @@
 """Interface for interacting with the GPFS API."""
 
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, get, post, retry
+from uplink import Body, Consumer, get, json, post, response_handler, retry
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -67,44 +67,35 @@ class TimeoutWithException(after_delay):
             yield False
 
 
-class CheckJobStatus:
-    """Run a request to an endpoint and checks the status until done."""
+@response_handler(requires_consumer=True)
+def check_job_status(
+    client: "GPFSClient", response: requests.Response
+) -> requests.Response:
+    """Check the status of the job indicated in the response.
 
-    def __init__(self, func: Callable):  #  type: ignore
-        """Captures the function to run."""
-        self.func = func
+    Args:
+        client: Consumer producing the response. It is needed in order to run the
+            corresponding `get_job_status` method.
+        response: Response of the request to perform a task asynchronously in the
+            server, eg. creating a fileset.
 
-    def __call__(  #  type: ignore
-        self,
-        instance: "GPFSClient",
-        *args,
-        **kwargs,
-    ) -> requests.Response:
-        """Run the decorated method.
+    Raises:
+        TimeoutError: If executing the job takes too long.
+        ErrorWhenProcessingJob: If anything goes wrong when processing the job.
 
-        Args:
-            instance: Instance of the GPFSClient to run.
-            args: Positional arguments for the decorated method.
-            kwargs: Keyword arguments for the decorated method.
+    Returns:
+        The response after successfully completing the request.
+    """
+    try:
+        if not 200 <= response.status_code < 300:
+            return response
 
-        Raises:
-            TimeoutError: If executing the job takes too long.
-            ErrorWhenProcessingJob: If anything goes wrong when processing the job.
+        data = response.json()
+        jobId = data["jobs"][0]["jobId"]
+        return client._get_job_status(jobId)
 
-        Returns:
-            The response after successfully completing the request.
-        """
-        try:
-            response: requests.Response = self.func(instance, *args, **kwargs)
-            data = response.json()
-            if not 200 <= response.status_code < 300:
-                raise ErrorWhenProcessingJob(data)
-
-            jobId = data["jobs"][0]["jobId"]
-            return instance._get_job_status(jobId)
-
-        except TimeoutError:
-            raise TimeoutError(f"JobID={jobId} failed to complete in time.")
+    except TimeoutError:
+        raise TimeoutError(f"JobID={jobId} failed to complete in time.")
 
 
 class GPFSClient(Consumer):
@@ -130,7 +121,8 @@ class GPFSClient(Consumer):
     def filesystems(self) -> requests.Response:
         """Return the information on the filesystems available."""
 
-    @CheckJobStatus
+    @check_job_status
+    @json
     @post("filesystems/{filesystemName}/filesets")
-    def create_fileset(self, filesystemName: str, body: Body) -> requests.Response:
+    def create_fileset(self, filesystemName: str, **body: Body) -> requests.Response:
         """Creates a new fileset in the requested filesystem."""
