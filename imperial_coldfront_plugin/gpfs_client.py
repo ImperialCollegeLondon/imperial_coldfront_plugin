@@ -79,7 +79,7 @@ def check_job_status(
             server, eg. creating a fileset.
 
     Raises:
-        TimeoutError: If executing the job takes too long.
+        JobTimeout: If executing the job takes too long.
         ErrorWhenProcessingJob: If anything goes wrong when processing the job.
 
     Returns:
