@@ -1,7 +1,18 @@
 """Plugin views."""
 
+import re
 from datetime import timedelta
 
+from coldfront.core.allocation.models import (
+    Allocation,
+    AllocationAttribute,
+    AllocationAttributeType,
+    AllocationStatusChoice,
+    AllocationUser,
+    AllocationUserStatusChoice,
+)
+from coldfront.core.project.models import Project
+from coldfront.core.resource.models import Resource
 from coldfront.core.user.utils import UserSearch
 from django.conf import settings
 from django.contrib import messages
@@ -28,9 +39,11 @@ from .emails import (
 from .forms import (
     GroupMembershipExtendForm,
     GroupMembershipForm,
+    RDFAllocationForm,
     TermsAndConditionsForm,
     UserSearchForm,
 )
+from .ldap import ldap_create_group_in_background
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
 from .policy import (
@@ -492,4 +505,96 @@ def group_membership_extend(
         request,
         "imperial_coldfront_plugin/extend_membership.html",
         dict(form=form, group_membership=group_membership),
+    )
+
+
+PROJECT_ID_PREFIX = "rdf-"
+PROJECT_ID_REGEX = re.compile(PROJECT_ID_PREFIX + r"(?P<number>\d{6})")
+
+
+def get_next_rdf_project_id():
+    """Get the next available RDF project id value."""
+    rdf_id_attribute_type = AllocationAttributeType.objects.get(name="RDF Project ID")
+    group_ids = AllocationAttribute.objects.filter(
+        allocation_attribute_type=rdf_id_attribute_type,
+    ).values_list("value", flat=True)
+    id_numbers = [
+        int(PROJECT_ID_REGEX.match(group_id).groupdict()["number"])
+        for group_id in group_ids
+    ]
+    new_project_number = max(id_numbers) + 1 if id_numbers else 1
+
+    return format_project_number_to_id(new_project_number)
+
+
+def format_project_number_to_id(num):
+    """Format an rdf project number into a full id string."""
+    return f"{PROJECT_ID_PREFIX}{num:06d}"
+
+
+@login_required
+def add_rdf_storage_allocation(request):
+    """Create a new RDF project allocation."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = RDFAllocationForm(request.POST)
+        if form.is_valid():
+            rdf_id_attribute_type = AllocationAttributeType.objects.get(
+                name="RDF Project ID"
+            )
+            group_id = get_next_rdf_project_id()
+            if AllocationAttribute.objects.filter(
+                allocation_attribute_type=rdf_id_attribute_type,
+                value=group_id,
+            ):
+                raise ValueError("RDF project with ID already exists.")
+
+            rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
+
+            allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+            project = get_object_or_404(Project, pk=form.cleaned_data["project"])
+            rdf_allocation = Allocation.objects.create(
+                project=project,
+                status=allocation_active_status,
+                quantity=1,
+                start_date=timezone.now().date(),
+                end_date=form.cleaned_data["end_date"],
+            )
+            rdf_allocation.resources.add(rdf_resource)
+
+            storage_quota_attribute_type = AllocationAttributeType.objects.get(
+                name="Storage Quota (GB)"
+            )
+            AllocationAttribute.objects.create(
+                allocation_attribute_type=storage_quota_attribute_type,
+                allocation=rdf_allocation,
+                value=form.cleaned_data["size"],
+            )
+
+            AllocationAttribute.objects.create(
+                allocation_attribute_type=rdf_id_attribute_type,
+                allocation=rdf_allocation,
+                value=group_id,
+            )
+
+            if settings.LDAP_ENABLED:
+                ldap_create_group_in_background(group_id)
+
+            allocation_user_active_status = AllocationUserStatusChoice.objects.get(
+                name="Active"
+            )
+            AllocationUser.objects.create(
+                allocation=rdf_allocation,
+                user=project.pi,
+                status=allocation_user_active_status,
+            )
+            messages.success(request, "RDF allocation created successfully.")
+
+            return redirect("home")
+    else:
+        form = RDFAllocationForm()
+    return render(
+        request, "imperial_coldfront_plugin/rdf_allocation_form.html", dict(form=form)
     )
