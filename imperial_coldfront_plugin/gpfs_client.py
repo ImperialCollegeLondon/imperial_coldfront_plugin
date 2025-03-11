@@ -29,8 +29,7 @@ class JobRunning(RetryPredicate):
             response: The response to explore.
 
         Raises:
-            ErrorWhenProcessingJob, if the job status is FAILED.
-            JobTimeout, if the job status is TIMEOUT.
+            ErrorWhenProcessingJob: if the job status is FAILED.
 
         Returns:
             True if the request should be retried, False otherwise.
@@ -55,7 +54,7 @@ class TimeoutWithException(after_delay):
         """Checks if delay is beyond maximum timeout.
 
         Raises:
-            TimeoutError, if delay is greater than the maximum delay.
+            JobTimeout: if delay is greater than the maximum delay.
 
         Yields:
             False, if delay has not reached the maximum.
@@ -63,7 +62,7 @@ class TimeoutWithException(after_delay):
         while True:
             delay = yield 0
             if self._max_delay < delay:
-                raise TimeoutError()
+                raise JobTimeout()
             yield False
 
 
