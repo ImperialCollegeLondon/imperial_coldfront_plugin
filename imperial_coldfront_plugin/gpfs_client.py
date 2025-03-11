@@ -93,8 +93,8 @@ def check_job_status(
         jobId = data["jobs"][0]["jobId"]
         return client._get_job_status(jobId)
 
-    except TimeoutError:
-        raise TimeoutError(f"JobID={jobId} failed to complete in time.")
+    except JobTimeout:
+        raise JobTimeout(f"JobID={jobId} failed to complete in time.")
 
 
 class GPFSClient(Consumer):
