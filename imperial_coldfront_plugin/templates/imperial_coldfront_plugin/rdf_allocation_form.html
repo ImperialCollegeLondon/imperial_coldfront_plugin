@@ -1,8 +1,28 @@
 {% extends "common/base.html" %}
 {% block content %}
-  <form method="post">
-    {% csrf_token %}
-    {% for field in form %}<p>{{ field.label }}{{ field }}{{ field.help_text }}{{ field.errors }}</p>{% endfor %}
-    <input type="submit" value="Create" />
-  </form>
+  <div class="container mt-4">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h2 class="mb-0">RDF Allocation Request</h2>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {% for field in form %}
+            <div class="form-group mb-3">
+              <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
+              <div class="field-wrapper">{{ field }}</div>
+              {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+              {% if field.errors %}<div class="alert alert-danger mt-1 py-1 px-2">{{ field.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+          <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <button type="submit" class="btn btn-success">
+              <i class="fa fa-check-circle me-2"></i>Create Allocation
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 {% endblock content %}
