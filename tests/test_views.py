@@ -3,8 +3,16 @@
 from datetime import timedelta
 from http import HTTPStatus
 from random import randint
+from unittest.mock import patch
 
 import pytest
+from coldfront.core.allocation.models import (
+    Allocation,
+    AllocationAttribute,
+    AllocationAttributeType,
+    AllocationStatusChoice,
+)
+from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.core.signing import TimestampSigner
 from django.shortcuts import render, reverse
@@ -13,10 +21,15 @@ from django.utils import timezone
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
+    RDFAllocationForm,
     TermsAndConditionsForm,
     UserSearchForm,
 )
 from imperial_coldfront_plugin.models import ResearchGroup, UnixUID
+from imperial_coldfront_plugin.views import (
+    format_project_number_to_id,
+    get_next_rdf_project_id,
+)
 
 
 @pytest.fixture
@@ -788,3 +801,100 @@ class TestCreateGroupView(LoginRequiredMixin):
                 kwargs=dict(group_pk=group.pk),
             ),
         )
+
+
+class TestGetNextRdfProjectId:
+    """Tests for the get_next_rdf_project_id utility function."""
+
+    def test_next_id(self, pi_project, rdf_allocation_dependencies):
+        """Check correct next id is generated from existing id values."""
+        rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
+        rdf_id_attribute_type = AllocationAttributeType.objects.get(
+            name="RDF Project ID"
+        )
+
+        allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+        allocation = Allocation.objects.create(
+            project=pi_project, status=allocation_active_status
+        )
+        allocation.resources.add(rdf_resource)
+
+        last_project_number = 23
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=rdf_id_attribute_type,
+            allocation=allocation,
+            value=format_project_number_to_id(last_project_number),
+        )
+
+        assert get_next_rdf_project_id() == format_project_number_to_id(
+            last_project_number + 1
+        )
+
+    def test_first(self, db):
+        """Check initial id generation."""
+        assert get_next_rdf_project_id() == format_project_number_to_id(1)
+
+
+class TestAddRDFStorageAllocation(LoginRequiredMixin):
+    """Tests for the add_rdf_storage_allocation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:add_rdf_storage_allocation")
+
+    def test_non_admin_forbidden(self, user_member_or_manager, auth_client_factory):
+        """Test non-admin users cannot access the page."""
+        client = auth_client_factory(user_member_or_manager)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_get(self, superuser_client):
+        """Check form rendering."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], RDFAllocationForm)
+
+    @patch("imperial_coldfront_plugin.views.ldap_create_group_in_background")
+    def test_post(
+        self,
+        ldap_create_group_mock,
+        pi_project,
+        superuser_client,
+        rdf_allocation_dependencies,
+    ):
+        """Test successful project creation."""
+        end_date = timezone.datetime.max.date()
+        size = 10
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(project=pi_project.pk, end_date=end_date, size=size),
+        )
+        assertRedirects(response, reverse("home"), fetch_redirect_response=False)
+
+        project_id = format_project_number_to_id(1)
+        from coldfront.core.allocation.models import (
+            Allocation,
+            AllocationAttribute,
+            AllocationUser,
+        )
+
+        allocation = Allocation.objects.get(
+            project=pi_project,
+            status__name="Active",
+            quantity=1,
+            start_date=timezone.now().date(),
+            end_date=end_date,
+        )
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="Storage Quota (GB)",
+            allocation=allocation,
+            value=size,
+        )
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="RDF Project ID",
+            allocation=allocation,
+            value=format_project_number_to_id(1),
+        )
+        AllocationUser.objects.get(
+            allocation=allocation, user=pi_project.pi, status__name="Active"
+        )
+        ldap_create_group_mock.assert_called_once_with(project_id)

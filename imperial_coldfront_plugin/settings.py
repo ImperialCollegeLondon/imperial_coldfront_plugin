@@ -23,4 +23,23 @@ Need to be False in order to access self-signed certificates.
 """
 GPFS_API_TIMEOUT = ENV.int("GPFS_API_TIMEOUT", default=60)
 """Timeout for requests that require creating, deleting or updating resources."""
+
 EXPIRATION_NOTIFICATION_DAYS = [1, 5, 30]
+
+LDAP_USERNAME = ENV.str("LDAP_USERNAME", default="")
+"""Active Directory user account name."""
+LDAP_PASSWORD = ENV.str("LDAP_PASSWORD", default="")
+"""Password for LDAP_USERNAME."""
+LDAP_URI = ENV.str("LDAP_URI", default="")
+"""Active Directory server URI."""
+LDAP_USER_OU = ENV.str(
+    "LDAP_USER_OU", default="OU=Users,OU=Imperial College (London),dc=ic,dc=ac,dc=uk"
+)
+"""The organisational unit containing Imperial user data."""
+LDAP_GROUP_OU = ENV.str(
+    "LDAP_GROUP_OU",
+    default="OU=RCS,OU=Groups,OU=Imperial College (London),DC=ic,DC=ac,DC=uk",
+)
+"""The organisational unit containing RDF access groups."""
+
+LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
