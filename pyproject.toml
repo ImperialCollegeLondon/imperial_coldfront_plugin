@@ -15,7 +15,6 @@ dependencies = [
     "requests",
     "uplink",
     "ldap3",
-    "django-crispy-forms"
 ]
 
 [project.optional-dependencies]
