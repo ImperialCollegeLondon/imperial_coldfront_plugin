@@ -137,12 +137,12 @@ class GPFSClient(Consumer):
 
     def create_fileset(
         self,
-        filesystemName,
-        filesetName,
-        ownerid,
-        groupid,
-        path,
-        permissions,
+        filesystemName: str,
+        filesetName: str,
+        ownerid: str,
+        groupid: str,
+        path: str,
+        permissions: str,
     ) -> requests.Response:
         """Method (public) to create a fileset in the requested filesystem.
 
