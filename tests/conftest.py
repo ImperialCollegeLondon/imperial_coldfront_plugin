@@ -38,6 +38,7 @@ def pytest_configure():
             "coldfront.core.research_output",
             "imperial_coldfront_plugin",
             "django_q",
+            "django-crispy-forms",
         ],
         SECRET_KEY="123",
         TEMPLATES=[
