@@ -62,7 +62,7 @@ class RDFAllocationForm(forms.Form):
 
     project = forms.ChoiceField(choices=get_project_choices)
     end_date = forms.DateField(
-        widget=forms.SelectDateWidget,
+        widget=forms.DateInput(attrs={"type": "date"}),
         validators=[MinValueValidator(timezone.now().date())],
     )
     size = forms.IntegerField(

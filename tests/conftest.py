@@ -38,6 +38,8 @@ def pytest_configure():
             "coldfront.core.research_output",
             "imperial_coldfront_plugin",
             "django_q",
+            "crispy_forms",
+            "crispy_bootstrap4",
         ],
         SECRET_KEY="123",
         TEMPLATES=[
@@ -62,6 +64,7 @@ def pytest_configure():
         ],
         TOKEN_TIMEOUT=60,
         Q_CLUSTER={"sync": True},
+        CRISPY_TEMPLATE_PACK="bootstrap4",
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
