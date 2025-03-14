@@ -131,7 +131,6 @@ class GPFSClient(Consumer):
         groupid: Body,
         path: Body,
         permissions: Body,
-        **body: Body,
     ) -> requests.Response:
         """Method (private) to create a fileset in the requested filesystem."""
 
