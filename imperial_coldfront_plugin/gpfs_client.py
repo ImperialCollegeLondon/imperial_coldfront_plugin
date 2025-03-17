@@ -122,40 +122,40 @@ class GPFSClient(Consumer):
 
     @check_job_status
     @json
-    @post("filesystems/{filesystemName}/filesets")
+    @post("filesystems/{filesystem_name}/filesets")
     def _create_fileset(
         self,
-        filesystemName: str,
+        filesystem_name: str,
         **data: Body,
     ) -> requests.Response:
         """Method (private) to create a fileset in the requested filesystem."""
 
     def create_fileset(
         self,
-        filesystemName: str,
-        filesetName: str,
-        ownerid: str,
-        groupid: str,
+        filesystem_name: str,
+        fileset_name: str,
+        owner_id: str,
+        group_id: str,
         path: str,
         permissions: str,
     ) -> requests.Response:
         """Method (public) to create a fileset in the requested filesystem.
 
         Args:
-            filesystemName: Name of the filesystem where the fileset will be created.
-            filesetName: Name of the fileset to create (rdf project id).
-            ownerid: ID of the owner (pi username).
-            groupid: ID of the group (rdf project id).
-            path: Path (TBD).
-            permissions: Permissions (TBD).
+            filesystem_name: Name of the filesystem where the fileset will be created.
+            fileset_name: Name of the fileset to create (rdf project id).
+            owner_id: ID of the owner (pi username).
+            group_id: ID of the group (rdf project id).
+            path: Path.
+            permissions: Permissions.
 
         Returns:
             The response after successfully creating the fileset.
         """
         return self._create_fileset(
-            filesystemName=filesystemName,
-            filesetName=filesetName,
-            owner=f"{ownerid}:{groupid}",
+            filesystem_name=filesystem_name,
+            fileset_name=fileset_name,
+            owner=f"{owner_id}:{group_id}",
             path=path,
             permissions=permissions,
         )
