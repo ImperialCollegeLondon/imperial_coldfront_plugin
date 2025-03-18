@@ -122,10 +122,10 @@ class GPFSClient(Consumer):
 
     @check_job_status
     @json
-    @post("filesystems/{filesystem_name}/filesets")
+    @post("filesystems/{filesystemName}/filesets")
     def _create_fileset(
         self,
-        filesystem_name: str,
+        filesystemName: str,
         **data: Body,
     ) -> requests.Response:
         """Method (private) to create a fileset in the requested filesystem."""
@@ -153,8 +153,8 @@ class GPFSClient(Consumer):
             The response after successfully creating the fileset.
         """
         return self._create_fileset(
-            filesystem_name=filesystem_name,
-            fileset_name=fileset_name,
+            filesystemName=filesystem_name,
+            filesetName=fileset_name,
             owner=f"{owner_id}:{group_id}",
             path=path,
             permissions=permissions,
