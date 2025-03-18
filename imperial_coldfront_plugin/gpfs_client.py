@@ -182,8 +182,10 @@ class GPFSClient(Consumer):
         Args:
             filesystem_name: Name of the filesystem where the quota will be set.
             fileset_name: Name of the fileset to set the quota.
-            block_quota: Block quota.
-            files_quota: Files quota.
+            block_quota: Number that specifies the block soft limit and hard
+                    limit. The number can be specified using the suffix K, M, G, or T.
+            files_quota: Number that specifies the inode soft limit and hard
+                    limit. The number can be specified using the suffix K, M, or G.
 
         Returns:
             The response after successfully setting the quota.
