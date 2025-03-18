@@ -21,7 +21,7 @@ GPFS_API_VERIFY = ENV.bool("GPFS_API_VERIFY", default=False)
 
 Need to be False in order to access self-signed certificates.
 """
-GPFS_API_TIMEOUT = ENV.int("GPFS_API_TIMEOUT", default=60)
+GPFS_API_TIMEOUT = ENV.int("GPFS_API_TIMEOUT", default=300)
 """Timeout for requests that require creating, deleting or updating resources."""
 
 EXPIRATION_NOTIFICATION_DAYS = [1, 5, 30]
