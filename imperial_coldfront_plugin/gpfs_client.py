@@ -159,3 +159,46 @@ class GPFSClient(Consumer):
             path=path,
             permissions=permissions,
         )
+
+    @check_job_status
+    @json
+    @post("filesystems/{filesystemName}/quotas")
+    def _set_quota(
+        self,
+        filesystemName: str,
+        **data: Body,
+    ) -> requests.Response:
+        """Method (private) to set a quota in the requested filesystem."""
+
+    def set_quota(
+        self,
+        filesystem_name: str,
+        fileset_name: str,
+        block_quota: str,
+        files_quota: str,
+    ) -> requests.Response:
+        """Method (public) to set a quota in the requested filesystem.
+
+        Args:
+            filesystem_name: Name of the filesystem where the quota will be set.
+            fileset_name: Name of the fileset to set the quota.
+            block_quota: Number that specifies the block soft limit and hard
+                    limit. The number can be specified using the suffix K, M, G, or T.
+            files_quota: Number that specifies the inode soft limit and hard
+                    limit. The number can be specified using the suffix K, M, or G.
+
+        Returns:
+            The response after successfully setting the quota.
+        """
+        return self._set_quota(
+            filesystemName=filesystem_name,
+            objectName=fileset_name,
+            operationType="setQuota",
+            quotaType="FILESET",
+            blockSoftLimit=block_quota,
+            blockHardLimit=block_quota,
+            filesSoftLimit=files_quota,
+            filesHardLimit=files_quota,
+            filesGracePeriod="null",
+            blockGracePeriod="null",
+        )
