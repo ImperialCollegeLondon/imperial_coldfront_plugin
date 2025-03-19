@@ -29,6 +29,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django_q.tasks import async_task
 
 from .emails import (
     send_group_access_granted_email,
@@ -539,6 +540,28 @@ def add_rdf_storage_allocation(request):
         return HttpResponseForbidden()
 
     if request.method == "POST":
+        filesystem_name = request.POST.get("filesystem_name")
+        fileset_name = request.POST.get("fileset_name")
+        owner_id = request.POST.get("owner_id")
+        group_id = request.POST.get("group_id")
+        path = request.POST.get("path")
+        permissions = request.POST.get("permissions")
+        block_quota = request.POST.get("block_quota")
+        files_quota = request.POST.get("files_quota")
+
+        # Run task in the background to create fileset and set quota
+        async_task(
+            "imperial_coldfront_plugin.tasks.task_create_fileset_set_quota",
+            filesystem_name,
+            fileset_name,
+            owner_id,
+            group_id,
+            path,
+            permissions,
+            block_quota,
+            files_quota,
+        )
+
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
