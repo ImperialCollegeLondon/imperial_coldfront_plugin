@@ -24,6 +24,17 @@ Need to be False in order to access self-signed certificates.
 GPFS_API_TIMEOUT = ENV.int("GPFS_API_TIMEOUT", default=300)
 """Timeout for requests that require creating, deleting or updating resources."""
 
+GPFS_FILESYSTEM_NAME = ENV.str("GPFS_API_FILESYSTEM_NAME", default="")
+"""Name of the GPFS filesystem."""
+
+GPFS_PERMISSIONS = ENV.str("GPFS_API_PERMISSIONS", default="700")
+"""Permissions for the fileset."""
+
+GPFS_FILES_QUOTA = ENV.int("GPFS_API_FILES_QUOTA", default=1000)
+"""Quota for the fileset."""
+
+GPFS_ENABLED = bool(GPFS_FILESYSTEM_NAME and GPFS_PERMISSIONS and GPFS_FILES_QUOTA)
+
 EXPIRATION_NOTIFICATION_DAYS = [1, 5, 30]
 
 LDAP_USERNAME = ENV.str("LDAP_USERNAME", default="")
