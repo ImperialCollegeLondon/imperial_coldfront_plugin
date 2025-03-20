@@ -29,7 +29,6 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django_q.tasks import async_task
 
 from .emails import (
     send_group_access_granted_email,
@@ -44,6 +43,7 @@ from .forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
+from .gpfs_client import GPFSClient
 from .ldap import ldap_create_group_in_background
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
@@ -540,30 +540,17 @@ def add_rdf_storage_allocation(request):
         return HttpResponseForbidden()
 
     if request.method == "POST":
-        filesystem_name = request.POST.get("filesystem_name")
-        fileset_name = request.POST.get("fileset_name")
-        owner_id = request.POST.get("owner_id")
-        group_id = request.POST.get("group_id")
+        filesystem_name = settings.GPFS_FILESYSTEM_NAME
+        owner_id = "root"
+        group_id = "root"
+        fileset_name = group_id
         path = request.POST.get("path")
-        permissions = request.POST.get("permissions")
-        block_quota = request.POST.get("block_quota")
-        files_quota = request.POST.get("files_quota")
-
-        # Run task in the background to create fileset and set quota
-        async_task(
-            "imperial_coldfront_plugin.tasks.task_create_fileset_set_quota",
-            filesystem_name,
-            fileset_name,
-            owner_id,
-            group_id,
-            path,
-            permissions,
-            block_quota,
-            files_quota,
-        )
+        permissions = settings.GPFS_PERMISSIONS
+        files_quota = settings.GPFS_FILES_QUOTA
 
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
+            block_quota = form.cleaned_data["size"]
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
                 name="RDF Project ID"
             )
@@ -614,6 +601,14 @@ def add_rdf_storage_allocation(request):
                 status=allocation_user_active_status,
             )
             messages.success(request, "RDF allocation created successfully.")
+
+            if settings.GPFS_ENABLED:
+                GPFSClient.gpfs_create_fileset_in_background(
+                    filesystem_name, fileset_name, owner_id, group_id, path, permissions
+                )
+                GPFSClient.gpfs_set_quota_in_background(
+                    filesystem_name, fileset_name, block_quota, files_quota
+                )
 
             return redirect("home")
     else:

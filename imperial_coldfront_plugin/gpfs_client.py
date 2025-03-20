@@ -1,9 +1,11 @@
 """Interface for interacting with the GPFS API."""
 
 from collections.abc import Generator
+from functools import wraps
 
 import requests
 from django.conf import settings
+from django_q.tasks import async_task
 from uplink import Body, Consumer, get, json, post, response_handler, retry
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
@@ -202,3 +204,16 @@ class GPFSClient(Consumer):
             filesGracePeriod="null",
             blockGracePeriod="null",
         )
+
+    def background_task(self, func):
+        """Wrapper to run a function in the background."""
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            """Run the function in the background."""
+            return async_task(func, *args, **kwargs)
+
+        return wrapper
+
+    gpfs_create_fileset_in_background = background_task(create_fileset)
+    gpfs_set_quota_in_background = background_task(set_quota)
