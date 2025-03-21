@@ -27,13 +27,18 @@ GPFS_API_TIMEOUT = ENV.int("GPFS_API_TIMEOUT", default=300)
 GPFS_FILESYSTEM_NAME = ENV.str("GPFS_API_FILESYSTEM_NAME", default="")
 """Name of the GPFS filesystem."""
 
+GPFS_FILESET_PATH = ENV.str("GPFS_API_FILESET_PATH", default="")
+"""Path to the fileset."""
+
 GPFS_PERMISSIONS = ENV.str("GPFS_API_PERMISSIONS", default="700")
 """Permissions for the fileset."""
 
 GPFS_FILES_QUOTA = ENV.int("GPFS_API_FILES_QUOTA", default=1000)
 """Quota for the fileset."""
 
-GPFS_ENABLED = bool(GPFS_FILESYSTEM_NAME and GPFS_PERMISSIONS and GPFS_FILES_QUOTA)
+GPFS_ENABLED = bool(
+    GPFS_FILESYSTEM_NAME and GPFS_FILESET_PATH and GPFS_PERMISSIONS and GPFS_FILES_QUOTA
+)
 
 EXPIRATION_NOTIFICATION_DAYS = [1, 5, 30]
 
