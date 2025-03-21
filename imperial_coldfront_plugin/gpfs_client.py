@@ -205,15 +205,19 @@ class GPFSClient(Consumer):
             blockGracePeriod="null",
         )
 
-    def background_task(self, func):
-        """Wrapper to run a function in the background."""
 
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            """Run the function in the background."""
-            return async_task(func, *args, **kwargs)
+def background_task(func):
+    """Wrapper to run a function in the background."""
 
-        return wrapper
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        """Run the function in the background."""
+        return async_task(func, *args, **kwargs)
 
-    gpfs_create_fileset_in_background = background_task(create_fileset)
-    gpfs_set_quota_in_background = background_task(set_quota)
+    return wrapper
+
+
+client = GPFSClient()
+
+gpfs_create_fileset_in_background = background_task(client.create_fileset)
+gpfs_set_quota_in_background = background_task(client.set_quota)

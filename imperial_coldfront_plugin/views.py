@@ -43,7 +43,10 @@ from .forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
-from .gpfs_client import GPFSClient
+from .gpfs_client import (
+    gpfs_create_fileset_in_background,
+    gpfs_set_quota_in_background,
+)
 from .ldap import ldap_create_group_in_background
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
@@ -603,10 +606,10 @@ def add_rdf_storage_allocation(request):
             messages.success(request, "RDF allocation created successfully.")
 
             if settings.GPFS_ENABLED:
-                GPFSClient.gpfs_create_fileset_in_background(
+                gpfs_create_fileset_in_background(
                     filesystem_name, fileset_name, owner_id, group_id, path, permissions
                 )
-                GPFSClient.gpfs_set_quota_in_background(
+                gpfs_set_quota_in_background(
                     filesystem_name, fileset_name, block_quota, files_quota
                 )
 
