@@ -547,7 +547,7 @@ def add_rdf_storage_allocation(request):
         owner_id = "root"
         group_id = "root"
         fileset_name = group_id
-        path = request.POST.get("path")
+        path = f"{settings.GPFS_FILESET_PATH}{group_id}/"
         permissions = settings.GPFS_PERMISSIONS
         files_quota = settings.GPFS_FILES_QUOTA
 
