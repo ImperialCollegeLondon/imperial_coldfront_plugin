@@ -43,10 +43,6 @@ from .forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
-from .gpfs_client import (
-    gpfs_create_fileset_in_background,
-    gpfs_set_quota_in_background,
-)
 from .ldap import ldap_create_group_in_background
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
@@ -57,6 +53,7 @@ from .policy import (
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
 )
+from .tasks import create_fileset_set_quota_background_task
 
 User = get_user_model()
 
@@ -543,17 +540,8 @@ def add_rdf_storage_allocation(request):
         return HttpResponseForbidden()
 
     if request.method == "POST":
-        filesystem_name = settings.GPFS_FILESYSTEM_NAME
-        owner_id = "root"
-        group_id = "root"
-        fileset_name = group_id
-        path = f"{settings.GPFS_FILESET_PATH}{group_id}/"
-        permissions = settings.GPFS_PERMISSIONS
-        files_quota = settings.GPFS_FILES_QUOTA
-
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
-            block_quota = form.cleaned_data["size"]
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
                 name="RDF Project ID"
             )
@@ -606,11 +594,15 @@ def add_rdf_storage_allocation(request):
             messages.success(request, "RDF allocation created successfully.")
 
             if settings.GPFS_ENABLED:
-                gpfs_create_fileset_in_background(
-                    filesystem_name, fileset_name, owner_id, group_id, path, permissions
-                )
-                gpfs_set_quota_in_background(
-                    filesystem_name, fileset_name, block_quota, files_quota
+                create_fileset_set_quota_background_task(
+                    filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+                    owner_id="root",
+                    group_id="root",
+                    fileset_name=group_id,
+                    path=f"{settings.GPFS_FILESET_PATH}{group_id}/",
+                    permissions=settings.GPFS_PERMISSIONS,
+                    files_quota=settings.GPFS_FILES_QUOTA,
+                    block_quota=form.cleaned_data["size"],
                 )
 
             return redirect("home")
