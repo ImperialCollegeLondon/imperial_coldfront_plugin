@@ -601,8 +601,8 @@ def add_rdf_storage_allocation(request):
                     fileset_name=group_id,
                     path=f"{settings.GPFS_FILESET_PATH}{group_id}/",
                     permissions=settings.GPFS_PERMISSIONS,
-                    files_quota=settings.GPFS_FILES_QUOTA,
                     block_quota=form.cleaned_data["size"],
+                    files_quota=settings.GPFS_FILES_QUOTA,
                 )
 
             return redirect("home")

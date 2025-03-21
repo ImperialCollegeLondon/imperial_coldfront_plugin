@@ -3,6 +3,7 @@
 import datetime
 
 from django.conf import settings
+from django_q.tasks import async_task
 
 from .emails import send_expiration_alert_email
 from .gpfs_client import GPFSClient
@@ -36,7 +37,13 @@ def create_fileset_set_quota_background_task(
 ):
     """Create a fileset and set a quota in the requested filesystem."""
     client = GPFSClient()
-    client.create_fileset(
-        filesystem_name, fileset_name, owner_id, group_id, path, permissions
-    )
-    client.set_quota(filesystem_name, fileset_name, block_quota, files_quota)
+
+    def task():
+        success = client.create_fileset(
+            filesystem_name, fileset_name, owner_id, group_id, path, permissions
+        )
+
+        if success:
+            client.set_quota(filesystem_name, fileset_name, block_quota, files_quota)
+
+    async_task(task)
