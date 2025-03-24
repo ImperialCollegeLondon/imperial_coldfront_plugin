@@ -885,7 +885,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             owner_id="root",
             group_id="root",
             fileset_name=project_id,
-            path=f"{settings.GPFS_FILESET_PATH}{project_id}/",
+            path=f"{settings.GPFS_FILESET_PATH}{settings.GPFS_FILESYSTEM_NAME}/{project_id}/",
             permissions=settings.GPFS_PERMISSIONS,
             block_quota=f"{size}G",
             files_quota=settings.GPFS_FILES_QUOTA,

@@ -72,6 +72,9 @@ def pytest_configure():
         }
         | dict(
             LDAP_ENABLED=True,
+            GPFS_FILESET_PATH="/path/",
+            GPFS_FILESYSTEM_NAME="testfs",
+            GPFS_ENABLED=True,
         ),  # override settings loaded by env var for tests
     )
 
