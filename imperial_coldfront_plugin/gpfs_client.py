@@ -10,6 +10,8 @@ from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
 from uplink.retry.when import RetryPredicate, status_5xx
 
+from .tasks import run_in_background
+
 
 class ErrorWhenProcessingJob(Exception):
     """Handles errors in asynchronous jobs."""
@@ -202,3 +204,45 @@ class GPFSClient(Consumer):
             filesGracePeriod="null",
             blockGracePeriod="null",
         )
+
+
+class FilesetCreationError(Exception):
+    """Raised when a problem is encountered when creating a fileset."""
+
+
+class FilesetQuotaError(Exception):
+    """Raised when a problem is encountered when setting a fileset quota."""
+
+
+def _create_fileset_set_quota(
+    filesystem_name: str,
+    fileset_name: str,
+    owner_id: str,
+    group_id: str,
+    path: str,
+    permissions: str,
+    block_quota: str,
+    files_quota: str,
+):
+    """Create a fileset and set a quota in the requested filesystem."""
+    client = GPFSClient()
+    try:
+        client.create_fileset(
+            filesystem_name, fileset_name, owner_id, group_id, path, permissions
+        ).raise_for_status()
+    except requests.HTTPError as e:
+        raise FilesetCreationError(
+            f"Error when creating fileset '{fileset_name}' - {e.response.content}"
+        ) from e
+
+    try:
+        client.set_quota(
+            filesystem_name, fileset_name, block_quota, files_quota
+        ).raise_for_status()
+    except requests.HTTPError as e:
+        raise FilesetQuotaError(
+            f"Error when setting fileset '{fileset_name}' quota  - {e.response.content}"
+        ) from e
+
+
+create_fileset_set_quota_in_background = run_in_background(_create_fileset_set_quota)

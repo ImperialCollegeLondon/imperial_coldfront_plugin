@@ -1,11 +1,10 @@
 """Module for performing operations in Active Directory via LDAP."""
 
-from functools import wraps
-
 import ldap3
 from django.conf import settings
-from django_q.tasks import async_task
 from ldap3 import Connection, Server
+
+from .tasks import run_in_background
 
 LDAP_GROUP_TYPE = -2147483646  # magic number
 AD_WILL_NOT_PERFORM_ERROR_CODE = 53
@@ -129,20 +128,6 @@ def _ldap_remove_member_from_group(
             raise LDAPGroupModifyError(
                 f"Failed to remove members from LDAP group '{group_name}' - {result}"
             )
-
-
-def run_in_background(func):
-    """Wrapper to run a function.
-
-    Note that Django q's architecture means this can't be used as a straight decorator
-    and it's output must be stored as a different name from the wrapped function.
-    """
-
-    @wraps(func)
-    def wrapped(*args, **kwargs):
-        return async_task(func, *args, **kwargs)
-
-    return wrapped
 
 
 ldap_create_group_in_background = run_in_background(_ldap_create_group)

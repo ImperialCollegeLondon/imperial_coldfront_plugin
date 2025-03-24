@@ -1,12 +1,12 @@
 """Plugin tasks."""
 
 import datetime
+from functools import wraps
 
 from django.conf import settings
 from django_q.tasks import async_task
 
 from .emails import send_expiration_alert_email
-from .gpfs_client import GPFSClient
 from .models import GroupMembership
 
 
@@ -25,25 +25,15 @@ def send_expiration_notifications():
             )
 
 
-def create_fileset_set_quota_background_task(
-    filesystem_name: str,
-    fileset_name: str,
-    owner_id: str,
-    group_id: str,
-    path: str,
-    permissions: str,
-    block_quota: str,
-    files_quota: str,
-):
-    """Create a fileset and set a quota in the requested filesystem."""
-    client = GPFSClient()
+def run_in_background(func):
+    """Wrapper to run a function.
 
-    def task():
-        success = client.create_fileset(
-            filesystem_name, fileset_name, owner_id, group_id, path, permissions
-        )
+    Note that Django q's architecture means this can't be used as a straight decorator
+    and it's output must be stored as a different name from the wrapped function.
+    """
 
-        if success:
-            client.set_quota(filesystem_name, fileset_name, block_quota, files_quota)
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        return async_task(func, *args, **kwargs)
 
-    async_task(task)
+    return wrapped

@@ -830,8 +830,10 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
 
     @patch("imperial_coldfront_plugin.views.ldap_create_group_in_background")
     @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group_in_background")
+    @patch("imperial_coldfront_plugin.views.create_fileset_set_quota_in_background")
     def test_post(
         self,
+        gpfs_task_mock,
         ldap_add_member_mock,
         ldap_create_group_mock,
         pi_project,
@@ -877,4 +879,14 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         ldap_create_group_mock.assert_called_once_with(project_id)
         ldap_add_member_mock.assert_called_once_with(
             project_id, pi_project.pi.username, allow_already_present=True
+        )
+        gpfs_task_mock.assert_called_once_with(
+            filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+            owner_id="root",
+            group_id="root",
+            fileset_name=project_id,
+            path=f"{settings.GPFS_FILESET_PATH}{project_id}/",
+            permissions=settings.GPFS_PERMISSIONS,
+            block_quota=f"{size}G",
+            files_quota=settings.GPFS_FILES_QUOTA,
         )
