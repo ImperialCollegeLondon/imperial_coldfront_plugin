@@ -43,6 +43,7 @@ from .forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
+from .gpfs_client import create_fileset_set_quota_in_background
 from .ldap import ldap_create_group_in_background
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
@@ -53,7 +54,6 @@ from .policy import (
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
 )
-from .tasks import create_fileset_set_quota_background_task
 
 User = get_user_model()
 
@@ -542,6 +542,7 @@ def add_rdf_storage_allocation(request):
     if request.method == "POST":
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
+            storage_size_gb = form.cleaned_data["size"]
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
                 name="RDF Project ID"
             )
@@ -571,7 +572,7 @@ def add_rdf_storage_allocation(request):
             AllocationAttribute.objects.create(
                 allocation_attribute_type=storage_quota_attribute_type,
                 allocation=rdf_allocation,
-                value=form.cleaned_data["size"],
+                value=storage_size_gb,
             )
 
             AllocationAttribute.objects.create(
@@ -594,14 +595,14 @@ def add_rdf_storage_allocation(request):
             messages.success(request, "RDF allocation created successfully.")
 
             if settings.GPFS_ENABLED:
-                create_fileset_set_quota_background_task(
+                create_fileset_set_quota_in_background(
                     filesystem_name=settings.GPFS_FILESYSTEM_NAME,
                     owner_id="root",
                     group_id="root",
                     fileset_name=group_id,
-                    path=f"{settings.GPFS_FILESET_PATH}{group_id}/",
+                    path=f"{settings.GPFS_FILESET_PATH}{settings.GPFS_FILESYSTEM_NAME}/{group_id}/",
                     permissions=settings.GPFS_PERMISSIONS,
-                    block_quota=form.cleaned_data["size"],
+                    block_quota=f"{storage_size_gb}G",
                     files_quota=settings.GPFS_FILES_QUOTA,
                 )
 
