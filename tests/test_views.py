@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 from http import HTTPStatus
+from pathlib import Path
 from random import randint
 from unittest.mock import patch
 
@@ -843,9 +844,17 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         """Test successful project creation."""
         end_date = timezone.datetime.max.date()
         size = 10
+        faculty = "faculty"
+        department = "department"
         response = superuser_client.post(
             self._get_url(),
-            data=dict(project=pi_project.pk, end_date=end_date, size=size),
+            data=dict(
+                project=pi_project.pk,
+                end_date=end_date,
+                size=size,
+                department=department,
+                faculty=faculty,
+            ),
         )
         assertRedirects(response, reverse("home"), fetch_redirect_response=False)
 
@@ -880,13 +889,24 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         ldap_add_member_mock.assert_called_once_with(
             project_id, pi_project.pi.username, allow_already_present=True
         )
+
+        path = Path(
+            settings.GPFS_FILESET_PATH,
+            settings.GPFS_FILESYSTEM_NAME,
+            faculty,
+            department,
+            pi_project.pi.username,
+            project_id,
+        )
+
         gpfs_task_mock.assert_called_once_with(
             filesystem_name=settings.GPFS_FILESYSTEM_NAME,
             owner_id="root",
             group_id="root",
             fileset_name=project_id,
-            path=f"{settings.GPFS_FILESET_PATH}{settings.GPFS_FILESYSTEM_NAME}/{project_id}/",
+            path=path,
             permissions=settings.GPFS_PERMISSIONS,
             block_quota=f"{size}G",
             files_quota=settings.GPFS_FILES_QUOTA,
+            parent_fileset=faculty,
         )

@@ -1,6 +1,7 @@
 """Interface for interacting with the GPFS API."""
 
 from collections.abc import Generator
+from pathlib import Path
 
 import requests
 from django.conf import settings
@@ -140,6 +141,7 @@ class GPFSClient(Consumer):
         group_id: str,
         path: str,
         permissions: str,
+        parent_fileset: str,
     ) -> requests.Response:
         """Method (public) to create a fileset in the requested filesystem.
 
@@ -150,6 +152,7 @@ class GPFSClient(Consumer):
             group_id: ID of the group (rdf project id).
             path: Path.
             permissions: Permissions.
+            parent_fileset: Name of the fileset the new fileset will belong to.
 
         Returns:
             The response after successfully creating the fileset.
@@ -160,6 +163,9 @@ class GPFSClient(Consumer):
             owner=f"{owner_id}:{group_id}",
             path=path,
             permissions=permissions,
+            inodeSpace=parent_fileset,
+            permissionChangeMode="chmodAndSetAcl",
+            iamMode="advisory",
         )
 
     @check_job_status
@@ -205,6 +211,39 @@ class GPFSClient(Consumer):
             blockGracePeriod="null",
         )
 
+    @check_job_status
+    @json
+    @post("filesystems/{filesystemName}/filesets/{filesetName}/directory/{path}")
+    def _create_fileset_directory(
+        self,
+        filesystemName: str,
+        filesetName: str,
+        path: str,
+        **data: Body,
+    ) -> requests.Response:
+        pass
+
+    def create_fileset_directory(
+        self, filesystem_name: str, fileset_name: str, path: str
+    ):
+        """Create a new directory within a fileset.
+
+        Args:
+          filesystem_name: name of the filesystem containing the fileset.
+          fileset_name: name of the fileset in which to create the directory.
+          path: location of the directory as a relative path w.r.t the fileset path,
+            will create new directories recursively as required.
+        """
+        return self._create_fileset_directory(
+            filesystem_name,
+            fileset_name,
+            path,
+            user="root",
+            group="root",
+            permissions="750",
+            recursive=True,
+        )
+
 
 class FilesetCreationError(Exception):
     """Raised when a problem is encountered when creating a fileset."""
@@ -219,16 +258,33 @@ def _create_fileset_set_quota(
     fileset_name: str,
     owner_id: str,
     group_id: str,
-    path: str,
+    path: Path,
     permissions: str,
     block_quota: str,
     files_quota: str,
+    parent_fileset: str,
 ):
     """Create a fileset and set a quota in the requested filesystem."""
     client = GPFSClient()
     try:
+        client.create_fileset_directory(
+            filesystem_name,
+            parent_fileset,
+            str(path.parent.relative_to(path.parents[2])),
+        )
+    except ErrorWhenProcessingJob:
+        # will fail if directory already exists
+        pass
+
+    try:
         client.create_fileset(
-            filesystem_name, fileset_name, owner_id, group_id, path, permissions
+            filesystem_name,
+            fileset_name,
+            owner_id,
+            group_id,
+            str(path),
+            permissions,
+            parent_fileset,
         ).raise_for_status()
     except requests.HTTPError as e:
         raise FilesetCreationError(
