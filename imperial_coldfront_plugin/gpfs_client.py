@@ -224,7 +224,11 @@ class GPFSClient(Consumer):
         pass
 
     def create_fileset_directory(
-        self, filesystem_name: str, fileset_name: str, path: str
+        self,
+        filesystem_name: str,
+        fileset_name: str,
+        path: str,
+        allow_existing: bool = False,
     ):
         """Create a new directory within a fileset.
 
@@ -233,16 +237,23 @@ class GPFSClient(Consumer):
           fileset_name: name of the fileset in which to create the directory.
           path: location of the directory as a relative path w.r.t the fileset path,
             will create new directories recursively as required.
+          allow_existing: if True do not raise an error if the directory already exists.
         """
-        return self._create_fileset_directory(
-            filesystem_name,
-            fileset_name,
-            path,
-            user="root",
-            group="root",
-            permissions="750",
-            recursive=True,
-        )
+        try:
+            return self._create_fileset_directory(
+                filesystem_name,
+                fileset_name,
+                path,
+                user="root",
+                group="root",
+                permissions="750",
+                recursive=True,
+            )
+        except ErrorWhenProcessingJob as e:
+            task_data = e.args[0]
+            if allow_existing and task_data["exitCode"] == 6:
+                return task_data
+            raise
 
 
 class FilesetCreationError(Exception):
@@ -266,15 +277,12 @@ def _create_fileset_set_quota(
 ):
     """Create a fileset and set a quota in the requested filesystem."""
     client = GPFSClient()
-    try:
-        client.create_fileset_directory(
-            filesystem_name,
-            parent_fileset,
-            str(path.parent.relative_to(path.parents[2])),
-        )
-    except ErrorWhenProcessingJob:
-        # will fail if directory already exists
-        pass
+    client.create_fileset_directory(
+        filesystem_name,
+        parent_fileset,
+        str(path.parent.relative_to(path.parents[2])),
+        allow_existing=True,
+    )
 
     try:
         client.create_fileset(
