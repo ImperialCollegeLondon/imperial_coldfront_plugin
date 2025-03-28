@@ -2,6 +2,7 @@
 
 import re
 from datetime import timedelta
+from pathlib import Path
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -543,13 +544,16 @@ def add_rdf_storage_allocation(request):
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
             storage_size_gb = form.cleaned_data["size"]
+            faculty = form.cleaned_data["faculty"]
+            department = form.cleaned_data["department"]
+
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
                 name="RDF Project ID"
             )
-            group_id = get_next_rdf_project_id()
+            project_id = get_next_rdf_project_id()
             if AllocationAttribute.objects.filter(
                 allocation_attribute_type=rdf_id_attribute_type,
-                value=group_id,
+                value=project_id,
             ):
                 raise ValueError("RDF project with ID already exists.")
 
@@ -578,11 +582,11 @@ def add_rdf_storage_allocation(request):
             AllocationAttribute.objects.create(
                 allocation_attribute_type=rdf_id_attribute_type,
                 allocation=rdf_allocation,
-                value=group_id,
+                value=project_id,
             )
 
             if settings.LDAP_ENABLED:
-                ldap_create_group_in_background(group_id)
+                ldap_create_group_in_background(project_id)
 
             allocation_user_active_status = AllocationUserStatusChoice.objects.get(
                 name="Active"
@@ -592,20 +596,31 @@ def add_rdf_storage_allocation(request):
                 user=project.pi,
                 status=allocation_user_active_status,
             )
-            messages.success(request, "RDF allocation created successfully.")
 
             if settings.GPFS_ENABLED:
+                parent_fileset_path = Path(
+                    settings.GPFS_FILESET_PATH,
+                    settings.GPFS_FILESYSTEM_NAME,
+                    faculty,
+                )
+                relative_projects_path = Path(
+                    department,
+                    project.pi.username,
+                )
                 create_fileset_set_quota_in_background(
                     filesystem_name=settings.GPFS_FILESYSTEM_NAME,
                     owner_id="root",
                     group_id="root",
-                    fileset_name=group_id,
-                    path=f"{settings.GPFS_FILESET_PATH}{settings.GPFS_FILESYSTEM_NAME}/{group_id}/",
+                    fileset_name=project_id,
+                    parent_fileset_path=parent_fileset_path,
+                    relative_projects_path=relative_projects_path,
                     permissions=settings.GPFS_PERMISSIONS,
                     block_quota=f"{storage_size_gb}G",
                     files_quota=settings.GPFS_FILES_QUOTA,
+                    parent_fileset=faculty,
                 )
 
+            messages.success(request, "RDF allocation created successfully.")
             return redirect("home")
     else:
         form = RDFAllocationForm()

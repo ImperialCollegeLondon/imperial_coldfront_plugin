@@ -10,7 +10,7 @@ def add_rdf_resource_type(apps, schema_editor):
 
     storage_resource_type, _ = ResourceType.objects.get_or_create(
         name="Storage",
-        defaults=dict(description="NAS Storage"),
+        defaults=dict(description="NAS storage"),
     )
     Resource.objects.get_or_create(
         name="RDF Project Storage Space",
