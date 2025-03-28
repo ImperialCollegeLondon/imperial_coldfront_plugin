@@ -4,7 +4,7 @@ import datetime
 from functools import wraps
 
 from django.conf import settings
-from django_q.tasks import async_task
+from django_q.tasks import async_task, schedule
 
 from .emails import send_expiration_alert_email
 from .models import GroupMembership
@@ -37,3 +37,14 @@ def run_in_background(func):
         return async_task(func, *args, **kwargs)
 
     return wrapped
+
+
+def run_consistency_check():
+    """Run the LDAP consistency check task."""
+    # Schedule the task to run daily
+    schedule(
+        "imperial_coldfront_plugin.tasks.check_ldap_consistency",
+        schedule_type="D",
+        repeats=-1,
+        next_run=datetime.datetime.now(),
+    )
