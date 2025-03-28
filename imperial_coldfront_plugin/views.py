@@ -598,20 +598,22 @@ def add_rdf_storage_allocation(request):
             )
 
             if settings.GPFS_ENABLED:
-                path = Path(
+                parent_fileset_path = Path(
                     settings.GPFS_FILESET_PATH,
                     settings.GPFS_FILESYSTEM_NAME,
                     faculty,
+                )
+                relative_projects_path = Path(
                     department,
                     project.pi.username,
-                    project_id,
                 )
                 create_fileset_set_quota_in_background(
                     filesystem_name=settings.GPFS_FILESYSTEM_NAME,
                     owner_id="root",
                     group_id="root",
                     fileset_name=project_id,
-                    path=path,
+                    parent_fileset_path=parent_fileset_path,
+                    relative_projects_path=relative_projects_path,
                     permissions=settings.GPFS_PERMISSIONS,
                     block_quota=f"{storage_size_gb}G",
                     files_quota=settings.GPFS_FILES_QUOTA,

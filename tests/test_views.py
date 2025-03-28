@@ -890,13 +890,12 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             project_id, pi_project.pi.username, allow_already_present=True
         )
 
-        path = Path(
-            settings.GPFS_FILESET_PATH,
-            settings.GPFS_FILESYSTEM_NAME,
-            faculty,
+        faculty_path = Path(
+            settings.GPFS_FILESET_PATH, settings.GPFS_FILESYSTEM_NAME, faculty
+        )
+        relative_projects_path = Path(
             department,
             pi_project.pi.username,
-            project_id,
         )
 
         gpfs_task_mock.assert_called_once_with(
@@ -904,7 +903,8 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             owner_id="root",
             group_id="root",
             fileset_name=project_id,
-            path=path,
+            parent_fileset_path=faculty_path,
+            relative_projects_path=relative_projects_path,
             permissions=settings.GPFS_PERMISSIONS,
             block_quota=f"{size}G",
             files_quota=settings.GPFS_FILES_QUOTA,

@@ -269,7 +269,8 @@ def _create_fileset_set_quota(
     fileset_name: str,
     owner_id: str,
     group_id: str,
-    path: Path,
+    parent_fileset_path: Path,
+    relative_projects_path: Path,
     permissions: str,
     block_quota: str,
     files_quota: str,
@@ -280,7 +281,7 @@ def _create_fileset_set_quota(
     client.create_fileset_directory(
         filesystem_name,
         parent_fileset,
-        str(path.parent.relative_to(path.parents[2])),
+        relative_projects_path,
         allow_existing=True,
     )
 
@@ -290,7 +291,7 @@ def _create_fileset_set_quota(
             fileset_name,
             owner_id,
             group_id,
-            str(path),
+            str(parent_fileset_path / relative_projects_path / fileset_name),
             permissions,
             parent_fileset,
         ).raise_for_status()
