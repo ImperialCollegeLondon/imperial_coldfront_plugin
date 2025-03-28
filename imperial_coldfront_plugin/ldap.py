@@ -183,11 +183,7 @@ def check_ldap_consistency():
                 continue
 
             actual_members = []
-            if (
-                group_search[0].get("attributes")
-                and "member" in group_search[0]["attributes"]
-            ):
-                for member_dn in group_search[0]["attributes"]["member"]:
+            for member_dn in group_search[0]["attributes"].get("member", []):
                     parts = member_dn.split(",")
                     cn_part = next(
                         (p for p in parts if p.strip().lower().startswith("cn=")), None
