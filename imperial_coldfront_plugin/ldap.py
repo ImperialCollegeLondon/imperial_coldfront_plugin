@@ -184,13 +184,13 @@ def check_ldap_consistency():
 
             actual_members = []
             for member_dn in group_search[0]["attributes"].get("member", []):
-                    parts = member_dn.split(",")
-                    cn_part = next(
-                        (p for p in parts if p.strip().lower().startswith("cn=")), None
-                    )
-                    if cn_part:
-                        username = cn_part.strip()[3:]
-                        actual_members.append(username)
+                parts = member_dn.split(",")
+                cn_part = next(
+                    (p for p in parts if p.strip().lower().startswith("cn=")), None
+                )
+                if cn_part:
+                    username = cn_part.strip()[3:]
+                    actual_members.append(username)
 
             missing_members = set(expected_usernames) - set(actual_members)
             extra_members = set(actual_members) - set(expected_usernames)
