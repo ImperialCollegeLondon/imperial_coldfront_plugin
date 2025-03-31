@@ -43,7 +43,7 @@ def run_consistency_check():
     """Run the LDAP consistency check task."""
     # Schedule the task to run daily
     schedule(
-        "imperial_coldfront_plugin.tasks.check_ldap_consistency",
+        "imperial_coldfront_plugin.ldap.check_ldap_consistency",
         schedule_type="D",
         repeats=-1,
         next_run=datetime.datetime.now(),
