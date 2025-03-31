@@ -1,14 +1,13 @@
 """Module for performing operations in Active Directory via LDAP."""
 
-import logging
 import re
 
 import ldap3
 from coldfront.core.allocation.models import Allocation, AllocationUser
 from django.conf import settings
-from django.core.mail import mail_admins
 from ldap3 import Connection, Server
 
+from .emails import _send_discrepancy_notification
 from .tasks import run_in_background
 
 LDAP_GROUP_TYPE = -2147483646  # magic number
@@ -137,9 +136,8 @@ def _ldap_remove_member_from_group(
 
 def check_ldap_consistency():
     """Check the consistency of LDAP groups with the database."""
-    logger = logging.getLogger(__name__)
     discrepancies = {
-        "missing_groups": [],
+        "membership_discrepancies": [],
     }
 
     allocations = Allocation.objects.filter(
@@ -147,7 +145,6 @@ def check_ldap_consistency():
         status__name="Active",
         allocationattribute__allocation_attribute_type__name="RDF Project ID",
     ).distinct()
-    logger.info(f"Found {allocations.count()} RDF allocations to check")
 
     expected_groups = {}
     conn = _get_ldap_connection()
@@ -165,22 +162,13 @@ def check_ldap_consistency():
         success, _, group_search, _ = conn.search(
             settings.LDAP_GROUP_OU, f"(cn={group_id})", attributes=["member"]
         )
-        if not group_search:
-            discrepancies["missing_groups"].append(
-                {
-                    "allocation_id": allocation.id,
-                    "group_id": group_id,
-                    "project_name": allocation.project.title,
-                }
-            )
-            continue
 
         actual_members = []
         for member_dn in group_search[0]["attributes"].get("member", []):
             match = re.search(r"cn=([^,]+)", member_dn, re.IGNORECASE)
-        if match:
-            username = match.group(1)
-            actual_members.append(username)
+            if match:
+                username = match.group(1)
+                actual_members.append(username)
 
         missing_members = set(expected_usernames) - set(actual_members)
         extra_members = set(actual_members) - set(expected_usernames)
@@ -200,56 +188,6 @@ def check_ldap_consistency():
         _send_discrepancy_notification(discrepancies)
 
     return discrepancies
-
-
-def _send_discrepancy_notification(discrepancies):
-    """Send email notification for discrepancies found during the consistency check."""
-    if not settings.ADMINS:
-        return
-
-    message = ["LDAP Consistency Check found discrepancies that require manual review:"]
-    if discrepancies.get("missing_groups"):
-        message.append("\nMissing AD Groups:")
-        for grp in discrepancies["missing_groups"]:
-            message.append(
-                f"- Group {grp['group_id']} (Project: {grp['project_name']}, Allocation ID: {grp['allocation_id']})"  # noqa: E501
-            )
-
-    if discrepancies.get("membership_discrepancies"):
-        message.append("\nMembership Discrepancies:")
-        for disc in discrepancies["membership_discrepancies"]:
-            message.append(
-                f"\nGroup {disc['group_id']} (Project: {disc['project_name']}, Allocation ID: {disc['allocation_id']})"  # noqa: E501
-            )
-            if disc["missing_members"]:
-                message.append(
-                    "  Users missing in AD group: " + ", ".join(disc["missing_members"])
-                )
-            if disc["extra_members"]:
-                message.append(
-                    "  Extra users in AD group: " + ", ".join(disc["extra_members"])
-                )
-
-    if discrepancies.get("processing_errors"):
-        message.append("\nErrors encountered during processing:")
-        for err in discrepancies["processing_errors"]:
-            if "allocation_id" in err:
-                message.append(
-                    f"- Allocation ID {err['allocation_id']}: {err['error']}"
-                )
-            else:
-                message.append(f"- {err['error']}")
-
-    if discrepancies.get("ldap_search_errors"):
-        message.append("\nLDAP Search Errors:")
-        for err in discrepancies.get("ldap_search_errors", []):
-            message.append(f"- Group {err.get('group_id')}: {err.get('error')}")
-
-    mail_admins(
-        subject="LDAP Consistency Check - Discrepancies Found",
-        message="\n".join(message),
-        fail_silently=False,
-    )
 
 
 check_ldap_consistency_in_background = run_in_background(check_ldap_consistency)
