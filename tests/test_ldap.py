@@ -89,12 +89,14 @@ def test_ldap_remove_member_from_group_wrong_error_code(ldap_connection_mock):
 
 @patch("imperial_coldfront_plugin.ldap._send_discrepancy_notification")
 def test_check_ldap_consistency_no_discrepancies(
-    mock_notify, rdf_allocation, allocation_user, ldap_connection_mock
+    mock_notify,
+    rdf_allocation,
+    allocation_user,
+    ldap_connection_mock,
+    rdf_allocation_project_id,
 ):
     """Test when everything is in sync between Coldfront and AD."""
-    group_id = rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="RDF Project ID"
-    ).value
+    group_id = rdf_allocation_project_id
     username = allocation_user.user.username
 
     def mock_search(base_dn, search_filter, **kwargs):
@@ -138,12 +140,14 @@ def test_check_ldap_consistency_no_discrepancies(
 
 @patch("imperial_coldfront_plugin.ldap._send_discrepancy_notification")
 def test_check_ldap_consistency_missing_members(
-    mock_notify, rdf_allocation, allocation_user, ldap_connection_mock
+    mock_notify,
+    rdf_allocation,
+    allocation_user,
+    ldap_connection_mock,
+    rdf_allocation_project_id,
 ):
     """Test when a user is missing from AD group."""
-    group_id = rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="RDF Project ID"
-    ).value
+    group_id = rdf_allocation_project_id
     username = allocation_user.user.username
 
     # Mock LDAP search to return empty group (no members)
@@ -184,12 +188,14 @@ def test_check_ldap_consistency_missing_members(
 
 @patch("imperial_coldfront_plugin.ldap._send_discrepancy_notification")
 def test_check_ldap_consistency_extra_members(
-    mock_notify, rdf_allocation, allocation_user, ldap_connection_mock
+    mock_notify,
+    rdf_allocation,
+    allocation_user,
+    ldap_connection_mock,
+    rdf_allocation_project_id,
 ):
     """Test when there are extra users in AD group."""
-    group_id = rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="RDF Project ID"
-    ).value
+    group_id = rdf_allocation_project_id
     username = allocation_user.user.username
     extra_user = "extra_user"
 
