@@ -1,7 +1,7 @@
 """Email sending functionality."""
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import mail_admins, send_mail
 from django_q.tasks import async_task
 
 
@@ -73,4 +73,54 @@ def send_expiration_alert_email(user, owner, expiration):
         f"This email is to notify you that {user.get_full_name()} ({user.email})'s "
         f"membership in the HPC access group of {owner.get_full_name()} is due "
         f"to expire on {expiration.date()}.",
+    )
+
+
+def _send_discrepancy_notification(discrepancies):
+    """Send email notification for discrepancies found during the consistency check."""
+    if not settings.ADMINS:
+        return
+
+    message = ["LDAP Consistency Check found discrepancies that require manual review:"]
+    if discrepancies.get("missing_groups"):
+        message.append("\nMissing AD Groups:")
+        for grp in discrepancies["missing_groups"]:
+            message.append(
+                f"- Group {grp['group_id']} (Project: {grp['project_name']}, Allocation ID: {grp['allocation_id']})"  # noqa: E501
+            )
+
+    if discrepancies.get("membership_discrepancies"):
+        message.append("\nMembership Discrepancies:")
+        for disc in discrepancies["membership_discrepancies"]:
+            message.append(
+                f"\nGroup {disc['group_id']} (Project: {disc['project_name']}, Allocation ID: {disc['allocation_id']})"  # noqa: E501
+            )
+            if disc["missing_members"]:
+                message.append(
+                    "  Users missing in AD group: " + ", ".join(disc["missing_members"])
+                )
+            if disc["extra_members"]:
+                message.append(
+                    "  Extra users in AD group: " + ", ".join(disc["extra_members"])
+                )
+
+    if discrepancies.get("processing_errors"):
+        message.append("\nErrors encountered during processing:")
+        for err in discrepancies["processing_errors"]:
+            if "allocation_id" in err:
+                message.append(
+                    f"- Allocation ID {err['allocation_id']}: {err['error']}"
+                )
+            else:
+                message.append(f"- {err['error']}")
+
+    if discrepancies.get("ldap_search_errors"):
+        message.append("\nLDAP Search Errors:")
+        for err in discrepancies.get("ldap_search_errors", []):
+            message.append(f"- Group {err.get('group_id')}: {err.get('error')}")
+
+    mail_admins(
+        subject="LDAP Consistency Check - Discrepancies Found",
+        message="\n".join(message),
+        fail_silently=False,
     )
