@@ -1,6 +1,7 @@
 """Module for performing operations in Active Directory via LDAP."""
 
 import logging
+import re
 
 import ldap3
 from coldfront.core.allocation.models import Allocation, AllocationUser
@@ -139,8 +140,6 @@ def check_ldap_consistency():
     logger = logging.getLogger(__name__)
     discrepancies = {
         "missing_groups": [],
-        "extra_groups": [],
-        "membership_discrepancies": [],
     }
 
     allocations = Allocation.objects.filter(
@@ -151,71 +150,54 @@ def check_ldap_consistency():
     logger.info(f"Found {allocations.count()} RDF allocations to check")
 
     expected_groups = {}
-    try:
-        conn = _get_ldap_connection()
-    except Exception as e:
-        logger.error(f"Failed to connect to LDAP: {e}")
-        return {"error": str(e)}
-
+    conn = _get_ldap_connection()
     for allocation in allocations:
-        try:
-            group_id = allocation.allocationattribute_set.get(
-                allocation_attribute_type__name="RDF Project ID"
-            ).value
+        group_id = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="RDF Project ID"
+        ).value
 
-            active_users = AllocationUser.objects.filter(
-                allocation=allocation, status__name="Active"
+        active_users = AllocationUser.objects.filter(
+            allocation=allocation, status__name="Active"
+        )
+        expected_usernames = [au.user.username for au in active_users]
+        expected_groups[group_id] = expected_usernames
+
+        success, _, group_search, _ = conn.search(
+            settings.LDAP_GROUP_OU, f"(cn={group_id})", attributes=["member"]
+        )
+        if not group_search:
+            discrepancies["missing_groups"].append(
+                {
+                    "allocation_id": allocation.id,
+                    "group_id": group_id,
+                    "project_name": allocation.project.title,
+                }
             )
-            expected_usernames = [au.user.username for au in active_users]
-            expected_groups[group_id] = expected_usernames
+            continue
 
-            success, _, group_search, _ = conn.search(
-                settings.LDAP_GROUP_OU, f"(cn={group_id})", attributes=["member"]
-            )
-            if not group_search:
-                discrepancies["missing_groups"].append(
-                    {
-                        "allocation_id": allocation.id,
-                        "group_id": group_id,
-                        "project_name": allocation.project.title,
-                    }
-                )
-                continue
+        actual_members = []
+        for member_dn in group_search[0]["attributes"].get("member", []):
+            match = re.search(r"cn=([^,]+)", member_dn, re.IGNORECASE)
+        if match:
+            username = match.group(1)
+            actual_members.append(username)
 
-            actual_members = []
-            for member_dn in group_search[0]["attributes"].get("member", []):
-                parts = member_dn.split(",")
-                cn_part = next(
-                    (p for p in parts if p.strip().lower().startswith("cn=")), None
-                )
-                if cn_part:
-                    username = cn_part.strip()[3:]
-                    actual_members.append(username)
+        missing_members = set(expected_usernames) - set(actual_members)
+        extra_members = set(actual_members) - set(expected_usernames)
 
-            missing_members = set(expected_usernames) - set(actual_members)
-            extra_members = set(actual_members) - set(expected_usernames)
-
-            if missing_members or extra_members:
-                discrepancies["membership_discrepancies"].append(
-                    {
-                        "allocation_id": allocation.id,
-                        "group_id": group_id,
-                        "project_name": allocation.project.title,
-                        "missing_members": list(missing_members),
-                        "extra_members": list(extra_members),
-                    }
-                )
-        except Exception as e:
-            logger.error(f"Error processing allocation {allocation.id}: {e}")
-            discrepancies.setdefault("processing_errors", []).append(
-                {"allocation_id": allocation.id, "error": str(e)}
+        if missing_members or extra_members:
+            discrepancies["membership_discrepancies"].append(
+                {
+                    "allocation_id": allocation.id,
+                    "group_id": group_id,
+                    "project_name": allocation.project.title,
+                    "missing_members": list(missing_members),
+                    "extra_members": list(extra_members),
+                }
             )
 
     if any(discrepancies.values()):
-        try:
-            _send_discrepancy_notification(discrepancies)
-        except Exception as e:
-            logger.error(f"Failed to send notification: {e}")
+        _send_discrepancy_notification(discrepancies)
 
     return discrepancies
 
