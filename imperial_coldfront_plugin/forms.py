@@ -61,6 +61,8 @@ class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
     project = forms.ChoiceField(choices=get_project_choices)
+    faculty = forms.CharField()
+    department = forms.CharField()
     end_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}),
         validators=[MinValueValidator(timezone.now().date())],
