@@ -74,4 +74,5 @@ class RDFAllocationForm(forms.Form):
         label="DART ID",
         help_text="The associated DART entry.",
         disabled=True,
+        required=False,
     )
