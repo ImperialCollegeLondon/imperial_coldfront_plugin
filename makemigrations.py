@@ -12,13 +12,6 @@ settings.configure(
         "django.contrib.contenttypes",
         "django.contrib.sites",
         "imperial_coldfront_plugin",
-        "coldfront.core.field_of_science",
-        "coldfront.core.project",
-        "coldfront.core.resource",
-        "coldfront.core.allocation",
-        "coldfront.core.grant",
-        "coldfront.core.publication",
-        "coldfront.core.research_output",
     ],
     # below checks do not need to pass to makemigrations
     SILENCED_SYSTEM_CHECKS=[
@@ -28,13 +21,7 @@ settings.configure(
         "admin.E409",
         "admin.E410",
     ],
-    SECRET_KEY="secret_key",
-    Q_CLUSTER={
-        "timeout": 300,
-        "retry": 600,
-    },
 )
-
 django.setup()
 
 if __name__ == "__main__":
