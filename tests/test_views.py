@@ -846,6 +846,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         size = 10
         faculty = "faculty"
         department = "department"
+        dart_id = "dart_id"
         response = superuser_client.post(
             self._get_url(),
             data=dict(
@@ -854,6 +855,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 size=size,
                 department=department,
                 faculty=faculty,
+                dart_id=dart_id,
             ),
         )
         assertRedirects(response, reverse("home"), fetch_redirect_response=False)
