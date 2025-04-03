@@ -30,6 +30,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django_q.tasks import Task
 
 from .emails import (
     send_group_access_granted_email,
@@ -626,4 +627,13 @@ def add_rdf_storage_allocation(request):
         form = RDFAllocationForm()
     return render(
         request, "imperial_coldfront_plugin/rdf_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def task_stat_view(request):
+    """Displays a list of tasks and their status."""
+    task_qs = Task.objects.all().order_by("started").reverse()
+    return render(
+        request, "imperial_coldfront_plugin/task_list.html", context={"tasks": task_qs}
     )
