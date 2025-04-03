@@ -910,3 +910,10 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             files_quota=settings.GPFS_FILES_QUOTA,
             parent_fileset=faculty,
         )
+
+
+class TestTaskListView(LoginRequiredMixin):
+    """Tests for the task_stat_view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:list_tasks")

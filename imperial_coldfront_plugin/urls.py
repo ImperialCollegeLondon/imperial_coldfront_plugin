@@ -60,4 +60,9 @@ urlpatterns = [
         views.add_rdf_storage_allocation,
         name="add_rdf_storage_allocation",
     ),
+    path(
+        "list_tasks/",
+        views.task_stat_view,
+        name="list_tasks",
+    ),
 ]
