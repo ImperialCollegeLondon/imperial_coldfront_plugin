@@ -559,7 +559,7 @@ def add_rdf_storage_allocation(request):
                 raise ValueError("RDF project with ID already exists.")
 
             dart_id_attribute_type = AllocationAttributeType.objects.get(
-                name="DART ID", is_private=True
+                name="DART ID", is_changeable=False
             )
             if AllocationAttribute.objects.filter(
                 allocation_attribute_type=dart_id_attribute_type,
