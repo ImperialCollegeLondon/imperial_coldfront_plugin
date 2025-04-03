@@ -136,17 +136,13 @@ def _ldap_remove_member_from_group(
 
 def check_ldap_consistency():
     """Check the consistency of LDAP groups with the database."""
-    discrepancies = {
-        "membership_discrepancies": [],
-    }
-
+    discrepancies = []
     allocations = Allocation.objects.filter(
         resources__name="RDF Project Storage Space",
         status__name="Active",
         allocationattribute__allocation_attribute_type__name="RDF Project ID",
     ).distinct()
 
-    expected_groups = {}
     conn = _get_ldap_connection()
     for allocation in allocations:
         group_id = allocation.allocationattribute_set.get(
@@ -157,7 +153,6 @@ def check_ldap_consistency():
             allocation=allocation, status__name="Active"
         )
         expected_usernames = [au.user.username for au in active_users]
-        expected_groups[group_id] = expected_usernames
 
         success, _, group_search, _ = conn.search(
             settings.LDAP_GROUP_OU, f"(cn={group_id})", attributes=["member"]
@@ -174,7 +169,7 @@ def check_ldap_consistency():
         extra_members = set(actual_members) - set(expected_usernames)
 
         if missing_members or extra_members:
-            discrepancies["membership_discrepancies"].append(
+            discrepancies.append(
                 {
                     "allocation_id": allocation.id,
                     "group_id": group_id,
@@ -184,7 +179,7 @@ def check_ldap_consistency():
                 }
             )
 
-    if any(discrepancies.values()):
+    if discrepancies:
         _send_discrepancy_notification(discrepancies)
 
     return discrepancies
