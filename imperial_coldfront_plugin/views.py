@@ -546,6 +546,7 @@ def add_rdf_storage_allocation(request):
             storage_size_gb = form.cleaned_data["size"]
             faculty = form.cleaned_data["faculty"]
             department = form.cleaned_data["department"]
+            dart_id = form.cleaned_data["dart_id"]
 
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
                 name="RDF Project ID"
@@ -556,6 +557,13 @@ def add_rdf_storage_allocation(request):
                 value=project_id,
             ):
                 raise ValueError("RDF project with ID already exists.")
+
+            dart_id_attribute_type = AllocationAttributeType.objects.get(name="DART ID")
+            if AllocationAttribute.objects.filter(
+                allocation_attribute_type=dart_id_attribute_type,
+                value=dart_id,
+            ):
+                raise ValueError("DART ID already exists.")
 
             rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
 
