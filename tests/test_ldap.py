@@ -87,20 +87,14 @@ def test_ldap_remove_member_from_group_wrong_error_code(ldap_connection_mock):
         _ldap_remove_member_from_group(GROUP_NAME, MEMBER_USERNAME, allow_missing=True)
 
 
-@patch("imperial_coldfront_plugin.ldap._send_discrepancy_notification")
 def test_check_ldap_consistency_no_discrepancies(
-    mock_notify,
-    rdf_allocation,
-    allocation_user,
-    ldap_connection_mock,
-    rdf_allocation_project_id,
+    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_project_id
 ):
     """Test when everything is in sync between Coldfront and AD."""
-    group_id = rdf_allocation_project_id
     username = allocation_user.user.username
 
     def mock_search(base_dn, search_filter, **kwargs):
-        if f"(cn={group_id})" in search_filter:
+        if f"(cn={rdf_allocation_project_id})" in search_filter:
             return (
                 True,
                 None,
@@ -128,80 +122,59 @@ def test_check_ldap_consistency_no_discrepancies(
 
         mock_re_search.side_effect = side_effect
 
-        result = check_ldap_consistency()
+        with patch(
+            "imperial_coldfront_plugin.ldap._send_discrepancy_notification"
+        ) as mock_notify:
+            result = check_ldap_consistency()
 
-    assert (
-        "membership_discrepancies" not in result
-        or len(result["membership_discrepancies"]) == 0
-    )
+    assert result == []
 
     mock_notify.assert_not_called()
 
 
-@patch("imperial_coldfront_plugin.ldap._send_discrepancy_notification")
 def test_check_ldap_consistency_missing_members(
-    mock_notify,
-    rdf_allocation,
-    allocation_user,
-    ldap_connection_mock,
-    rdf_allocation_project_id,
+    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_project_id
 ):
     """Test when a user is missing from AD group."""
-    group_id = rdf_allocation_project_id
     username = allocation_user.user.username
 
-    # Mock LDAP search to return empty group (no members)
     def mock_search(base_dn, search_filter, **kwargs):
-        if f"(cn={group_id})" in search_filter:
+        if f"(cn={rdf_allocation_project_id})" in search_filter:
             return (
                 True,
                 None,
-                [
-                    {
-                        "attributes": {
-                            "member": []  # Empty member list
-                        }
-                    }
-                ],
+                [{"attributes": {"member": []}}],
                 None,
             )
         return (True, None, [], None)
 
     ldap_connection_mock().search.side_effect = mock_search
 
-    # Call function
-    result = check_ldap_consistency()
+    with patch(
+        "imperial_coldfront_plugin.ldap._send_discrepancy_notification"
+    ) as mock_notify:
+        result = check_ldap_consistency()
 
-    # Verify membership discrepancy was detected
-    assert "membership_discrepancies" in result
-    assert len(result["membership_discrepancies"]) == 1
-    discrepancy = result["membership_discrepancies"][0]
+    assert len(result) == 1
+    discrepancy = result[0]
     assert discrepancy["allocation_id"] == rdf_allocation.id
-    assert discrepancy["group_id"] == group_id
+    assert discrepancy["group_id"] == rdf_allocation_project_id
     assert discrepancy["project_name"] == rdf_allocation.project.title
     assert username in discrepancy["missing_members"]
     assert not discrepancy["extra_members"]
 
-    # Verify notification was sent
     mock_notify.assert_called_once()
 
 
-@patch("imperial_coldfront_plugin.ldap._send_discrepancy_notification")
 def test_check_ldap_consistency_extra_members(
-    mock_notify,
-    rdf_allocation,
-    allocation_user,
-    ldap_connection_mock,
-    rdf_allocation_project_id,
+    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_project_id
 ):
     """Test when there are extra users in AD group."""
-    group_id = rdf_allocation_project_id
     username = allocation_user.user.username
     extra_user = "extra_user"
 
-    # Mock LDAP search to return group with expected user plus an extra one
     def mock_search(base_dn, search_filter, **kwargs):
-        if f"(cn={group_id})" in search_filter:
+        if f"(cn={rdf_allocation_project_id})" in search_filter:
             return (
                 True,
                 None,
@@ -221,7 +194,6 @@ def test_check_ldap_consistency_extra_members(
 
     ldap_connection_mock().search.side_effect = mock_search
 
-    # Patch re.search to correctly extract usernames
     with patch("imperial_coldfront_plugin.ldap.re.search") as mock_re_search:
 
         def side_effect(pattern, string, flags=0):
@@ -236,17 +208,16 @@ def test_check_ldap_consistency_extra_members(
 
         mock_re_search.side_effect = side_effect
 
-        # Call function
-        result = check_ldap_consistency()
+        with patch(
+            "imperial_coldfront_plugin.ldap._send_discrepancy_notification"
+        ) as mock_notify:
+            result = check_ldap_consistency()
 
-    # Verify membership discrepancy was detected
-    assert "membership_discrepancies" in result
-    assert len(result["membership_discrepancies"]) == 1
-    discrepancy = result["membership_discrepancies"][0]
+    assert len(result) == 1
+    discrepancy = result[0]
     assert discrepancy["allocation_id"] == rdf_allocation.id
-    assert discrepancy["group_id"] == group_id
+    assert discrepancy["group_id"] == rdf_allocation_project_id
     assert not discrepancy["missing_members"]
     assert extra_user in discrepancy["extra_members"]
 
-    # Verify notification was sent
     mock_notify.assert_called_once()
