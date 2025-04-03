@@ -81,15 +81,15 @@ class RDFAllocationForm(forms.Form):
 
     project = forms.ChoiceField(
         choices=get_project_choices,
-        widget=forms.Select(attrs={"data-live-search": "true"}),
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
     )
     faculty = forms.ChoiceField(
         choices=get_faculty_choices,
-        widget=forms.Select(attrs={"data-live-search": "true"}),
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
     )
     department = forms.ChoiceField(
         choices=get_department_choices,
-        widget=forms.Select(attrs={"data-live-search": "true"}),
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
     )
     end_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}),
