@@ -81,46 +81,25 @@ def _send_discrepancy_notification(discrepancies):
     if not settings.ADMINS:
         return
 
-    message = ["LDAP Consistency Check found discrepancies that require manual review:"]
-    if discrepancies.get("missing_groups"):
-        message.append("\nMissing AD Groups:")
-        for grp in discrepancies["missing_groups"]:
-            message.append(
-                f"- Group {grp['group_id']} (Project: {grp['project_name']}, Allocation ID: {grp['allocation_id']})"  # noqa: E501
-            )
+    message = "The following discrepancies were detected between Coldfront and AD:\n\n"
 
-    if discrepancies.get("membership_discrepancies"):
-        message.append("\nMembership Discrepancies:")
-        for disc in discrepancies["membership_discrepancies"]:
-            message.append(
-                f"\nGroup {disc['group_id']} (Project: {disc['project_name']}, Allocation ID: {disc['allocation_id']})"  # noqa: E501
-            )
-            if disc["missing_members"]:
-                message.append(
-                    "  Users missing in AD group: " + ", ".join(disc["missing_members"])
-                )
-            if disc["extra_members"]:
-                message.append(
-                    "  Extra users in AD group: " + ", ".join(disc["extra_members"])
-                )
+    message += "Membership Discrepancies:\n"
+    for discrepancy in discrepancies:
+        project_name = discrepancy["project_name"]
+        group_id = discrepancy["group_id"]
+        message += f"\n- Project: {project_name} (Group: {group_id})\n"
 
-    if discrepancies.get("processing_errors"):
-        message.append("\nErrors encountered during processing:")
-        for err in discrepancies["processing_errors"]:
-            if "allocation_id" in err:
-                message.append(
-                    f"- Allocation ID {err['allocation_id']}: {err['error']}"
-                )
-            else:
-                message.append(f"- {err['error']}")
+        if discrepancy["missing_members"]:
+            message += "  Missing members (in Coldfront but not in AD):\n"
+            for member in sorted(discrepancy["missing_members"]):
+                message += f"    - {member}\n"
 
-    if discrepancies.get("ldap_search_errors"):
-        message.append("\nLDAP Search Errors:")
-        for err in discrepancies.get("ldap_search_errors", []):
-            message.append(f"- Group {err.get('group_id')}: {err.get('error')}")
+        if discrepancy["extra_members"]:
+            message += "  Extra members (in AD but not in Coldfront):\n"
+            for member in sorted(discrepancy["extra_members"]):
+                message += f"    - {member}\n"
 
     mail_admins(
         subject="LDAP Consistency Check - Discrepancies Found",
-        message="\n".join(message),
-        fail_silently=False,
+        message=message,
     )
