@@ -8,12 +8,10 @@ from django_q.tasks import schedule
 def run_consistency_check(apps, schema_editor):
     """Schedule a task to run the consistency check."""
     Schedule = apps.get_model("django_q", "Schedule")
-    schedule(
-        "imperial_coldfront_plugin.tasks.check_allocation_user_consistency",
-        schedule_type="I",
-        minutes=60,
-        repeats=-1,
-        next_run=datetime.datetime.now(),
+    Schedule.objects.update_or_create(
+        name="LDAP consistency check",
+        func="imperial_coldfront_plugin.tasks.check_allocation_user_consistency",
+        schedule_type="D",
     )
 
 class Migration(migrations.Migration):
