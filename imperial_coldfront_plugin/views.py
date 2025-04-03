@@ -595,6 +595,12 @@ def add_rdf_storage_allocation(request):
                 value=project_id,
             )
 
+            AllocationAttribute.objects.create(
+                allocation_attribute_type=dart_id_attribute_type,
+                allocation=rdf_allocation,
+                value=dart_id,
+            )
+
             if settings.LDAP_ENABLED:
                 ldap_create_group_in_background(project_id)
 
