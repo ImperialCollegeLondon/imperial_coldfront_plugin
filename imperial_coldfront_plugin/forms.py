@@ -71,8 +71,6 @@ class RDFAllocationForm(forms.Form):
         validators=[MinValueValidator(1)], help_text="In gigabytes"
     )
     dart_id = forms.CharField(
-        label="DART ID",
         help_text="The associated DART entry.",
-        disabled=True,
-        required=False,
+        disabled=False,
     )

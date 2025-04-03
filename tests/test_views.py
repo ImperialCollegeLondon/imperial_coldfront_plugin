@@ -884,6 +884,11 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             allocation=allocation,
             value=format_project_number_to_id(1),
         )
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="DART ID",
+            allocation=allocation,
+            value=dart_id,
+        )
         AllocationUser.objects.get(
             allocation=allocation, user=pi_project.pi, status__name="Active"
         )
