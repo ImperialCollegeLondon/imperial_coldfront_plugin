@@ -71,9 +71,15 @@ def get_faculty_choices():
     return [(fac, fac) for fac in sorted(set(DEP_FAC_PLACEHOLDER.values()))]
 
 
-def get_department_choices():
+def get_department_choices(faculty: str) -> list[str]:
     """Get the available departments."""
-    return [(dep, dep) for dep in sorted(DEP_FAC_PLACEHOLDER.keys())]
+    return [dep for dep, fac in DEP_FAC_PLACEHOLDER.items() if fac == faculty]
+
+
+def get_initial_department_choices():
+    """Get the deppartment choices available as the page loads."""
+    fac = get_faculty_choices()
+    return [(dep, dep) for dep in get_department_choices(fac[0][0])]
 
 
 class RDFAllocationForm(forms.Form):
@@ -88,7 +94,7 @@ class RDFAllocationForm(forms.Form):
         widget=forms.Select(attrs={"class": "js-example-basic-single"}),
     )
     department = forms.ChoiceField(
-        choices=get_department_choices,
+        choices=get_initial_department_choices,
         widget=forms.Select(attrs={"class": "js-example-basic-single"}),
     )
     end_date = forms.DateField(
