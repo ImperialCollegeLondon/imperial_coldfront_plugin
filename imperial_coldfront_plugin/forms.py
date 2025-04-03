@@ -57,12 +57,40 @@ def get_project_choices():
     ]
 
 
+DEP_FAC_PLACEHOLDER = {
+    "Physics": "Natural Sciences",
+    "Chemistry": "Natural Sciences",
+    "Life Sciences": "Natural Sciences",
+    "Aeronautics": "Engineering",
+    "Mechanical Engineering": "Engineering",
+}
+
+
+def get_faculty_choices():
+    """Get the available faculties."""
+    return [(fac, fac) for fac in sorted(set(DEP_FAC_PLACEHOLDER.values()))]
+
+
+def get_department_choices():
+    """Get the available departments."""
+    return [(dep, dep) for dep in sorted(DEP_FAC_PLACEHOLDER.keys())]
+
+
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project = forms.ChoiceField(choices=get_project_choices)
-    faculty = forms.CharField()
-    department = forms.CharField()
+    project = forms.ChoiceField(
+        choices=get_project_choices,
+        widget=forms.Select(attrs={"data-live-search": "true"}),
+    )
+    faculty = forms.ChoiceField(
+        choices=get_faculty_choices,
+        widget=forms.Select(attrs={"data-live-search": "true"}),
+    )
+    department = forms.ChoiceField(
+        choices=get_department_choices,
+        widget=forms.Select(attrs={"data-live-search": "true"}),
+    )
     end_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}),
         validators=[MinValueValidator(timezone.now().date())],
