@@ -70,3 +70,7 @@ class RDFAllocationForm(forms.Form):
     size = forms.IntegerField(
         validators=[MinValueValidator(1)], help_text="In gigabytes"
     )
+    dart_id = forms.CharField(
+        help_text="The associated DART entry.",
+        disabled=False,
+    )
