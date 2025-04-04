@@ -3,6 +3,8 @@
 This module contains form classes used for research group management.
 """
 
+from collections.abc import Iterable
+
 from django import forms
 from django.core.validators import MinValueValidator
 from django.utils import timezone
@@ -57,12 +59,53 @@ def get_project_choices():
     ]
 
 
+DEPARTMENTS = {
+    "Physics": "physics",
+    "Dyson School of Design Engineering": "dsde",
+    "Chemistry": "chemistry",
+    "Aeronautics": "aero",
+}
+
+FACULTIES = {"Faculty of Engineering": "foe", "Faculty of Natural Sciences": "fons"}
+
+DEPARTMENTS_IN_FACULTY = {
+    "foe": ["Dyson School of Design Engineering", "Aeronautics"],
+    "fons": ["Physics", "Chemistry"],
+}
+
+
+def get_faculty_choices() -> Iterable[tuple[str, str]]:
+    """Get the available faculties."""
+    return [("", "--------")] + [(id_, name) for name, id_ in FACULTIES.items()]
+
+
+def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
+    """Get the available departments for the chosen faculty."""
+    return [("", "--------")] + [
+        (DEPARTMENTS[name], name) for name in DEPARTMENTS_IN_FACULTY[faculty_id]
+    ]
+
+
+def get_initial_department_choices() -> Iterable[tuple[str, str]]:
+    """Get all the initial departments in tuple form."""
+    return [("", "--------")] + [(id_, name) for name, id_ in DEPARTMENTS.items()]
+
+
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project = forms.ChoiceField(choices=get_project_choices)
-    faculty = forms.CharField()
-    department = forms.CharField()
+    project = forms.ChoiceField(
+        choices=get_project_choices,
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+    )
+    faculty = forms.ChoiceField(
+        choices=get_faculty_choices,
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+    )
+    department = forms.ChoiceField(
+        choices=get_initial_department_choices,
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+    )
     end_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}),
         validators=[MinValueValidator(timezone.now().date())],
