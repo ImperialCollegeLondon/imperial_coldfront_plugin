@@ -81,6 +81,8 @@ def get_faculty_choices() -> Iterable[tuple[str, str]]:
 
 def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
     """Get the available departments for the chosen faculty."""
+    if not faculty_id or faculty_id not in DEPARTMENTS_IN_FACULTY:
+        return [("", "--------")]
     return [("", "--------")] + [
         (DEPARTMENTS[name], name) for name in DEPARTMENTS_IN_FACULTY[faculty_id]
     ]
