@@ -2,6 +2,7 @@
 
 from django.db import migrations
 
+
 def add_rdf_resource_type(apps, schema_editor):
     Resource = apps.get_model("resource", "Resource")
     ResourceType = apps.get_model("resource", "ResourceType")
@@ -21,7 +22,7 @@ def add_rdf_resource_type(apps, schema_editor):
             is_public=True,
             requires_payment=False,
             resource_type=storage_resource_type,
-        )
+        ),
     )
 
     text_attribute_type, _ = AttributeType.objects.get_or_create(name="Text")
@@ -32,18 +33,25 @@ def add_rdf_resource_type(apps, schema_editor):
             is_unique=True,
             is_private=True,
             is_changeable=False,
-        )
+        ),
     )
 
-
+    AllocationAttributeType.objects.get_or_create(
+        name="DART ID",
+        defaults=dict(
+            attribute_type=text_attribute_type,
+            is_unique=True,
+            is_changeable=False,
+        ),
+    )
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('imperial_coldfront_plugin', '0009_schedule_expiry_notification'),
-        ('resource', '0002_auto_20191017_1141'),
-        ('allocation', '0005_auto_20211117_1413'),
+        ("imperial_coldfront_plugin", "0009_schedule_expiry_notification"),
+        ("resource", "0002_auto_20191017_1141"),
+        ("allocation", "0005_auto_20211117_1413"),
     ]
 
     operations = [

@@ -846,6 +846,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         size = 10
         faculty = "faculty"
         department = "department"
+        dart_id = "dart_id"
         response = superuser_client.post(
             self._get_url(),
             data=dict(
@@ -854,6 +855,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 size=size,
                 department=department,
                 faculty=faculty,
+                dart_id=dart_id,
             ),
         )
         assertRedirects(response, reverse("home"), fetch_redirect_response=False)
@@ -881,6 +883,11 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             allocation_attribute_type__name="RDF Project ID",
             allocation=allocation,
             value=format_project_number_to_id(1),
+        )
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="DART ID",
+            allocation=allocation,
+            value=dart_id,
         )
         AllocationUser.objects.get(
             allocation=allocation, user=pi_project.pi, status__name="Active"
