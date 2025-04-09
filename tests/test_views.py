@@ -844,8 +844,8 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         """Test successful project creation."""
         end_date = timezone.datetime.max.date()
         size = 10
-        faculty = "faculty"
-        department = "department"
+        faculty = "foe"
+        department = "dsde"
         dart_id = "dart_id"
         response = superuser_client.post(
             self._get_url(),
