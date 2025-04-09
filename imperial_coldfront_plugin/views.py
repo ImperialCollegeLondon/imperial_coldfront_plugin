@@ -643,6 +643,9 @@ def add_rdf_storage_allocation(request):
 @login_required
 def task_stat_view(request):
     """Displays a list of tasks and their status."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
     task_qs = Task.objects.all().order_by("started").reverse()
     return render(
         request, "imperial_coldfront_plugin/task_list.html", context={"tasks": task_qs}
