@@ -40,7 +40,9 @@ $("#id_faculty").change(function () {
 
     });
 
-    $('#id_faculty').trigger('change');
+    window.onload = function() {
+        $('#id_faculty').trigger('change');
+};
 
   </script>
 {% endblock content %}
