@@ -922,5 +922,34 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
 class TestTaskListView(LoginRequiredMixin):
     """Tests for the task_stat_view."""
 
-    def _get_url(self):
-        return reverse("imperial_coldfront_plugin:list_tasks")
+    def _get_url(self, group: str = "None"):
+        return reverse("imperial_coldfront_plugin:list_tasks", kwargs={"group": group})
+
+    def test_no_tasks_returned(self, superuser_client):
+        """Test that the tasks returned are none."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
+        assert len(response.context["tasks"]) == 0
+
+    def test_the_right_tasks_returned(self, superuser_client):
+        """Test that the tasks returned are the right ones."""
+        from datetime import datetime
+        from uuid import uuid4
+
+        from django_q.models import Task
+
+        for g in ["test", "test", "test", "other"]:
+            Task.objects.create(
+                id=uuid4(),
+                func="time.sleep",
+                args=[16],
+                started=datetime.now(),
+                stopped=datetime.now(),
+                group=g,
+            )
+
+        response = superuser_client.get(self._get_url("test"))
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
+        assert len(response.context["tasks"]) == 3
