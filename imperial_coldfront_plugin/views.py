@@ -547,6 +547,7 @@ def add_rdf_storage_allocation(request):
             storage_size_gb = form.cleaned_data["size"]
             faculty = form.cleaned_data["faculty"]
             department = form.cleaned_data["department"]
+            dart_id = form.cleaned_data["dart_id"]
 
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
                 name="RDF Project ID"
@@ -584,6 +585,15 @@ def add_rdf_storage_allocation(request):
                 allocation_attribute_type=rdf_id_attribute_type,
                 allocation=rdf_allocation,
                 value=project_id,
+            )
+
+            dart_id_attribute_type = AllocationAttributeType.objects.get(
+                name="DART ID", is_changeable=False
+            )
+            AllocationAttribute.objects.create(
+                allocation_attribute_type=dart_id_attribute_type,
+                allocation=rdf_allocation,
+                value=dart_id,
             )
 
             if settings.LDAP_ENABLED:
