@@ -255,7 +255,6 @@ class GPFSClient(Consumer):
                 return task_data
             raise
 
-    @check_job_status
     @json
     @get("filesystems/{filesystemName}/filesets/{filesetName}/quotas")
     def _retrieve_quota_usage(
@@ -274,8 +273,8 @@ class GPFSClient(Consumer):
         """Method (public) to retrieve the quota usage of a fileset.
 
         Args:
-            filesystem_name: Name of the filesystem where the quota will be set.
-            fileset_name: Name of the fileset to set the quota.
+            filesystem_name: Name of the filesystem to retrieve the quota usage from.
+            fileset_name: Name of the fileset to retrieve the quota usage from.
 
         Returns:
             The response after successfully retrieving the quota usage.
