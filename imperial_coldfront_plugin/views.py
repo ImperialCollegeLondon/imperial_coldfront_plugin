@@ -604,7 +604,7 @@ def add_rdf_storage_allocation(request):
             )
 
             chain.append(
-                "imperial_coldfront_plugin.models.AllocationUser.objects.create",
+                "coldfront.core.allocation.models.AllocationUser.objects.create",
                 allocation=rdf_allocation,
                 user=project.pi,
                 status=allocation_user_active_status,
