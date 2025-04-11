@@ -93,6 +93,22 @@ def get_initial_department_choices() -> Iterable[tuple[str, str]]:
     return [("", "--------")] + [(id_, name) for name, id_ in DEPARTMENTS.items()]
 
 
+def is_valid_faculty_department_combination(
+    faculty_id: str, department_id: str
+) -> bool:
+    """Check if the faculty and department combination is valid.
+
+    Args:
+        faculty_id: The ID of the faculty.
+        department_id: The ID of the department.
+
+    Returns:
+        bool: True if the combination is valid, False otherwise.
+    """
+    dep = {value: key for key, value in DEPARTMENTS.items()}.get(department_id)
+    return dep in DEPARTMENTS_IN_FACULTY.get(faculty_id, [])
+
+
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 

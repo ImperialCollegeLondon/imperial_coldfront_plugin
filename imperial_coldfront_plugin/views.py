@@ -44,6 +44,7 @@ from .forms import (
     TermsAndConditionsForm,
     UserSearchForm,
     get_department_choices,
+    is_valid_faculty_department_combination,
 )
 from .gpfs_client import create_fileset_set_quota_in_background
 from .ldap import ldap_create_group_in_background
@@ -548,6 +549,9 @@ def add_rdf_storage_allocation(request):
             faculty = form.cleaned_data["faculty"]
             department = form.cleaned_data["department"]
             dart_id = form.cleaned_data["dart_id"]
+
+            if not is_valid_faculty_department_combination(faculty, department):
+                return HttpResponseBadRequest("Invalid faculty/department combination.")
 
             rdf_id_attribute_type = AllocationAttributeType.objects.get(
                 name="RDF Project ID"
