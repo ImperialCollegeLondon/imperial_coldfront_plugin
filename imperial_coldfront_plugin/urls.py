@@ -60,4 +60,9 @@ urlpatterns = [
         views.add_rdf_storage_allocation,
         name="add_rdf_storage_allocation",
     ),
+    path(
+        "load_departments/",
+        views.load_departments,
+        name="load_departments",
+    ),
 ]
