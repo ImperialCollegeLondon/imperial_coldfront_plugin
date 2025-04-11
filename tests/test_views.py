@@ -829,9 +829,9 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], RDFAllocationForm)
 
-    @patch("imperial_coldfront_plugin.views.ldap_create_group_in_background")
+    @patch("imperial_coldfront_plugin.ldap._ldap_create_group")
     @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group_in_background")
-    @patch("imperial_coldfront_plugin.views.create_fileset_set_quota_in_background")
+    @patch("imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota")
     def test_post(
         self,
         gpfs_task_mock,
@@ -839,7 +839,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         ldap_create_group_mock,
         pi_project,
         superuser_client,
-        rdf_allocation_dependencies,
     ):
         """Test successful project creation."""
         end_date = timezone.datetime.max.date()
@@ -917,3 +916,39 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             files_quota=settings.GPFS_FILES_QUOTA,
             parent_fileset=faculty,
         )
+
+
+class TestTaskListView(LoginRequiredMixin):
+    """Tests for the task_stat_view."""
+
+    def _get_url(self, group: str = "None"):
+        return reverse("imperial_coldfront_plugin:list_tasks", kwargs={"group": group})
+
+    def test_no_tasks_returned(self, superuser_client):
+        """Test that the tasks returned are none."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
+        assert len(response.context["tasks"]) == 0
+
+    def test_the_right_tasks_returned(self, superuser_client):
+        """Test that the tasks returned are the right ones."""
+        from datetime import datetime
+        from uuid import uuid4
+
+        from django_q.models import Task
+
+        for g in ["test", "test", "test", "other"]:
+            Task.objects.create(
+                id=uuid4(),
+                func="time.sleep",
+                args=[16],
+                started=datetime.now(),
+                stopped=datetime.now(),
+                group=g,
+            )
+
+        response = superuser_client.get(self._get_url("test"))
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
+        assert len(response.context["tasks"]) == 3
