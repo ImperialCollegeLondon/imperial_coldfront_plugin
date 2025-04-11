@@ -637,7 +637,7 @@ def add_rdf_storage_allocation(request):
 
             group = chain.run()
             messages.success(request, "RDF allocation created successfully.")
-            return redirect("list_tasks", group=group)
+            return redirect("imperial_coldfront_plugin:list_tasks", group=group)
     else:
         form = RDFAllocationForm()
     return render(

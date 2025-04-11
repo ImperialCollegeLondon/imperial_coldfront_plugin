@@ -829,9 +829,9 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], RDFAllocationForm)
 
-    @patch("imperial_coldfront_plugin.views.ldap_create_group_in_background")
+    @patch("imperial_coldfront_plugin.ldap._ldap_create_group")
     @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group_in_background")
-    @patch("imperial_coldfront_plugin.views.create_fileset_set_quota_in_background")
+    @patch("imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota")
     def test_post(
         self,
         gpfs_task_mock,
@@ -839,7 +839,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         ldap_create_group_mock,
         pi_project,
         superuser_client,
-        rdf_allocation_dependencies,
     ):
         """Test successful project creation."""
         end_date = timezone.datetime.max.date()
