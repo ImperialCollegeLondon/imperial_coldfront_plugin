@@ -12,6 +12,7 @@ from django.core.signing import TimestampSigner
 from django.shortcuts import render, reverse
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django_q.tasks import Chain
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
@@ -19,6 +20,7 @@ from imperial_coldfront_plugin.forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
+from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
 from imperial_coldfront_plugin.models import ResearchGroup, UnixUID
 from imperial_coldfront_plugin.views import (
     format_project_number_to_id,
@@ -829,24 +831,44 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], RDFAllocationForm)
 
-    @patch("imperial_coldfront_plugin.views.ldap_create_group_in_background")
+    @pytest.fixture
+    def post_ldap_conn_mock(self, mocker):
+        """Mock LDAP connection for test_post method.
+
+        Because we pass _ldap_create_group directly to the Django Q Chain
+        we can't mock the function as Django Q encounters an error pickling the mock.
+        Instead for this function we mock out the ldap connection and check the raw
+        arguments passed to it.
+        """
+        ldap_conn_mock = mocker.patch("imperial_coldfront_plugin.ldap.Connection")
+        ldap_conn_mock().add.return_value = True, [[]], None, None
+
+        return ldap_conn_mock
+
+    @patch("imperial_coldfront_plugin.views.Chain")
     @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group_in_background")
-    @patch("imperial_coldfront_plugin.views.create_fileset_set_quota_in_background")
+    @patch("imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota")
     def test_post(
         self,
         gpfs_task_mock,
         ldap_add_member_mock,
-        ldap_create_group_mock,
+        chain_mock,
+        post_ldap_conn_mock,
         pi_project,
         superuser_client,
         rdf_allocation_dependencies,
     ):
         """Test successful project creation."""
+        # mock the chain to inject the group value to check the redirect later
+        chain_group = "chain_group"
+        chain_mock.return_value = Chain(cached=True, group=chain_group)
         end_date = timezone.datetime.max.date()
         size = 10
         faculty = "faculty"
         department = "department"
         dart_id = "dart_id"
+        group_name = get_next_rdf_project_id()
+
         response = superuser_client.post(
             self._get_url(),
             data=dict(
@@ -858,7 +880,11 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 dart_id=dart_id,
             ),
         )
-        assertRedirects(response, reverse("home"), fetch_redirect_response=False)
+        assertRedirects(
+            response,
+            reverse("imperial_coldfront_plugin:list_tasks", args=[chain_group]),
+            fetch_redirect_response=False,
+        )
 
         project_id = format_project_number_to_id(1)
         from coldfront.core.allocation.models import (
@@ -892,7 +918,15 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         AllocationUser.objects.get(
             allocation=allocation, user=pi_project.pi, status__name="Active"
         )
-        ldap_create_group_mock.assert_called_once_with(project_id)
+        post_ldap_conn_mock().add.assert_called_once_with(
+            group_dn_from_name(group_name),
+            object_class=["top", "group"],
+            attributes=dict(
+                cn=group_name,
+                groupType=LDAP_GROUP_TYPE,
+                sAMAccountName=group_name,
+            ),
+        )
         ldap_add_member_mock.assert_called_once_with(
             project_id, pi_project.pi.username, allow_already_present=True
         )
@@ -917,3 +951,39 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             files_quota=settings.GPFS_FILES_QUOTA,
             parent_fileset=faculty,
         )
+
+
+class TestTaskListView(LoginRequiredMixin):
+    """Tests for the task_stat_view."""
+
+    def _get_url(self, group: str = "None"):
+        return reverse("imperial_coldfront_plugin:list_tasks", kwargs={"group": group})
+
+    def test_no_tasks_returned(self, superuser_client):
+        """Test that the tasks returned are none."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
+        assert len(response.context["tasks"]) == 0
+
+    def test_the_right_tasks_returned(self, superuser_client):
+        """Test that the tasks returned are the right ones."""
+        from datetime import datetime
+        from uuid import uuid4
+
+        from django_q.models import Task
+
+        for g in ["test", "test", "test", "other"]:
+            Task.objects.create(
+                id=uuid4(),
+                func="time.sleep",
+                args=[16],
+                started=datetime.now(),
+                stopped=datetime.now(),
+                group=g,
+            )
+
+        response = superuser_client.get(self._get_url("test"))
+        assert response.status_code == HTTPStatus.OK
+        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
+        assert len(response.context["tasks"]) == 3
