@@ -623,7 +623,7 @@ def add_rdf_storage_allocation(request):
 
                 chain.append(
                     "imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota",
-                    settings.GPFS_FILESYSTEM_NAME,
+                    filesystem_name=settings.GPFS_FILESYSTEM_NAME,
                     owner_id="root",
                     group_id="root",
                     fileset_name=project_id,
