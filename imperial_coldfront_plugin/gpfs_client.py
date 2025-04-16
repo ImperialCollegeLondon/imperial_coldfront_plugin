@@ -255,6 +255,50 @@ class GPFSClient(Consumer):
                 return task_data
             raise
 
+    @json
+    @get("filesystems/{filesystemName}/filesets/{filesetName}/quotas")
+    def _retrieve_quota_usage(
+        self,
+        filesystemName: str,
+        filesetName: str,
+    ) -> requests.Response:
+        """Method (private) to retrieve the quota usage of a fileset."""
+        pass
+
+    def retrieve_quota_usage(
+        self,
+        filesystem_name: str,
+        fileset_name: str,
+    ) -> requests.Response:
+        """Method (public) to retrieve the quota usage of a fileset.
+
+        Args:
+            filesystem_name: Name of the filesystem to retrieve the quota usage from.
+            fileset_name: Name of the fileset to retrieve the quota usage from.
+
+        Returns:
+            The block and files usage values.
+        """
+        response = self._retrieve_quota_usage(
+            filesystemName=filesystem_name, filesetName=fileset_name
+        )
+        data = response.json()
+
+        block_usage = data["quotas"][0][
+            "blockUsage"
+        ]  # denotes the "Usage": Current capacity quota usage.
+
+        files_usage = data["quotas"][0][
+            "filesUsage"
+        ]  # denotes the "Number of files in usage": Number of inodes.
+
+        retrieved_data = {
+            "block_usage": block_usage,
+            "files_usage": files_usage,
+        }
+
+        return retrieved_data
+
 
 class FilesetCreationError(Exception):
     """Raised when a problem is encountered when creating a fileset."""
