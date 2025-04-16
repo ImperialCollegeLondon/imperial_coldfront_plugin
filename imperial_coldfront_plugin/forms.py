@@ -6,6 +6,7 @@ This module contains form classes used for research group management.
 from collections.abc import Iterable
 
 from django import forms
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 
@@ -60,23 +61,23 @@ def get_project_choices():
 
 
 DEPARTMENTS = {
-    "Physics": "physics",
-    "Dyson School of Design Engineering": "dsde",
-    "Chemistry": "chemistry",
-    "Aeronautics": "aero",
+    "physics": "Physics",
+    "dsde": "Dyson School of Design Engineering",
+    "chemistry": "Chemistry",
+    "aero": "Aeronautics",
 }
 
-FACULTIES = {"Faculty of Engineering": "foe", "Faculty of Natural Sciences": "fons"}
+FACULTIES = {"foe": "Faculty of Engineering", "fons": "Faculty of Natural Sciences"}
 
 DEPARTMENTS_IN_FACULTY = {
-    "foe": ["Dyson School of Design Engineering", "Aeronautics"],
-    "fons": ["Physics", "Chemistry"],
+    "foe": ["dsde", "aero"],
+    "fons": ["physics", "chemistry"],
 }
 
 
 def get_faculty_choices() -> Iterable[tuple[str, str]]:
     """Get the available faculties."""
-    return [("", "--------")] + [(id_, name) for name, id_ in FACULTIES.items()]
+    return [("", "--------"), *FACULTIES.items()]
 
 
 def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
@@ -84,29 +85,13 @@ def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
     if not faculty_id or faculty_id not in DEPARTMENTS_IN_FACULTY:
         return [("", "--------")]
     return [("", "--------")] + [
-        (DEPARTMENTS[name], name) for name in DEPARTMENTS_IN_FACULTY[faculty_id]
+        (id_, DEPARTMENTS[id_]) for id_ in DEPARTMENTS_IN_FACULTY[faculty_id]
     ]
 
 
 def get_initial_department_choices() -> Iterable[tuple[str, str]]:
     """Get all the initial departments in tuple form."""
-    return [("", "--------")] + [(id_, name) for name, id_ in DEPARTMENTS.items()]
-
-
-def is_valid_faculty_department_combination(
-    faculty_id: str, department_id: str
-) -> bool:
-    """Check if the faculty and department combination is valid.
-
-    Args:
-        faculty_id: The ID of the faculty.
-        department_id: The ID of the department.
-
-    Returns:
-        bool: True if the combination is valid, False otherwise.
-    """
-    dep = {value: key for key, value in DEPARTMENTS.items()}.get(department_id)
-    return dep in DEPARTMENTS_IN_FACULTY.get(faculty_id, [])
+    return [("", "--------"), *DEPARTMENTS.items()]
 
 
 class RDFAllocationForm(forms.Form):
@@ -135,3 +120,15 @@ class RDFAllocationForm(forms.Form):
         help_text="The associated DART entry.",
         disabled=False,
     )
+
+    def clean(self) -> bool:
+        """Check if the faculty and department combination is valid.
+
+        Raises:
+            ValidationError: If the combination is invalid.
+        """
+        cleaned_data = super().clean()
+        faculty_id = cleaned_data["faculty"]
+        department_id = cleaned_data["department"]
+        if department_id not in DEPARTMENTS_IN_FACULTY[faculty_id]:
+            raise ValidationError("Invalid faculty and department combination.")
