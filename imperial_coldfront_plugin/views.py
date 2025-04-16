@@ -9,7 +9,6 @@ from coldfront.core.allocation.models import (
     AllocationAttribute,
     AllocationAttributeType,
     AllocationStatusChoice,
-    AllocationUser,
     AllocationUserStatusChoice,
 )
 from coldfront.core.project.models import Project
@@ -30,6 +29,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django_q.tasks import Chain, Task
 
 from .emails import (
     send_group_access_granted_email,
@@ -45,8 +45,6 @@ from .forms import (
     UserSearchForm,
     get_department_choices,
 )
-from .gpfs_client import create_fileset_set_quota_in_background
-from .ldap import ldap_create_group_in_background
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
 from .policy import (
@@ -596,13 +594,18 @@ def add_rdf_storage_allocation(request):
                 value=dart_id,
             )
 
+            chain = Chain(cached=True)
             if settings.LDAP_ENABLED:
-                ldap_create_group_in_background(project_id)
+                chain.append(
+                    "imperial_coldfront_plugin.ldap._ldap_create_group", project_id
+                )
 
             allocation_user_active_status = AllocationUserStatusChoice.objects.get(
                 name="Active"
             )
-            AllocationUser.objects.create(
+
+            chain.append(
+                "coldfront.core.allocation.models.AllocationUser.objects.create",
                 allocation=rdf_allocation,
                 user=project.pi,
                 status=allocation_user_active_status,
@@ -618,7 +621,9 @@ def add_rdf_storage_allocation(request):
                     department,
                     project.pi.username,
                 )
-                create_fileset_set_quota_in_background(
+
+                chain.append(
+                    "imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota",
                     filesystem_name=settings.GPFS_FILESYSTEM_NAME,
                     owner_id="root",
                     group_id="root",
@@ -631,8 +636,9 @@ def add_rdf_storage_allocation(request):
                     parent_fileset=faculty,
                 )
 
+            group = chain.run()
             messages.success(request, "RDF allocation created successfully.")
-            return redirect("home")
+            return redirect("imperial_coldfront_plugin:list_tasks", group=group)
     else:
         form = RDFAllocationForm()
     return render(
@@ -648,4 +654,16 @@ def load_departments(request):
         request,
         "imperial_coldfront_plugin/departments_list.html",
         {"departments": departments},
+    )
+
+
+@login_required
+def task_stat_view(request, group: str):
+    """Displays a list of tasks and their status."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    task_qs = Task.objects.filter(group=group).order_by("started").reverse()
+    return render(
+        request, "imperial_coldfront_plugin/task_list.html", context={"tasks": task_qs}
     )
