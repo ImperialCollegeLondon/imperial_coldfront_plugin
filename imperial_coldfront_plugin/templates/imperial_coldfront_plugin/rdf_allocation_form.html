@@ -7,7 +7,9 @@
         <h2>RDF Allocation Request</h2>
       </div>
       <div class="card-body">
-        <form method="post">
+        <form method="post"
+              id="allocation_form"
+              departments-url="{% url 'imperial_coldfront_plugin:load_departments' %}">
           {% csrf_token %}
           {{ form|crispy }}
           <div class="mt-4">
@@ -17,4 +19,33 @@
       </div>
     </div>
   </div>
+  <script>
+    // Enable Select2 for the select elements
+    $(document).ready(function() {
+    $('.js-example-basic-single').select2();
+});
+
+    // When the faculty select changes, update the department selection
+$("#id_faculty").change(function () {
+      var url = $("#allocation_form").attr("departments-url");
+      var faculty = $(this).val();
+
+      $.ajax({                       // initialize an AJAX request
+        url: url,                    // set the url of the request
+        data: {
+          'faculty': faculty         // add the faculty to the GET parameters
+        },
+        success: function (data) {   // `data` is the return of the `load_departments` view function
+          $("#id_department").html(data);  // replace the contents of the department input with the data that came from the server
+        }
+      });
+
+    });
+
+    // Trigger the change event on page load to populate the department field based on the selected faculty
+    window.onload = function() {
+        $('#id_faculty').trigger('change');
+};
+
+  </script>
 {% endblock content %}

@@ -3,7 +3,10 @@
 This module contains form classes used for research group management.
 """
 
+from collections.abc import Iterable
+
 from django import forms
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 
@@ -57,12 +60,55 @@ def get_project_choices():
     ]
 
 
+DEPARTMENTS = {
+    "physics": "Physics",
+    "dsde": "Dyson School of Design Engineering",
+    "chemistry": "Chemistry",
+    "aero": "Aeronautics",
+}
+
+FACULTIES = {"foe": "Faculty of Engineering", "fons": "Faculty of Natural Sciences"}
+
+DEPARTMENTS_IN_FACULTY = {
+    "foe": ["dsde", "aero"],
+    "fons": ["physics", "chemistry"],
+}
+
+
+def get_faculty_choices() -> Iterable[tuple[str, str]]:
+    """Get the available faculties."""
+    return [("", "--------"), *FACULTIES.items()]
+
+
+def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
+    """Get the available departments for the chosen faculty."""
+    if not faculty_id or faculty_id not in DEPARTMENTS_IN_FACULTY:
+        return [("", "--------")]
+    return [("", "--------")] + [
+        (id_, DEPARTMENTS[id_]) for id_ in DEPARTMENTS_IN_FACULTY[faculty_id]
+    ]
+
+
+def get_initial_department_choices() -> Iterable[tuple[str, str]]:
+    """Get all the initial departments in tuple form."""
+    return [("", "--------"), *DEPARTMENTS.items()]
+
+
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project = forms.ChoiceField(choices=get_project_choices)
-    faculty = forms.CharField()
-    department = forms.CharField()
+    project = forms.ChoiceField(
+        choices=get_project_choices,
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+    )
+    faculty = forms.ChoiceField(
+        choices=get_faculty_choices,
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+    )
+    department = forms.ChoiceField(
+        choices=get_initial_department_choices,
+        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+    )
     end_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}),
         validators=[MinValueValidator(timezone.now().date())],
@@ -74,3 +120,15 @@ class RDFAllocationForm(forms.Form):
         help_text="The associated DART entry.",
         disabled=False,
     )
+
+    def clean(self) -> bool:
+        """Check if the faculty and department combination is valid.
+
+        Raises:
+            ValidationError: If the combination is invalid.
+        """
+        cleaned_data = super().clean()
+        faculty_id = cleaned_data["faculty"]
+        department_id = cleaned_data["department"]
+        if department_id not in DEPARTMENTS_IN_FACULTY[faculty_id]:
+            raise ValidationError("Invalid faculty and department combination.")

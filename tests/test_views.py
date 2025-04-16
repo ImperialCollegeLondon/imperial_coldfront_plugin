@@ -864,8 +864,8 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         chain_mock.return_value = Chain(cached=True, group=chain_group)
         end_date = timezone.datetime.max.date()
         size = 10
-        faculty = "faculty"
-        department = "department"
+        faculty = "foe"
+        department = "dsde"
         dart_id = "dart_id"
         group_name = get_next_rdf_project_id()
 
@@ -951,6 +951,32 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             files_quota=settings.GPFS_FILES_QUOTA,
             parent_fileset=faculty,
         )
+
+    class TestLoadDepartmentsView:
+        """Tests for the load_departments view."""
+
+        def _get_url(self):
+            return reverse("imperial_coldfront_plugin:load_departments")
+
+        def test_get_departments(self, client, mocker):
+            """Test that the view returns the list of departments."""
+            faculty = "Engineering"
+            mock_get_department_choices = mocker.patch(
+                "imperial_coldfront_plugin.views.get_department_choices"
+            )
+            mock_get_department_choices.return_value = [
+                "Computer Science",
+                "Mechanical",
+            ]
+
+            response = client.get(self._get_url(), {"faculty": faculty})
+
+            assert response.status_code == HTTPStatus.OK
+            assertTemplateUsed(
+                response, "imperial_coldfront_plugin/departments_list.html"
+            )
+            assert response.context["departments"] == ["Computer Science", "Mechanical"]
+            mock_get_department_choices.assert_called_once_with(faculty)
 
 
 class TestTaskListView(LoginRequiredMixin):
