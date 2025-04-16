@@ -277,11 +277,27 @@ class GPFSClient(Consumer):
             fileset_name: Name of the fileset to retrieve the quota usage from.
 
         Returns:
-            The response after successfully retrieving the quota usage.
+            The block and files usage values.
         """
-        return self._retrieve_quota_usage(
+        response = self._retrieve_quota_usage(
             filesystemName=filesystem_name, filesetName=fileset_name
         )
+        data = response.json()
+
+        block_usage = data["quotas"][0][
+            "blockUsage"
+        ]  # denotes the "Usage": Current capacity quota usage.
+
+        files_usage = data["quotas"][0][
+            "filesUsage"
+        ]  # denotes the "Number of files in usage": Number of inodes.
+
+        retrieved_data = {
+            "block_usage": block_usage,
+            "files_usage": files_usage,
+        }
+
+        return retrieved_data
 
 
 class FilesetCreationError(Exception):
