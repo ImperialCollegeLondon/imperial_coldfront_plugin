@@ -3,7 +3,6 @@
 from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
-from random import randint
 from unittest.mock import patch
 
 import pytest
@@ -21,7 +20,7 @@ from imperial_coldfront_plugin.forms import (
     UserSearchForm,
 )
 from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
-from imperial_coldfront_plugin.models import ResearchGroup, UnixUID
+from imperial_coldfront_plugin.models import ResearchGroup
 from imperial_coldfront_plugin.views import (
     format_project_number_to_id,
     get_next_rdf_project_id,
@@ -391,59 +390,6 @@ class TestRemoveGroupMemberView(LoginRequiredMixin, GroupMembershipPKMixin):
                 args=[group_membership.group.pk],
             ),
         )
-
-
-class TestGetActiveUsersView:
-    """Tests for the get active users view."""
-
-    def _get_url(self):
-        return reverse("imperial_coldfront_plugin:get_active_users")
-
-    def test_user(self, auth_client_factory, research_group_factory):
-        """Test the get_active_users view returns the right data."""
-        group, memberships = research_group_factory(number_of_members=1)
-        user = memberships[0].member
-        user_uid = UnixUID.objects.create(user=user, identifier=randint(0, 100000))
-        UnixUID.objects.create(user=group.owner, identifier=randint(0, 100000))
-
-        response = auth_client_factory(user).get(self._get_url())
-        assert response.status_code == HTTPStatus.OK
-        expected = bytes(
-            f"{user.username}:x:{user_uid.identifier}:{group.gid}:"
-            f"{user.first_name} {user.last_name}:"
-            f"/rds/general/user/{user.username}/home:/bin/bash",
-            "utf-8",
-        )
-        psswd_list = response.content.split(b"\n")
-        assert len(psswd_list) == 3
-        assert psswd_list[0] == expected
-
-    def test_owner(self, auth_client_factory, research_group_factory):
-        """Test the get_active_users view returns the right data."""
-        group, memberships = research_group_factory(number_of_members=0)
-        owner_uid = UnixUID.objects.create(
-            user=group.owner, identifier=randint(0, 100000)
-        )
-
-        response = auth_client_factory(group.owner).get(self._get_url())
-        assert response.status_code == HTTPStatus.OK
-        expected = bytes(
-            f"{group.owner.username}:x:{owner_uid.identifier}:{group.gid}:"
-            f"{group.owner.first_name} {group.owner.last_name}:"
-            f"/rds/general/user/{group.owner.username}/home:/bin/bash",
-            "utf-8",
-        )
-        psswd_list = response.content.split(b"\n")
-        assert len(psswd_list) == 2
-        assert psswd_list[0] == expected
-
-    def test_no_unixuid(self, auth_client_factory, research_group_factory):
-        """Test the get_active_users view returns the right data."""
-        group, memberships = research_group_factory(number_of_members=1)
-
-        response = auth_client_factory(group.owner).get(self._get_url())
-        assert response.status_code == HTTPStatus.OK
-        assert b"" == response.content
 
 
 class TestGetGroupDataView:
