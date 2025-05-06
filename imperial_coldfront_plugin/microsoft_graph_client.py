@@ -101,11 +101,6 @@ class MicrosoftGraphClient(Consumer):
         """Get the profile data for a user."""
         pass
 
-    @response_handler(get_uid_from_response)
-    @get("users/{username}@ic.ac.uk?$select=onPremisesExtensionAttributes")
-    def user_uid(self, username: str):
-        """Get the Unix uid for a user."""
-
     @response_handler(parse_profile_data_list)
     @headers(dict(ConsistencyLevel="eventual"))
     @get("users?$search={query}&$select=" + PROFILE_ATTRIBUTES)

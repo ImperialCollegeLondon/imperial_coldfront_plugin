@@ -5,9 +5,6 @@ from typing import Any
 from django.contrib.auth.models import User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
-from .microsoft_graph_client import get_graph_api_client
-from .models import UnixUID
-
 
 def _update_user(user: User, claims: dict[str, Any]) -> None:
     user.username = claims["preferred_username"]
@@ -28,7 +25,6 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         """
         user = super().create_user(claims)
         _update_user(user, claims)
-        UnixUID.objects.create(user=user, identifier=claims["uid"])
         return user
 
     def update_user(self, user: User, claims: dict[str, Any]) -> User:
@@ -58,7 +54,4 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user_info = super().get_userinfo(access_token, id_token, payload)
         username = payload["preferred_username"].removesuffix("@ic.ac.uk")
         user_info["preferred_username"] = username
-
-        graph_client = get_graph_api_client(access_token)
-        user_info["uid"] = graph_client.user_uid(username)
         return user_info

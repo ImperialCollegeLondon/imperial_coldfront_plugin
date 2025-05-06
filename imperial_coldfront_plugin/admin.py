@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import GroupMembership, ResearchGroup, UnixUID
+from .models import GroupMembership, ResearchGroup
 
 
 @admin.register(ResearchGroup)
@@ -17,10 +17,3 @@ class GroupMembershipAdmin(admin.ModelAdmin):
     """Admin configuration for the GroupMembership model."""
 
     pass
-
-
-@admin.register(UnixUID)
-class UnixUIDAdmin(admin.ModelAdmin):
-    """Admin configuration for the UnixUID model."""
-
-    list_display = ("identifier", "user")
