@@ -531,7 +531,12 @@ def add_rdf_storage_allocation(request):
                 title=f"{user.get_full_name()}'s Research Group",
                 status=ProjectStatusChoice.objects.get(name="Active"),
             )
-
+            ProjectUserStatus.objects.create(
+                user=user,
+                project=project,
+                role=ProjectUserRoleChoice.objects.get(name="Manager"),
+                status=ProjectUserStatusChoice.objects.get(name="Active"),
+           )
             rdf_allocation = Allocation.objects.create(
                 project=project,
                 status=allocation_active_status,
