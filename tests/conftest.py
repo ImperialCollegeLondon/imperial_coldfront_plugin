@@ -385,7 +385,7 @@ def rdf_allocation(pi_project, rdf_allocation_dependencies, rdf_allocation_proje
     )
     from coldfront.core.resource.models import Resource
 
-    rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
+    rdf_resource = Resource.objects.get(name="RDF Active")
     rdf_id_attribute_type = AllocationAttributeType.objects.get(name="RDF Project ID")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
