@@ -97,9 +97,8 @@ def get_initial_department_choices() -> Iterable[tuple[str, str]]:
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project = forms.ChoiceField(
-        choices=get_project_choices,
-        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+    username = forms.CharField(
+        help_text="Name of the user associated to this allocation.",
     )
     faculty = forms.ChoiceField(
         choices=get_faculty_choices,

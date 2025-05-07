@@ -11,7 +11,7 @@ from coldfront.core.allocation.models import (
     AllocationStatusChoice,
     AllocationUserStatusChoice,
 )
-from coldfront.core.project.models import Project
+from coldfront.core.project.models import Project, ProjectStatusChoice
 from coldfront.core.resource.models import Resource
 from coldfront.core.user.utils import UserSearch
 from django.conf import settings
@@ -524,7 +524,14 @@ def add_rdf_storage_allocation(request):
             rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
 
             allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-            project = get_object_or_404(Project, pk=form.cleaned_data["project"])
+
+            user = get_or_create_user(form.cleaned_data["username"])
+            project = Project.objects.get_or_create(
+                pi=user,
+                title=user.username,
+                status=ProjectStatusChoice.objects.get(name="Active"),
+            )
+
             rdf_allocation = Allocation.objects.create(
                 project=project,
                 status=allocation_active_status,
@@ -631,3 +638,26 @@ def task_stat_view(request, group: str):
     return render(
         request, "imperial_coldfront_plugin/task_list.html", context={"tasks": task_qs}
     )
+
+
+def get_or_create_user(username: str) -> User:
+    """Get user from the database or creates one using data from Graph.
+
+    Args:
+        username: The username of the user to be retrieved or created.
+
+    Return:
+        The user, already existing or newly created.
+    """
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        client = get_graph_api_client()
+        user_data = client.user_profile(username)
+        user = User.objects.create(
+            username=user_data["username"],
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
+            email=user_data["email"],
+        )
+    return user
