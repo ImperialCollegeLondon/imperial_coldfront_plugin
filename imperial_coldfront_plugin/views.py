@@ -11,7 +11,13 @@ from coldfront.core.allocation.models import (
     AllocationStatusChoice,
     AllocationUserStatusChoice,
 )
-from coldfront.core.project.models import Project, ProjectStatusChoice
+from coldfront.core.project.models import (
+    Project,
+    ProjectStatusChoice,
+    ProjectUser,
+    ProjectUserRoleChoice,
+    ProjectUserStatusChoice,
+)
 from coldfront.core.resource.models import Resource
 from coldfront.core.user.utils import UserSearch
 from django.conf import settings
@@ -525,18 +531,21 @@ def add_rdf_storage_allocation(request):
 
             allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
 
+            # We create a new user and an associated project, if they don't exist.
             user = get_or_create_user(form.cleaned_data["username"])
-            project = Project.objects.get_or_create(
+            project, project_created = Project.objects.get_or_create(
                 pi=user,
                 title=f"{user.get_full_name()}'s Research Group",
                 status=ProjectStatusChoice.objects.get(name="Active"),
             )
-            ProjectUserStatus.objects.create(
-                user=user,
-                project=project,
-                role=ProjectUserRoleChoice.objects.get(name="Manager"),
-                status=ProjectUserStatusChoice.objects.get(name="Active"),
-            )
+            if project_created:
+                ProjectUser.objects.create(
+                    user=user,
+                    project=project,
+                    role=ProjectUserRoleChoice.objects.get(name="Manager"),
+                    status=ProjectUserStatusChoice.objects.get(name="Active"),
+                )
+
             rdf_allocation = Allocation.objects.create(
                 project=project,
                 status=allocation_active_status,
