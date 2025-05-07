@@ -17,5 +17,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(add_expiry_email_notification_task),
+        # migrations.RunPython(add_expiry_email_notification_task),
     ]
