@@ -14,9 +14,9 @@ def add_rdf_resource_type(apps, schema_editor):
         defaults=dict(description="NAS storage"),
     )
     Resource.objects.get_or_create(
-        name="RDF Project Storage Space",
+        name="RDF Active",
         defaults=dict(
-            description="Storage space associated with a project on the RDF.",
+            description="Storage space associated with a research group on the RDF.",
             is_allocatable=False,
             is_available=True,
             is_public=True,

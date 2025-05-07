@@ -521,7 +521,7 @@ def add_rdf_storage_allocation(request):
             ):
                 raise ValueError("RDF project with ID already exists.")
 
-            rdf_resource = Resource.objects.get(name="RDF Project Storage Space")
+            rdf_resource = Resource.objects.get(name="RDF Active")
 
             allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
             project = get_object_or_404(Project, pk=form.cleaned_data["project"])

@@ -138,7 +138,7 @@ def check_ldap_consistency():
     """Check the consistency of LDAP groups with the database."""
     discrepancies = []
     allocations = Allocation.objects.filter(
-        resources__name="RDF Project Storage Space",
+        resources__name="RDF Active",
         status__name="Active",
         allocationattribute__allocation_attribute_type__name="RDF Project ID",
     ).distinct()
