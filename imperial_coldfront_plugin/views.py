@@ -528,7 +528,7 @@ def add_rdf_storage_allocation(request):
             user = get_or_create_user(form.cleaned_data["username"])
             project = Project.objects.get_or_create(
                 pi=user,
-                title=user.username,
+                title=f"{user.get_full_name()}'s Research Group",
                 status=ProjectStatusChoice.objects.get(name="Active"),
             )
 
