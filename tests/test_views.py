@@ -959,3 +959,40 @@ class TestTaskListView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
         assert len(response.context["tasks"]) == 3
+
+
+def test_get_or_create_project(pi):
+    """Test get_or_create_project function."""
+    from coldfront.core.project.models import (
+        Project,
+        ProjectStatusChoice,
+        ProjectUser,
+        ProjectUserRoleChoice,
+        ProjectUserStatusChoice,
+    )
+
+    from imperial_coldfront_plugin.views import get_or_create_project
+
+    assert not Project.objects.filter(pi=pi)
+    assert not ProjectStatusChoice.objects.filter(name="Active")
+    assert not ProjectUserRoleChoice.objects.filter(name="Manager")
+    assert not ProjectUserStatusChoice.objects.filter(name="Active")
+
+    project = get_or_create_project(pi)
+
+    assert project == Project.objects.get(pi=pi)
+    ProjectUser.objects.get(user=pi, project=project)
+    ProjectStatusChoice.objects.get(name="Active")
+    ProjectUserRoleChoice.objects.get(name="Manager")
+    ProjectUserStatusChoice.objects.get(name="Active")
+
+
+def test_get_or_create_user(
+    get_graph_api_client_mock, parsed_profile, django_user_model
+):
+    """Test get_or_create_user function."""
+    from imperial_coldfront_plugin.views import get_or_create_user
+
+    assert not django_user_model.objects.filter(username=parsed_profile["username"])
+    user = get_or_create_user(parsed_profile["username"])
+    assert user == django_user_model.objects.get(username=parsed_profile["username"])

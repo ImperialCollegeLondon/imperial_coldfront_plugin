@@ -678,7 +678,7 @@ def get_or_create_project(user: User) -> Project:
     project, project_created = Project.objects.get_or_create(
         pi=user,
         title=f"{user.get_full_name()}'s Research Group",
-        status=ProjectStatusChoice.objects.get(name="Active"),
+        status=ProjectStatusChoice.objects.get_or_create(name="Active")[0],
     )
     if project_created:
         ProjectUser.objects.create(
