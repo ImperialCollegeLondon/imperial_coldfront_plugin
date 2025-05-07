@@ -818,7 +818,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         response = superuser_client.post(
             self._get_url(),
             data=dict(
-                project=pi_project.pk,
+                username=pi_project.pi.username,
                 end_date=end_date,
                 size=size,
                 department=department,

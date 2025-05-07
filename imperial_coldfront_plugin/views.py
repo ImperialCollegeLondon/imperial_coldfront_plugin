@@ -533,18 +533,7 @@ def add_rdf_storage_allocation(request):
 
             # We create a new user and an associated project, if they don't exist.
             user = get_or_create_user(form.cleaned_data["username"])
-            project, project_created = Project.objects.get_or_create(
-                pi=user,
-                title=f"{user.get_full_name()}'s Research Group",
-                status=ProjectStatusChoice.objects.get(name="Active"),
-            )
-            if project_created:
-                ProjectUser.objects.create(
-                    user=user,
-                    project=project,
-                    role=ProjectUserRoleChoice.objects.get(name="Manager"),
-                    status=ProjectUserStatusChoice.objects.get(name="Active"),
-                )
+            project = get_or_create_project(user)
 
             rdf_allocation = Allocation.objects.create(
                 project=project,
@@ -675,3 +664,27 @@ def get_or_create_user(username: str) -> User:
             email=user_data["email"],
         )
     return user
+
+
+def get_or_create_project(user: User) -> Project:
+    """Get project from the database or creates one.
+
+    Args:
+        user: The user object that will own a project.
+
+    Return:
+        The project, already existing or newly created.
+    """
+    project, project_created = Project.objects.get_or_create(
+        pi=user,
+        title=f"{user.get_full_name()}'s Research Group",
+        status=ProjectStatusChoice.objects.get(name="Active"),
+    )
+    if project_created:
+        ProjectUser.objects.create(
+            user=user,
+            project=project,
+            role=ProjectUserRoleChoice.objects.get_or_create(name="Manager")[0],
+            status=ProjectUserStatusChoice.objects.get_or_create(name="Active")[0],
+        )
+    return project
