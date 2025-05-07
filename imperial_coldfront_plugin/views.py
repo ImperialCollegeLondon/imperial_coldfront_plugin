@@ -8,6 +8,7 @@ from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
     AllocationAttributeType,
+    AllocationAttributeUsage,
     AllocationStatusChoice,
     AllocationUserStatusChoice,
 )
@@ -541,16 +542,32 @@ def add_rdf_storage_allocation(request):
                 quantity=1,
                 start_date=timezone.now().date(),
                 end_date=form.cleaned_data["end_date"],
+                is_changeable=True,
             )
             rdf_allocation.resources.add(rdf_resource)
 
             storage_quota_attribute_type = AllocationAttributeType.objects.get(
                 name="Storage Quota (GB)"
             )
-            AllocationAttribute.objects.create(
+            quota_attribute = AllocationAttribute.objects.create(
                 allocation_attribute_type=storage_quota_attribute_type,
                 allocation=rdf_allocation,
                 value=storage_size_gb,
+            )
+            AllocationAttributeUsage.objects.create(
+                allocation_attribute=quota_attribute, value=0
+            )
+
+            files_quota_attribute_type = AllocationAttributeType.objects.get(
+                name="Files Quota"
+            )
+            files_attribute = AllocationAttribute.objects.create(
+                allocation_attribute_type=files_quota_attribute_type,
+                allocation=rdf_allocation,
+                value=settings.GPFS_FILES_QUOTA,
+            )
+            AllocationAttributeUsage.objects.create(
+                allocation_attribute=files_attribute, value=0
             )
 
             AllocationAttribute.objects.create(

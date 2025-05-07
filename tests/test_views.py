@@ -829,6 +829,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         from coldfront.core.allocation.models import (
             Allocation,
             AllocationAttribute,
+            AllocationAttributeUsage,
             AllocationUser,
         )
 
@@ -849,10 +850,21 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         )
 
         project_id = format_project_number_to_id(1)
-        AllocationAttribute.objects.get(
+        storage_attribute = AllocationAttribute.objects.get(
             allocation_attribute_type__name="Storage Quota (GB)",
             allocation=allocation,
             value=size,
+        )
+        AllocationAttributeUsage.objects.get(
+            allocation_attribute=storage_attribute, value=0
+        )
+        files_attribute = AllocationAttribute.objects.get(
+            allocation_attribute_type__name="Files Quota",
+            allocation=allocation,
+            value=settings.GPFS_FILES_QUOTA,
+        )
+        AllocationAttributeUsage.objects.get(
+            allocation_attribute=files_attribute, value=0
         )
         AllocationAttribute.objects.get(
             allocation_attribute_type__name="RDF Project ID",
