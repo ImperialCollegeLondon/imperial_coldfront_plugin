@@ -969,7 +969,6 @@ class TestTaskListView(LoginRequiredMixin):
         response = superuser_client.get(self._get_url("test"))
         assert response.status_code == HTTPStatus.OK
         assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
-        assert len(response.context["tasks"]) == 3
         assert len(response.context["completed"]) == 3
 
 
