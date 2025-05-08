@@ -963,6 +963,7 @@ class TestTaskListView(LoginRequiredMixin):
 
 def test_get_or_create_project(pi):
     """Test get_or_create_project function."""
+    from coldfront.core.field_of_science.models import FieldOfScience
     from coldfront.core.project.models import (
         Project,
         ProjectStatusChoice,
@@ -972,6 +973,8 @@ def test_get_or_create_project(pi):
     )
 
     from imperial_coldfront_plugin.views import get_or_create_project
+
+    FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
 
     assert not Project.objects.filter(pi=pi)
     assert not ProjectStatusChoice.objects.filter(name="Active")
