@@ -299,6 +299,30 @@ class GPFSClient(Consumer):
 
         return retrieved_data
 
+    @json
+    @get("filesystems/{filesystemName}/quotas")
+    def _retrieve_all_fileset_quotas(
+        self,
+        filesystemName: str,
+    ) -> requests.Response:
+        """Method (private) to retrieve the quotas of a filesystem."""
+
+    def retrieve_all_fileset_usages(self, filesystem_name: str):
+        """Get the quotas for all filesets.
+
+        Arguments:
+            filesystem_name: Name of the filesystem to retrieve the quota usage from.
+        """
+        data = self._retrieve_all_fileset_quotas(filesystem_name).json()
+        return {
+            quota["objectName"]: {
+                "files": quota["filesUsage"],
+                "block_gb": quota["blockUsage"] / 1024**2,
+            }
+            for quota in data["quotas"]
+            if quota["quotaType"] == "FILESET"
+        }
+
 
 class FilesetCreationError(Exception):
     """Raised when a problem is encountered when creating a fileset."""
