@@ -29,7 +29,8 @@ def get_new_gid() -> int:
 
     # Check each range to find the first available GID
     for gid_range in settings.GID_RANGES:
-        start, end = gid_range
+        start = gid_range.start
+        end = gid_range.stop
         if max_gid is None or max_gid < start:
             return start
 
