@@ -293,7 +293,7 @@ class GPFSClient(Consumer):
         ]  # denotes the "Number of files in usage": Number of inodes.
 
         retrieved_data = {
-            "block_usage": block_usage,
+            "block_usage_gb": block_usage / 1024**2,
             "files_usage": files_usage,
         }
 
