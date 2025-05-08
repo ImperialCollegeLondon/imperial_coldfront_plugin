@@ -17,7 +17,7 @@ def add_rdf_resource_type(apps, schema_editor):
         name="RDF Active",
         defaults=dict(
             description="Storage space associated with a research group on the RDF.",
-            is_allocatable=False,
+            is_allocatable=True,
             is_available=True,
             is_public=True,
             requires_payment=False,
@@ -40,7 +40,7 @@ def add_rdf_resource_type(apps, schema_editor):
         name="DART ID",
         defaults=dict(
             attribute_type=text_attribute_type,
-            is_unique=True,
+            is_unique=False,
             is_changeable=False,
         ),
     )
