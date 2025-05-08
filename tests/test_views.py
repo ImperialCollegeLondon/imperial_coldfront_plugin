@@ -19,6 +19,7 @@ from imperial_coldfront_plugin.forms import (
     TermsAndConditionsForm,
     UserSearchForm,
 )
+from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
 from imperial_coldfront_plugin.models import ResearchGroup
 from imperial_coldfront_plugin.views import (
@@ -814,6 +815,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         department = "dsde"
         dart_id = "1001"
         group_name = get_next_rdf_project_id()
+        gid = get_new_gid()
 
         response = superuser_client.post(
             self._get_url(),
@@ -824,6 +826,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 department=department,
                 faculty=faculty,
                 dart_id=dart_id,
+                gid=gid,
             ),
         )
         from coldfront.core.allocation.models import (
