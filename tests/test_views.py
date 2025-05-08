@@ -812,7 +812,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         size = 10
         faculty = "foe"
         department = "dsde"
-        dart_id = "dart_id"
+        dart_id = "1001"
         group_name = get_next_rdf_project_id()
 
         response = superuser_client.post(

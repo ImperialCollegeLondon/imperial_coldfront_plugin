@@ -70,3 +70,11 @@ def test_rdf_allocation_form_clean_invalid_combination(rdf_form_data):
     form = RDFAllocationForm(data=rdf_form_data)
     assert not form.is_valid()
     assert form.errors == dict(__all__=["Invalid faculty and department combination."])
+
+
+def test_rdf_allocation_form_invalid_dart_id(rdf_form_data):
+    """Test that validation is being applied to dart_id field."""
+    rdf_form_data["dart_id"] = "-1"
+    form = RDFAllocationForm(data=rdf_form_data)
+    assert not form.is_valid()
+    assert form.errors == dict(dart_id=["Dart ID outside valid range"])

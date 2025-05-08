@@ -10,6 +10,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 
+from .dart import DartIDValidationError, validate_dart_id
+
 
 class GroupMembershipForm(forms.Form):
     """Form for inviting a user to a research group."""
@@ -119,6 +121,15 @@ class RDFAllocationForm(forms.Form):
         help_text="The associated DART entry.",
         disabled=False,
     )
+
+    def clean_dart_id(self) -> str:
+        """Validate provided Dart ID."""
+        dart_id = self.cleaned_data["dart_id"]
+        try:
+            validate_dart_id(dart_id)
+        except DartIDValidationError as e:
+            raise ValidationError(e.args[0])
+        return dart_id
 
     def clean(self) -> bool:
         """Check if the faculty and department combination is valid.

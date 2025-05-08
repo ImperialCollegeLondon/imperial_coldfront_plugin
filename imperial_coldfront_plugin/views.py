@@ -38,6 +38,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django_q.tasks import Chain, Task
 
+from .dart import create_dart_id_attribute
 from .emails import (
     send_group_access_granted_email,
     send_group_invite_email,
@@ -576,14 +577,7 @@ def add_rdf_storage_allocation(request):
                 value=project_id,
             )
 
-            dart_id_attribute_type = AllocationAttributeType.objects.get(
-                name="DART ID", is_changeable=False
-            )
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=dart_id_attribute_type,
-                allocation=rdf_allocation,
-                value=dart_id,
-            )
+            create_dart_id_attribute(dart_id, rdf_allocation)
 
             chain = Chain()
             if settings.LDAP_ENABLED:
