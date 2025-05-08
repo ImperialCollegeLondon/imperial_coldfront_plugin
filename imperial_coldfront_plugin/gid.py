@@ -1,8 +1,8 @@
 """Functionality to get a new GID value."""
 
 from coldfront.core.allocation.models import Allocation
+from django.conf import settings
 from django.db.models import Max
-from settings import GID_RANGES
 
 
 def get_new_gid() -> int:
@@ -28,7 +28,7 @@ def get_new_gid() -> int:
     ]
 
     # Check each range to find the first available GID
-    for gid_range in GID_RANGES:
+    for gid_range in settings.GID_RANGES:
         start, end = gid_range
         if max_gid is None or max_gid < start:
             return start
