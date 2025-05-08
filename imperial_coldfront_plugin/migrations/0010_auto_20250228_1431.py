@@ -45,17 +45,6 @@ def add_rdf_resource_type(apps, schema_editor):
         ),
     )
 
-    int_attribute_type, _ = AttributeType.objects.get_or_create(name="Int")
-    AllocationAttributeType.objects.get_or_create(
-        name="Files Quota",
-        defaults=dict(
-            attribute_type=int_attribute_type,
-            is_unique=True,
-            is_private=False,
-            is_changeable=False,
-        )
-    )
-
 
 class Migration(migrations.Migration):
 
