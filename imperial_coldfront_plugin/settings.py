@@ -57,3 +57,8 @@ LDAP_GROUP_OU = ENV.str(
 """The organisational unit containing RDF access groups."""
 
 LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
+
+GID_RANGES = [
+    range(1000000, 1999999),
+    range(2000000, 2999999),
+]
