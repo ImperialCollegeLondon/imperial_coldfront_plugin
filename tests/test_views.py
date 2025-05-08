@@ -826,13 +826,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 dart_id=dart_id,
             ),
         )
-        assertRedirects(
-            response,
-            reverse("imperial_coldfront_plugin:list_tasks", args=[chain_group]),
-            fetch_redirect_response=False,
-        )
-
-        project_id = format_project_number_to_id(1)
         from coldfront.core.allocation.models import (
             Allocation,
             AllocationAttribute,
@@ -846,6 +839,16 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             start_date=timezone.now().date(),
             end_date=end_date,
         )
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:list_tasks",
+                args=[chain_group, allocation.pk],
+            ),
+            fetch_redirect_response=False,
+        )
+
+        project_id = format_project_number_to_id(1)
         AllocationAttribute.objects.get(
             allocation_attribute_type__name="Storage Quota (GB)",
             allocation=allocation,
@@ -928,18 +931,26 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
 class TestTaskListView(LoginRequiredMixin):
     """Tests for the task_stat_view."""
 
-    def _get_url(self, group: str = "None"):
-        return reverse("imperial_coldfront_plugin:list_tasks", kwargs={"group": group})
+    def _get_url(self, group: str = "None", allocation_pk=1):
+        return reverse(
+            "imperial_coldfront_plugin:list_tasks",
+            kwargs={"group": group, "allocation_pk": allocation_pk},
+        )
 
     def test_no_tasks_returned(self, superuser_client):
         """Test that the tasks returned are none."""
         response = superuser_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
-        assert len(response.context["tasks"]) == 0
+        assert len(response.context["queued"]) == 0
+        assert len(response.context["completed"]) == 0
 
     def test_the_right_tasks_returned(self, superuser_client):
-        """Test that the tasks returned are the right ones."""
+        """Test that the tasks returned are the right ones.
+
+        Note that this currently only checks for completed tasks as building test data
+        for queued tasks is prohibitively complex.
+        """
         from datetime import datetime
         from uuid import uuid4
 
@@ -959,6 +970,7 @@ class TestTaskListView(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
         assert len(response.context["tasks"]) == 3
+        assert len(response.context["completed"]) == 3
 
 
 def test_get_or_create_project(pi):

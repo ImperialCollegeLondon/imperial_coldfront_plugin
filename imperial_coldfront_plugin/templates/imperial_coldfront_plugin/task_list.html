@@ -1,22 +1,39 @@
 {% extends "common/base.html" %}
 {% block content %}
+  <div class="mb-3">
+    <h2 class="text-justify">Allocation Creation In Progress</h2>
+    <p>
+      Background processes for RDF storage allocation creation are shown below.
+      Refresh this page to view progress. Storage allocation has been completed once
+      all tasks have "True" in the success column.
+    </p>
+    <hr>
+  </div>
   <table>
     <tr>
-      <th>Name</th>
-      <th>Func</th>
+      <th>Task</th>
       <th>Started</th>
       <th>Stopped</th>
       <th>Success</th>
       <th></th>
     </tr>
-    {% for task in tasks %}
+    {% for task in completed %}
       <tr>
-        <td>{{ task.name }}</td>
         <td>{{ task.func }}</td>
         <td>{{ task.started }}</td>
         <td>{{ task.stopped }}</td>
         <td>{{ task.success }}</td>
       </tr>
     {% endfor %}
+    {% for task in queued %}
+      <tr>
+        <td>{{ task.func }}</td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>
+    {% endfor %}
   </table>
+  <a class="btn btn-primary"
+     href="{% url 'allocation-detail' allocation_pk %}">View allocation</a>
 {% endblock content %}

@@ -568,7 +568,7 @@ def add_rdf_storage_allocation(request):
                 value=dart_id,
             )
 
-            chain = Chain(cached=True)
+            chain = Chain()
             if settings.LDAP_ENABLED:
                 chain.append(
                     "imperial_coldfront_plugin.ldap._ldap_create_group", project_id
@@ -612,7 +612,11 @@ def add_rdf_storage_allocation(request):
 
             group = chain.run()
             messages.success(request, "RDF allocation created successfully.")
-            return redirect("imperial_coldfront_plugin:list_tasks", group=group)
+            return redirect(
+                "imperial_coldfront_plugin:list_tasks",
+                group=group,
+                allocation_pk=rdf_allocation.pk,
+            )
     else:
         form = RDFAllocationForm()
     return render(
@@ -632,14 +636,24 @@ def load_departments(request):
 
 
 @login_required
-def task_stat_view(request, group: str):
+def task_stat_view(request, group: str, allocation_pk: int):
     """Displays a list of tasks and their status."""
+    from django_q.models import OrmQ
+
     if not request.user.is_superuser:
         return HttpResponseForbidden()
 
-    task_qs = Task.objects.filter(group=group).order_by("started").reverse()
+    queued = [qt.task() for qt in OrmQ.objects.all() if qt.task()["group"] == group]
+    completed = Task.objects.filter(group=group).order_by("started").reverse()
+
     return render(
-        request, "imperial_coldfront_plugin/task_list.html", context={"tasks": task_qs}
+        request,
+        "imperial_coldfront_plugin/task_list.html",
+        context={
+            "completed": completed,
+            "queued": queued,
+            "allocation_pk": allocation_pk,
+        },
     )
 
 

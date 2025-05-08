@@ -20,5 +20,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(add_group_pruning_task),
+        # migrations.RunPython(add_group_pruning_task),  # This line is commented out because the group pruning task is currently not required. Uncomment if needed in the future.
     ]

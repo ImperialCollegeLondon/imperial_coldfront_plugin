@@ -10,7 +10,7 @@ def run_consistency_check(apps, schema_editor):
     Schedule = apps.get_model("django_q", "Schedule")
     Schedule.objects.update_or_create(
         name="LDAP consistency check",
-        func="imperial_coldfront_plugin.tasks.check_allocation_user_consistency",
+        func="imperial_coldfront_plugin.ldap.check_ldap_consistency",
         schedule_type="D",
     )
 

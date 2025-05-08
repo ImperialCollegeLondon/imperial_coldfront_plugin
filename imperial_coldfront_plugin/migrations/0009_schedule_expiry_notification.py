@@ -17,5 +17,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(add_expiry_email_notification_task),
+        # The following line is commented out because the expiry email notification task
+        # is no longer required. It is kept here for historical reference.
+        # migrations.RunPython(add_expiry_email_notification_task),
     ]

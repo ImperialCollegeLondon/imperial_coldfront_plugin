@@ -65,7 +65,7 @@ urlpatterns = [
         name="load_departments",
     ),
     path(
-        "list_tasks/<str:group>/",
+        "list_tasks/<str:group>/<int:allocation_pk>/",
         views.task_stat_view,
         name="list_tasks",
     ),
