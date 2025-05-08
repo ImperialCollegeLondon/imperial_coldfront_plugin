@@ -18,14 +18,12 @@ def get_new_gid() -> int:
     Raises:
         ValueError: If no available GID is found in the configured ranges.
     """
-    existing_gids = Allocation.objects.filter(
-        allocationattribute__allocation_attribute_type__name="GID"
-    ).values_list("allocationattribute__value", flat=True)
+   existing_gids = AllocationAttribute.objects.filter(
+       allocation_attribute_type__name="GID"
+   )
 
-    # Get the maximum GID value already assigned
-    max_gid = existing_gids.aggregate(Max("allocationattribute__value"))[
-        "allocationattribute__value__max"
-    ]
+   # Get the maximum GID value already assigned
+   max_gid = max(eg.typed_value() for eg in existing_gids)
 
     # Check each range to find the first available GID
     for gid_range in settings.GID_RANGES:
