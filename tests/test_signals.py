@@ -21,13 +21,13 @@ def ldap_remove_member_mock(mocker):
 def test_sync_ldap_group_membership(
     ldap_remove_member_mock,
     ldap_add_member_mock,
-    pi,
+    user,
     rdf_allocation_project_id,
     allocation_user,
 ):
     """Test sync_ldap_group_membership signal."""
     ldap_add_member_mock.assert_called_once_with(
-        rdf_allocation_project_id, pi.username, allow_already_present=True
+        rdf_allocation_project_id, user.username, allow_already_present=True
     )
     ldap_remove_member_mock.assert_not_called()
 
@@ -39,14 +39,14 @@ def test_sync_ldap_group_membership(
 
     ldap_add_member_mock.assert_called_once()
     ldap_remove_member_mock.assert_called_once_with(
-        rdf_allocation_project_id, pi.username, allow_missing=True
+        rdf_allocation_project_id, user.username, allow_missing=True
     )
 
 
 def test_sync_ldap_group_membership_no_project_id(
     ldap_remove_member_mock,
     ldap_add_member_mock,
-    pi,
+    user,
     rdf_allocation,
     rdf_allocation_project_id,
     allocation_user_active_status,
@@ -57,7 +57,7 @@ def test_sync_ldap_group_membership_no_project_id(
     ).delete()
     allocation_user = AllocationUser.objects.create(
         allocation=rdf_allocation,
-        user=pi,
+        user=user,
         status=allocation_user_active_status,
     )
 
@@ -74,7 +74,7 @@ def test_remove_ldap_group_membership(
     ldap_remove_member_mock,
     rdf_allocation_project_id,
     allocation_user,
-    pi,
+    user,
 ):
     """Test remove_ldap_group_membership signal."""
     ldap_remove_member_mock.assert_not_called()
@@ -82,12 +82,12 @@ def test_remove_ldap_group_membership(
     allocation_user.delete()
 
     ldap_remove_member_mock(
-        rdf_allocation_project_id, pi.username, allowing_missing=True
+        rdf_allocation_project_id, user.username, allowing_missing=True
     )
 
 
 def test_remove_ldap_group_membership_no_project_id(
-    ldap_remove_member_mock, pi, rdf_allocation, allocation_user
+    ldap_remove_member_mock, rdf_allocation, allocation_user
 ):
     """Test remove_ldap_group_membership_signal for non-rdf allocation."""
     rdf_allocation.allocationattribute_set.get(

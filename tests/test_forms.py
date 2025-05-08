@@ -43,12 +43,12 @@ def test_get_initial_department_choices():
 
 
 @pytest.fixture
-def rdf_form_data(pi_project):
+def rdf_form_data(project):
     """Fixture to provide RDFAllocationForm data."""
     faculty_id = "foe"
     department_id = DEPARTMENTS_IN_FACULTY[faculty_id][0]
     return dict(
-        username=pi_project.pi.username,
+        username=project.pi.username,
         faculty=faculty_id,
         department=department_id,
         end_date=datetime.max.date(),
