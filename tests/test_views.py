@@ -1022,3 +1022,45 @@ def test_get_or_create_user(
     assert not django_user_model.objects.filter(username=parsed_profile["username"])
     user = get_or_create_user(parsed_profile["username"])
     assert user == django_user_model.objects.get(username=parsed_profile["username"])
+
+
+class TestAddDartID(LoginRequiredMixin):
+    """Tests for the add_dart_id_to_allocation view function."""
+
+    def _get_url(self, allocation_pk=1):
+        return reverse("imperial_coldfront_plugin:add_dart_id", args=[allocation_pk])
+
+    def test_invalid_user(self, rdf_allocation, user_client):
+        """Test a standard user cannot access the view."""
+        response = user_client.get(self._get_url(rdf_allocation.pk))
+        assert response.status_code == 403
+
+    def test_get(self, rdf_allocation, allocation_user, pi_client):
+        """Test get method."""
+        from imperial_coldfront_plugin.forms import DartIDForm
+
+        response = pi_client.get(self._get_url(rdf_allocation.pk))
+        assert response.status_code == 200
+        assert isinstance(response.context["form"], DartIDForm)
+
+    def test_post(self, rdf_allocation, allocation_user, pi_client):
+        """Test post method."""
+        dart_id = "1001"
+        response = pi_client.post(
+            self._get_url(rdf_allocation.pk), data=dict(dart_id=dart_id)
+        )
+        assertRedirects(
+            response,
+            reverse(
+                "allocation-detail",
+                args=[rdf_allocation.pk],
+            ),
+            fetch_redirect_response=False,
+        )
+        from coldfront.core.allocation.models import AllocationAttribute
+
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="DART ID",
+            value=dart_id,
+            allocation=rdf_allocation,
+        )

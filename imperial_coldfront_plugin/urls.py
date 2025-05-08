@@ -69,4 +69,9 @@ urlpatterns = [
         views.task_stat_view,
         name="list_tasks",
     ),
+    path(
+        "add_dart_id/<int:allocation_pk>/",
+        views.add_dart_id_to_allocation,
+        name="add_dart_id",
+    ),
 ]
