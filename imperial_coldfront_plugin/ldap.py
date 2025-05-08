@@ -52,7 +52,7 @@ class LDAPGroupModifyError(Exception):
     """Dedicated exception for errors encountered when creating an LDAP group."""
 
 
-def _ldap_create_group(group_name: str, conn: Connection | None = None):
+def _ldap_create_group(group_name: str, gid: int, conn: Connection | None = None):
     """Create an LDAP group."""
     if conn is None:
         conn = _get_ldap_connection()
@@ -62,6 +62,7 @@ def _ldap_create_group(group_name: str, conn: Connection | None = None):
         object_class=["top", "group"],
         attributes=dict(
             cn=group_name,
+            gidNumber=gid,
             groupType=LDAP_GROUP_TYPE,
             sAMAccountName=group_name,
         ),
