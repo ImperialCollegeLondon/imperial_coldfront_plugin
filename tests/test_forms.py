@@ -48,7 +48,7 @@ def rdf_form_data(pi_project):
     faculty_id = "foe"
     department_id = DEPARTMENTS_IN_FACULTY[faculty_id][0]
     return dict(
-        project=pi_project.pk,
+        username=pi_project.pi.username,
         faculty=faculty_id,
         department=department_id,
         end_date=datetime.max.date(),

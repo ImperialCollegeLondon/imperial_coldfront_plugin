@@ -336,7 +336,7 @@ def pi_project(pi):
 
     return Project.objects.create(
         pi=pi,
-        title="project title",
+        title=f"{pi.get_full_name()}'s Research Group",
         status=project_active_status,
         field_of_science=field_of_science_other,
     )

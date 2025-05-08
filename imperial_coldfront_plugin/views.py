@@ -11,7 +11,13 @@ from coldfront.core.allocation.models import (
     AllocationStatusChoice,
     AllocationUserStatusChoice,
 )
-from coldfront.core.project.models import Project
+from coldfront.core.project.models import (
+    Project,
+    ProjectStatusChoice,
+    ProjectUser,
+    ProjectUserRoleChoice,
+    ProjectUserStatusChoice,
+)
 from coldfront.core.resource.models import Resource
 from coldfront.core.user.utils import UserSearch
 from django.conf import settings
@@ -524,7 +530,11 @@ def add_rdf_storage_allocation(request):
             rdf_resource = Resource.objects.get(name="RDF Active")
 
             allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-            project = get_object_or_404(Project, pk=form.cleaned_data["project"])
+
+            # We create a new user and an associated project, if they don't exist.
+            user = get_or_create_user(form.cleaned_data["username"])
+            project = get_or_create_project(user)
+
             rdf_allocation = Allocation.objects.create(
                 project=project,
                 status=allocation_active_status,
@@ -645,3 +655,52 @@ def task_stat_view(request, group: str, allocation_pk: int):
             "allocation_pk": allocation_pk,
         },
     )
+
+
+def get_or_create_user(username: str) -> User:
+    """Get user from the database or creates one using data from Graph.
+
+    Args:
+        username: The username of the user to be retrieved or created.
+
+    Return:
+        The user, already existing or newly created.
+    """
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        client = get_graph_api_client()
+        user_data = client.user_profile(username)
+        user = User.objects.create(
+            username=user_data["username"],
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
+            email=user_data["email"],
+        )
+    return user
+
+
+def get_or_create_project(user: User) -> Project:
+    """Get project from the database or creates one.
+
+    Args:
+        user: The user object that will own a project.
+
+    Return:
+        The project, already existing or newly created.
+    """
+    project, project_created = Project.objects.get_or_create(
+        pi=user,
+        defaults=dict(
+            title=f"{user.get_full_name()}'s Research Group",
+            status=ProjectStatusChoice.objects.get_or_create(name="Active")[0],
+        ),
+    )
+    if project_created:
+        ProjectUser.objects.create(
+            user=user,
+            project=project,
+            role=ProjectUserRoleChoice.objects.get_or_create(name="Manager")[0],
+            status=ProjectUserStatusChoice.objects.get_or_create(name="Active")[0],
+        )
+    return project
