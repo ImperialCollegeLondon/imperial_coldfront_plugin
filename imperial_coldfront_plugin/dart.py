@@ -24,7 +24,7 @@ def validate_dart_id(dart_id: str):
         raise DartIDValidationError("Dart ID already assigned to an allocation")
 
 
-def create_dart_id_attribute(dart_id: int, allocation: Allocation):
+def create_dart_id_attribute(dart_id: str, allocation: Allocation):
     """Create an AllocationAttribute for a Dart ID."""
     validate_dart_id(dart_id)
     dart_id_attribute_type = AllocationAttributeType.objects.get(
