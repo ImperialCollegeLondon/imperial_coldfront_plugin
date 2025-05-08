@@ -379,3 +379,31 @@ def _create_fileset_set_quota(
 
 
 create_fileset_set_quota_in_background = run_in_background(_create_fileset_set_quota)
+
+
+def _update_quota_usages_task():
+    """Update the usages of all quota related allocation attributes."""
+    from coldfront.core.allocation.models import Allocation
+
+    client = GPFSClient()
+    usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)
+
+    # use prefetch_related to reduce number of database operations
+    allocations = Allocation.objects.filter(
+        resources__name="RDF Active"
+    ).prefetch_related("allocationattribute_set")
+    # below could use some more error handling but is a reasonable first pass
+    for allocation in allocations:
+        rdf_id = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="RDF Project ID"
+        ).value
+        storage_attribute_usage = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Storage Quota (GB)"
+        ).allocationattributeusage
+        storage_attribute_usage.value = usages[rdf_id]["block_gb"]
+        storage_attribute_usage.save()
+        files_attribute_usage = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Files Quota"
+        ).allocationattributeusage
+        files_attribute_usage.value = usages[rdf_id]["files"]
+        files_attribute_usage.save()
