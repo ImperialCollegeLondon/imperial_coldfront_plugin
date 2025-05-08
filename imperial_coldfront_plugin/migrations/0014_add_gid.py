@@ -23,7 +23,7 @@ def add_gid_attribute_type(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("imperial_coldfront_plugin", "0012_delete_unixuid"),
+        ("imperial_coldfront_plugin", "0013_auto_20250508_1115"),
     ]
 
     operations = [
