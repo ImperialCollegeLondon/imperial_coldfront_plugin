@@ -63,7 +63,7 @@ class TestSendExpirationNotificationsTask:
 @pytest.fixture
 def usage_data(rdf_allocation_project_id):
     """Test quota usage data."""
-    return {rdf_allocation_project_id: dict(files=1001, block_gb=333)}
+    return {rdf_allocation_project_id: dict(files_usage=1001, block_usage_gb=333)}
 
 
 @pytest.fixture
@@ -110,7 +110,9 @@ def test_update_quota_usages_task(
     _update_quota_usages_task()
 
     storage_usage.refresh_from_db()
-    assert storage_usage.value == usage_data[rdf_allocation_project_id]["block_gb"]
+    assert (
+        storage_usage.value == usage_data[rdf_allocation_project_id]["block_usage_gb"]
+    )
 
     files_usage.refresh_from_db()
-    assert files_usage.value == usage_data[rdf_allocation_project_id]["files"]
+    assert files_usage.value == usage_data[rdf_allocation_project_id]["files_usage"]

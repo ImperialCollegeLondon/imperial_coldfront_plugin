@@ -316,8 +316,8 @@ class GPFSClient(Consumer):
         data = self._retrieve_all_fileset_quotas(filesystem_name).json()
         return {
             quota["objectName"]: {
-                "files": quota["filesUsage"],
-                "block_gb": quota["blockUsage"] / 1024**2,
+                "files_usage": quota["filesUsage"],
+                "block_usage_gb": quota["blockUsage"] / 1024**2,
             }
             for quota in data["quotas"]
             if quota["quotaType"] == "FILESET"
@@ -400,10 +400,10 @@ def _update_quota_usages_task():
         storage_attribute_usage = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Storage Quota (GB)"
         ).allocationattributeusage
-        storage_attribute_usage.value = usages[rdf_id]["block_gb"]
+        storage_attribute_usage.value = usages[rdf_id]["block_usage_gb"]
         storage_attribute_usage.save()
         files_attribute_usage = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Files Quota"
         ).allocationattributeusage
-        files_attribute_usage.value = usages[rdf_id]["files"]
+        files_attribute_usage.value = usages[rdf_id]["files_usage"]
         files_attribute_usage.save()
