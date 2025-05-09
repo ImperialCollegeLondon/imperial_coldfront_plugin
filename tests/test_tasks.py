@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 
+from imperial_coldfront_plugin.gpfs_client import _update_quota_usages_task
 from imperial_coldfront_plugin.tasks import send_expiration_notifications
 
 
@@ -57,3 +58,61 @@ class TestSendExpirationNotificationsTask:
         send_expiration_notifications()
 
         assert len(mailoutbox) == 0
+
+
+@pytest.fixture
+def usage_data(rdf_allocation_project_id):
+    """Test quota usage data."""
+    return {rdf_allocation_project_id: dict(files_usage=1001, block_usage_gb=333)}
+
+
+@pytest.fixture
+def mock_gpfs_client(mocker, usage_data):
+    """Mock gpfs client to return test usage data."""
+    mock = mocker.patch(
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_usages"
+    )
+    mock.return_value = usage_data
+    return mock
+
+
+def test_update_quota_usages_task(
+    rdf_allocation, mock_gpfs_client, usage_data, rdf_allocation_project_id
+):
+    """Test _update_quotas_task."""
+    from coldfront.core.allocation.models import (
+        AllocationAttribute,
+        AllocationAttributeType,
+        AllocationAttributeUsage,
+    )
+
+    storage_attribute = AllocationAttribute.objects.create(
+        allocation=rdf_allocation,
+        allocation_attribute_type=AllocationAttributeType.objects.get(
+            name="Storage Quota (GB)"
+        ),
+        value=0,
+    )
+    storage_usage = AllocationAttributeUsage.objects.create(
+        allocation_attribute=storage_attribute, value=0
+    )
+    files_attribute = AllocationAttribute.objects.create(
+        allocation=rdf_allocation,
+        allocation_attribute_type=AllocationAttributeType.objects.get(
+            name="Files Quota"
+        ),
+        value=0,
+    )
+    files_usage = AllocationAttributeUsage.objects.create(
+        allocation_attribute=files_attribute, value=0
+    )
+
+    _update_quota_usages_task()
+
+    storage_usage.refresh_from_db()
+    assert (
+        storage_usage.value == usage_data[rdf_allocation_project_id]["block_usage_gb"]
+    )
+
+    files_usage.refresh_from_db()
+    assert files_usage.value == usage_data[rdf_allocation_project_id]["files_usage"]
