@@ -38,6 +38,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django_q.tasks import Chain, Task
 
+from .dart import create_dart_id_attribute
 from .emails import (
     send_group_access_granted_email,
     send_group_invite_email,
@@ -45,6 +46,7 @@ from .emails import (
     send_member_promotion_to_manager_email,
 )
 from .forms import (
+    DartIDForm,
     GroupMembershipExtendForm,
     GroupMembershipForm,
     RDFAllocationForm,
@@ -57,6 +59,7 @@ from .models import GroupMembership, ResearchGroup
 from .policy import (
     check_group_owner_manager_or_superuser,
     check_group_owner_or_superuser,
+    check_project_pi_or_superuser,
     user_already_has_hpc_access,
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
@@ -576,14 +579,7 @@ def add_rdf_storage_allocation(request):
                 value=project_id,
             )
 
-            dart_id_attribute_type = AllocationAttributeType.objects.get(
-                name="DART ID", is_changeable=False
-            )
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=dart_id_attribute_type,
-                allocation=rdf_allocation,
-                value=dart_id,
-            )
+            create_dart_id_attribute(dart_id, rdf_allocation)
 
             chain = Chain()
             if settings.LDAP_ENABLED:
@@ -721,3 +717,21 @@ def get_or_create_project(user: User) -> Project:
             status=ProjectUserStatusChoice.objects.get_or_create(name="Active")[0],
         )
     return project
+
+
+@login_required
+def add_dart_id_to_allocation(request: HttpRequest, allocation_pk: int):
+    """Dedicated view function to add dart ids to an allocation."""
+    allocation = get_object_or_404(Allocation, pk=allocation_pk)
+    check_project_pi_or_superuser(allocation.project, request.user)
+
+    if request.method == "POST":
+        form = DartIDForm(request.POST)
+        if form.is_valid():
+            create_dart_id_attribute(form.cleaned_data["dart_id"], allocation)
+            return redirect(reverse("allocation-detail", args=[allocation_pk]))
+    else:
+        form = DartIDForm()
+    return render(
+        request, "imperial_coldfront_plugin/dart_id_form.html", context=dict(form=form)
+    )

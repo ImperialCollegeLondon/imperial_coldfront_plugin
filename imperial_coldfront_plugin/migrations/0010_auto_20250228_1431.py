@@ -42,6 +42,7 @@ def add_rdf_resource_type(apps, schema_editor):
             attribute_type=text_attribute_type,
             is_unique=False,
             is_changeable=False,
+            is_private=False,
         ),
     )
 

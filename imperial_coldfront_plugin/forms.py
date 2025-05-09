@@ -10,6 +10,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 
+from .dart import DartIDValidationError, validate_dart_id
+
 
 class GroupMembershipForm(forms.Form):
     """Form for inviting a user to a research group."""
@@ -120,6 +122,15 @@ class RDFAllocationForm(forms.Form):
         disabled=False,
     )
 
+    def clean_dart_id(self) -> str:
+        """Validate provided Dart ID."""
+        dart_id = self.cleaned_data["dart_id"]
+        try:
+            validate_dart_id(dart_id)
+        except DartIDValidationError as e:
+            raise ValidationError(e.args[0])
+        return dart_id
+
     def clean(self) -> bool:
         """Check if the faculty and department combination is valid.
 
@@ -131,3 +142,18 @@ class RDFAllocationForm(forms.Form):
         department_id = cleaned_data["department"]
         if department_id not in DEPARTMENTS_IN_FACULTY[faculty_id]:
             raise ValidationError("Invalid faculty and department combination.")
+
+
+class DartIDForm(forms.Form):
+    """Form for collection of a Dart ID value."""
+
+    dart_id = forms.CharField(disabled=False)
+
+    def clean_dart_id(self) -> str:
+        """Validate provided Dart ID."""
+        dart_id = self.cleaned_data["dart_id"]
+        try:
+            validate_dart_id(dart_id)
+        except DartIDValidationError as e:
+            raise ValidationError(e.args[0])
+        return dart_id
