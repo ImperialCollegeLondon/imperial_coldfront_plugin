@@ -8,7 +8,7 @@ def add_gid_attribute_type(apps, schema_editor):
     AllocationAttributeType = apps.get_model("allocation", "AllocationAttributeType")
     AttributeType = apps.get_model("allocation", "AttributeType")
 
-    text_attribute_type, _ = AttributeType.objects.get_or_create(name="Text")
+    text_attribute_type, _ = AttributeType.objects.get_or_create(name="Int")
     AllocationAttributeType.objects.get_or_create(
         name="GID",
         defaults=dict(
@@ -23,7 +23,7 @@ def add_gid_attribute_type(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("imperial_coldfront_plugin", "0013_auto_20250508_1115"),
+        ("imperial_coldfront_plugin", "0014_auto_20250508_2158"),
     ]
 
     operations = [

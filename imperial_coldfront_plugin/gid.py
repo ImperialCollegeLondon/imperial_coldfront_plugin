@@ -1,8 +1,7 @@
 """Functionality to get a new GID value."""
 
-from coldfront.core.allocation.models import Allocation
+from coldfront.core.allocation.models import AllocationAttribute
 from django.conf import settings
-from django.db.models import Max
 
 
 def get_new_gid() -> int:
@@ -18,12 +17,16 @@ def get_new_gid() -> int:
     Raises:
         ValueError: If no available GID is found in the configured ranges.
     """
-   existing_gids = AllocationAttribute.objects.filter(
-       allocation_attribute_type__name="GID"
-   )
+    existing_gids = AllocationAttribute.objects.filter(
+        allocation_attribute_type__name="GID"
+    )
 
-   # Get the maximum GID value already assigned
-   max_gid = max(eg.typed_value() for eg in existing_gids)
+    # Get the maximum GID value already assigned
+    try:
+        max_gid = max(eg.typed_value() for eg in existing_gids)
+    except ValueError:
+        # if there are no existing gids
+        max_gid = None
 
     # Check each range to find the first available GID
     for gid_range in settings.GID_RANGES:

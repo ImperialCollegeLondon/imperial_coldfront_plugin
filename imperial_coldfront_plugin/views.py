@@ -589,14 +589,13 @@ def add_rdf_storage_allocation(request):
                 allocation=rdf_allocation,
                 value=gid,
             )
-            AllocationAttributeUsage.objects.create(
-                allocation_attribute=gid_attribute_type, value=0
-            )
 
             chain = Chain()
             if settings.LDAP_ENABLED:
                 chain.append(
-                    "imperial_coldfront_plugin.ldap._ldap_create_group", project_id
+                    "imperial_coldfront_plugin.ldap._ldap_create_group",
+                    project_id,
+                    gid,
                 )
 
             allocation_user_active_status = AllocationUserStatusChoice.objects.get(

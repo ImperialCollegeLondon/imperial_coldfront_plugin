@@ -889,6 +889,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 cn=group_name,
                 groupType=LDAP_GROUP_TYPE,
                 sAMAccountName=group_name,
+                gidNumber=min(settings.GID_RANGES[0]),
             ),
         )
         ldap_add_member_mock.assert_called_once_with(
