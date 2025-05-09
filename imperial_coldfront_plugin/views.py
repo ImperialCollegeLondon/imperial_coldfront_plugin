@@ -54,6 +54,7 @@ from .forms import (
     UserSearchForm,
     get_department_choices,
 )
+from .gid import get_new_gid
 from .microsoft_graph_client import get_graph_api_client
 from .models import GroupMembership, ResearchGroup
 from .policy import (
@@ -581,10 +582,20 @@ def add_rdf_storage_allocation(request):
 
             create_dart_id_attribute(dart_id, rdf_allocation)
 
+            gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
+            gid = get_new_gid()
+            AllocationAttribute.objects.create(
+                allocation_attribute_type=gid_attribute_type,
+                allocation=rdf_allocation,
+                value=gid,
+            )
+
             chain = Chain()
             if settings.LDAP_ENABLED:
                 chain.append(
-                    "imperial_coldfront_plugin.ldap._ldap_create_group", project_id
+                    "imperial_coldfront_plugin.ldap._ldap_create_group",
+                    project_id,
+                    gid,
                 )
 
             allocation_user_active_status = AllocationUserStatusChoice.objects.get(

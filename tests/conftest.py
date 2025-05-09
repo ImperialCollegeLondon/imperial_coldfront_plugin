@@ -75,6 +75,7 @@ def pytest_configure():
             GPFS_FILESET_PATH="/path/",
             GPFS_FILESYSTEM_NAME="testfs",
             GPFS_ENABLED=True,
+            GID_RANGES=[range(1031386, 1031435)],
         ),  # override settings loaded by env var for tests
     )
 
