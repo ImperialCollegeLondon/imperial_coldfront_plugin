@@ -817,18 +817,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         group_name = get_next_rdf_project_id()
         gid = get_new_gid()
 
-        response = superuser_client.post(
-            self._get_url(),
-            data=dict(
-                username=pi_project.pi.username,
-                end_date=end_date,
-                size=size,
-                department=department,
-                faculty=faculty,
-                dart_id=dart_id,
-                gid=gid,
-            ),
-        )
         from coldfront.core.allocation.models import (
             Allocation,
             AllocationAttribute,
@@ -843,6 +831,21 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             start_date=timezone.now().date(),
             end_date=end_date,
         )
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                username=pi_project.pi.username,
+                end_date=end_date,
+                size=size,
+                department=department,
+                faculty=faculty,
+                dart_id=dart_id,
+                allocation=allocation.pk,
+                gid=gid,
+            ),
+        )
+
         assertRedirects(
             response,
             reverse(
@@ -876,7 +879,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         )
         AllocationAttribute.objects.get(
             allocation_attribute_type__name="DART ID",
-            allocation=allocation,
+            allocation=allocation.pk,
             value=dart_id,
         )
         AllocationUser.objects.get(
@@ -1050,8 +1053,10 @@ class TestAddDartID(LoginRequiredMixin):
     def test_post(self, rdf_allocation, allocation_user, pi_client):
         """Test post method."""
         dart_id = "1001"
+        allocation = "RDF Storage Allocation"
         response = pi_client.post(
-            self._get_url(rdf_allocation.pk), data=dict(dart_id=dart_id)
+            self._get_url(rdf_allocation.pk),
+            data=dict(dart_id=dart_id, allocation=allocation),
         )
         assertRedirects(
             response,

@@ -26,7 +26,7 @@ def validate_dart_id(dart_id: str, allocation: Allocation):
 
 def create_dart_id_attribute(dart_id: str, allocation: Allocation):
     """Create an AllocationAttribute for a Dart ID."""
-    validate_dart_id(dart_id)
+    validate_dart_id(dart_id, allocation)
     dart_id_attribute_type = AllocationAttributeType.objects.get(
         name="DART ID", is_changeable=False
     )
