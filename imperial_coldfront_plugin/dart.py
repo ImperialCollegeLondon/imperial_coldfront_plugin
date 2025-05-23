@@ -20,7 +20,7 @@ def validate_dart_id(dart_id: str, allocation: Allocation):
 
     Raises:
         DartIDValidationError: If the Dart ID is not a number or is outside
-        the valid range or if it is already assigned to the allocation.
+            the valid range or if it is already assigned to the allocation.
     """
     try:
         if int(dart_id) < 1:
