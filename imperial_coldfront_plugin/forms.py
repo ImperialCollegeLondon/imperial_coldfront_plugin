@@ -125,8 +125,9 @@ class RDFAllocationForm(forms.Form):
     def clean_dart_id(self) -> str:
         """Validate provided Dart ID."""
         dart_id = self.cleaned_data["dart_id"]
+        allocation = self.cleaned_data.get("allocation")
         try:
-            validate_dart_id(dart_id)
+            validate_dart_id(dart_id, allocation)
         except DartIDValidationError as e:
             raise ValidationError(e.args[0])
         return dart_id
@@ -152,8 +153,9 @@ class DartIDForm(forms.Form):
     def clean_dart_id(self) -> str:
         """Validate provided Dart ID."""
         dart_id = self.cleaned_data["dart_id"]
+        allocation = self.cleaned_data.get("allocation")
         try:
-            validate_dart_id(dart_id)
+            validate_dart_id(dart_id, allocation)
         except DartIDValidationError as e:
             raise ValidationError(e.args[0])
         return dart_id

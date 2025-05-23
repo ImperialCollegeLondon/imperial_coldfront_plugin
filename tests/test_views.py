@@ -1050,8 +1050,10 @@ class TestAddDartID(LoginRequiredMixin):
     def test_post(self, rdf_allocation, allocation_user, pi_client):
         """Test post method."""
         dart_id = "1001"
+        allocation = "RDF Storage Allocation"
         response = pi_client.post(
-            self._get_url(rdf_allocation.pk), data=dict(dart_id=dart_id)
+            self._get_url(rdf_allocation.pk),
+            data=dict(dart_id=dart_id, allocation=allocation),
         )
         assertRedirects(
             response,
