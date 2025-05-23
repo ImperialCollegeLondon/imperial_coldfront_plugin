@@ -12,7 +12,16 @@ class DartIDValidationError(Exception):
 
 
 def validate_dart_id(dart_id: str, allocation: Allocation):
-    """Validate range and availability of Dart ID value."""
+    """Validate range and availability of Dart ID value.
+
+    Args:
+        dart_id (str): Dart ID to validate.
+        allocation (Allocation): Allocation to check against.
+
+    Raises:
+        DartIDValidationError: If the Dart ID is not a number or is outside
+        the valid range or if it is already assigned to the allocation.
+    """
     try:
         if int(dart_id) < 1:
             raise DartIDValidationError("Dart ID outside valid range")
