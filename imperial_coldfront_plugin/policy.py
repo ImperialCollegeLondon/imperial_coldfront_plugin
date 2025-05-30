@@ -1,5 +1,7 @@
 """Policy functionality governing the eligibility of users access RCS systems."""
 
+from django.core.exceptions import PermissionDenied
+
 
 def user_eligible_for_hpc_access(user_profile):
     """Assess the eligibility of a user to join a ResearchGroup.
@@ -136,24 +138,6 @@ def user_eligible_to_be_pi(user_profile):
         return False
 
     return True
-
-
-def check_group_owner_manager_or_superuser(group, user):
-    """Check if the user is the owner or manager of the group or a superuser."""
-    if not (
-        group.owner == user
-        or user.is_superuser
-        or GroupMembership.objects.filter(
-            group=group, member=user, is_manager=True, expiration__gt=timezone.now()
-        ).exists()
-    ):
-        raise PermissionDenied
-
-
-def check_group_owner_or_superuser(group, user):
-    """Check if the user is the owner of the group or a superuser."""
-    if not (group.owner == user or user.is_superuser):
-        raise PermissionDenied
 
 
 def check_project_pi_or_superuser(project, user):

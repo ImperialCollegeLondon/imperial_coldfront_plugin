@@ -12,6 +12,7 @@ from django_q.tasks import Chain
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import RDFAllocationForm
+from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
 from imperial_coldfront_plugin.views import (
     format_project_number_to_id,
@@ -363,24 +364,26 @@ class TestAddDartID(LoginRequiredMixin):
     def _get_url(self, allocation_pk=1):
         return reverse("imperial_coldfront_plugin:add_dart_id", args=[allocation_pk])
 
-    def test_invalid_user(self, rdf_allocation, user_client):
+    def test_invalid_user(self, rdf_allocation, user_factory, auth_client_factory):
         """Test a standard user cannot access the view."""
-        response = user_client.get(self._get_url(rdf_allocation.pk))
+        response = auth_client_factory(user_factory()).get(
+            self._get_url(rdf_allocation.pk)
+        )
         assert response.status_code == 403
 
-    def test_get(self, rdf_allocation, allocation_user, pi_client):
+    def test_get(self, rdf_allocation, allocation_user, user_client):
         """Test get method."""
         from imperial_coldfront_plugin.forms import DartIDForm
 
-        response = pi_client.get(self._get_url(rdf_allocation.pk))
+        response = user_client.get(self._get_url(rdf_allocation.pk))
         assert response.status_code == 200
         assert isinstance(response.context["form"], DartIDForm)
 
-    def test_post(self, rdf_allocation, allocation_user, pi_client):
+    def test_post(self, rdf_allocation, allocation_user, user_client):
         """Test post method."""
         dart_id = "1001"
         allocation = "RDF Storage Allocation"
-        response = pi_client.post(
+        response = user_client.post(
             self._get_url(rdf_allocation.pk),
             data=dict(dart_id=dart_id, allocation=allocation),
         )
