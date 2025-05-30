@@ -12,7 +12,6 @@ from django.utils import timezone
 
 from .dart import DartIDValidationError, validate_dart_id
 
-
 DEPARTMENTS = {
     "physics": "Physics",
     "dsde": "Dyson School of Design Engineering",
