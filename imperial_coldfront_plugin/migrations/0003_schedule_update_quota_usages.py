@@ -13,7 +13,7 @@ def schedule_update_quota_usages_task(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('imperial_coldfront_plugin', '0013_auto_20250508_1115'),
+        ('imperial_coldfront_plugin', '0002_schedule_ldap_consistency_check'),
     ]
 
     operations = [

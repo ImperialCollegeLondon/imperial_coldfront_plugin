@@ -17,7 +17,8 @@ def run_consistency_check(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('imperial_coldfront_plugin', '0010_auto_20250228_1431'),
+        ('imperial_coldfront_plugin', '0001_add_rdf_resource_rdf_project_attribute_dart_id_attribute'),
+        ('django_q', '0014_schedule_cluster'),
     ]
 
     operations = [

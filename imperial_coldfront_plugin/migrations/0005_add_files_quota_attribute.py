@@ -21,7 +21,8 @@ def add_files_quota_attribute(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('imperial_coldfront_plugin', '0012_delete_unixuid'),
+        ('imperial_coldfront_plugin', '0004_add_gid_attribute'),
+        ("allocation", "0005_auto_20211117_1413"),
     ]
 
     operations = [

@@ -49,8 +49,9 @@ def add_rdf_resource_type(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    initial = True
+
     dependencies = [
-        ("imperial_coldfront_plugin", "0009_schedule_expiry_notification"),
         ("resource", "0002_auto_20191017_1141"),
         ("allocation", "0005_auto_20211117_1413"),
     ]
