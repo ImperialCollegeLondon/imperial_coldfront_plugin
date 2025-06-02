@@ -1,12 +1,11 @@
 """Pytest configuration."""
 
-from random import choices, randint
+from random import choices
 from string import ascii_lowercase
 
 import pytest
 from django.conf import settings
 from django.test import Client
-from django.utils import timezone
 
 
 def pytest_configure():
@@ -122,28 +121,6 @@ def user_factory(django_user_model):
 
 
 @pytest.fixture
-def research_group_factory(user_factory):
-    """Provides a factory for research groups with optional members."""
-    from imperial_coldfront_plugin.models import GroupMembership, ResearchGroup
-
-    def create_group(number_of_members=1, owner=None):
-        group = ResearchGroup.objects.create(
-            owner=owner or user_factory(is_pi=True),
-            gid=randint(0, 100000),
-            name=random_string(),
-        )
-        memberships = [
-            GroupMembership.objects.create(
-                member=user_factory(), group=group, expiration=timezone.now()
-            )
-            for _ in range(number_of_members)
-        ]
-        return group, memberships
-
-    return create_group
-
-
-@pytest.fixture
 def auth_client_factory():
     """Provides a factory for authenticated Django test clients."""
 
@@ -163,54 +140,9 @@ def user(user_factory):
 
 
 @pytest.fixture
-def pi(user_factory):
-    """Provides a Django user with PI status."""
-    return user_factory(username="testpi", is_pi=True)
-
-
-@pytest.fixture
-def pi_group(research_group_factory, pi):
-    """Provides a research group with a single member."""
-    return research_group_factory(owner=pi)[0]
-
-
-@pytest.fixture
-def pi_group_member(pi_group):
-    """Provides the member of pi_group."""
-    return pi_group.groupmembership_set.first().member
-
-
-@pytest.fixture
-def pi_group_membership(pi_group_member):
-    """Provides the GroupMembership object for pi_group_member."""
-    return pi_group_member.groupmembership
-
-
-@pytest.fixture
-def pi_group_manager(pi_group, user_factory):
-    """Provides a manager for pi_group."""
-    from imperial_coldfront_plugin.models import GroupMembership
-
-    manager = user_factory(username="manager")
-    GroupMembership.objects.create(
-        group=pi_group,
-        member=manager,
-        is_manager=True,
-        expiration=timezone.datetime.max,
-    )
-    return manager
-
-
-@pytest.fixture
 def user_client(auth_client_factory, user):
     """Return an authenticated Django test client for `user`."""
     return auth_client_factory(user)
-
-
-@pytest.fixture
-def pi_client(auth_client_factory, pi):
-    """Return an authenticated Django test client for a PI."""
-    return auth_client_factory(pi)
 
 
 @pytest.fixture
@@ -281,33 +213,9 @@ def _get_user_fixture(request):
     return request.getfixturevalue(request.param)
 
 
-@pytest.fixture(params=["pi", "pi_group_manager", "superuser"])
-def pi_manager_or_superuser(request):
-    """Parametrized fixture providing a pi, manager or superuser."""
-    return _get_user_fixture(request)
-
-
-@pytest.fixture(params=["pi", "superuser"])
-def pi_or_superuser(request):
-    """Parametrized fixture providing a pi or superuser."""
-    return _get_user_fixture(request)
-
-
-@pytest.fixture(params=["pi_group_member", "pi_group_manager"])
-def member_or_manager(request):
-    """Parametrized fixture providing a member or manager."""
-    return _get_user_fixture(request)
-
-
-@pytest.fixture(params=["user", "pi_group_member"])
-def user_or_member(request):
+@pytest.fixture(params=["user", "superuser"])
+def user_or_superuser(request):
     """Parametrized fixture providing a user or member."""
-    return _get_user_fixture(request)
-
-
-@pytest.fixture(params=["user", "pi_group_member", "pi_group_manager"])
-def user_member_or_manager(request):
-    """Parametrized fixture providing a user, member or manager."""
     return _get_user_fixture(request)
 
 
@@ -327,8 +235,8 @@ def ldap_connection_mock(mocker):
 
 
 @pytest.fixture
-def pi_project(pi):
-    """Provides a Coldfront project owned by the pi user."""
+def project(user):
+    """Provides a Coldfront project owned by a user."""
     from coldfront.core.field_of_science.models import FieldOfScience
     from coldfront.core.project.models import Project, ProjectStatusChoice
 
@@ -336,8 +244,8 @@ def pi_project(pi):
     field_of_science_other = FieldOfScience.objects.create(description="Other")
 
     return Project.objects.create(
-        pi=pi,
-        title=f"{pi.get_full_name()}'s Research Group",
+        pi=user,
+        title=f"{user.get_full_name()}'s Research Group",
         status=project_active_status,
         field_of_science=field_of_science_other,
     )
@@ -376,7 +284,7 @@ def rdf_allocation_project_id(rdf_allocation_project_number):
 
 
 @pytest.fixture
-def rdf_allocation(pi_project, rdf_allocation_dependencies, rdf_allocation_project_id):
+def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_project_id):
     """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.allocation.models import (
         Allocation,
@@ -391,7 +299,7 @@ def rdf_allocation(pi_project, rdf_allocation_dependencies, rdf_allocation_proje
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
     allocation = Allocation.objects.create(
-        project=pi_project, status=allocation_active_status
+        project=project, status=allocation_active_status
     )
     allocation.resources.add(rdf_resource)
 
@@ -412,12 +320,12 @@ def allocation_user_active_status(db):
 
 
 @pytest.fixture
-def allocation_user(allocation_user_active_status, rdf_allocation, pi):
+def allocation_user(allocation_user_active_status, rdf_allocation, user):
     """Provides an active user for rdf_allocation fixture."""
     from coldfront.core.allocation.models import AllocationUser
 
     return AllocationUser.objects.create(
         allocation=rdf_allocation,
-        user=pi,
+        user=user,
         status=allocation_user_active_status,
     )
