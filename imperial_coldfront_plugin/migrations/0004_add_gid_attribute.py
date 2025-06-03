@@ -23,7 +23,8 @@ def add_gid_attribute_type(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("imperial_coldfront_plugin", "0014_auto_20250508_2158"),
+        ("imperial_coldfront_plugin", "0003_schedule_update_quota_usages"),
+        ("allocation", "0005_auto_20211117_1413"),
     ]
 
     operations = [
