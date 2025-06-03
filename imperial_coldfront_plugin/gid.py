@@ -13,9 +13,6 @@ def get_new_gid() -> int:
 
     Returns:
         int: The next available GID value.
-
-    Raises:
-        ValueError: If no available GID is found in the configured ranges.
     """
     existing_gids = AllocationAttribute.objects.filter(
         allocation_attribute_type__name="GID"
@@ -35,7 +32,8 @@ def get_new_gid() -> int:
         if max_gid is None or max_gid < start:
             return start
 
-        if max_gid < end:
+        if start <= max_gid < end:
             return max_gid + 1
 
-    raise ValueError("No available GID found in the configured ranges.")
+        if max_gid == end - 1:
+            return end
