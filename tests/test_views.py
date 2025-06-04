@@ -184,7 +184,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
 
         project_id = format_project_number_to_id(1)
         storage_attribute = AllocationAttribute.objects.get(
-            allocation_attribute_type__name="Storage Quota (GB)",
+            allocation_attribute_type__name="Storage Quota (TB)",
             allocation=allocation,
             value=size,
         )
@@ -242,7 +242,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             parent_fileset_path=faculty_path,
             relative_projects_path=relative_projects_path,
             permissions=settings.GPFS_PERMISSIONS,
-            block_quota=f"{size}G",
+            block_quota=f"{size}T",
             files_quota=settings.GPFS_FILES_QUOTA,
             parent_fileset=faculty,
         )

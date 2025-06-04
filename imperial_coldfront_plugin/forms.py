@@ -65,7 +65,7 @@ class RDFAllocationForm(forms.Form):
         validators=[MinValueValidator(timezone.now().date())],
     )
     size = forms.IntegerField(
-        validators=[MinValueValidator(1)], help_text="In gigabytes"
+        validators=[MinValueValidator(1)], help_text="In terabytes"
     )
     dart_id = forms.CharField(
         help_text="The associated DART entry.",
