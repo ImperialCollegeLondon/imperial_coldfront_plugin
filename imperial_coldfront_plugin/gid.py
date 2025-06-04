@@ -29,11 +29,12 @@ def get_new_gid() -> int:
     for gid_range in settings.GID_RANGES:
         start = gid_range.start
         end = gid_range.stop
-        if max_gid is None or max_gid < start:
+        if max_gid is None:
+            # If no existing GID, return the start of the first range
             return start
 
-        if start <= max_gid < end:
+        elif start <= max_gid < end:
             return max_gid + 1
 
-        if max_gid == end - 1:
-            return end
+        else:
+            raise ValueError("No GID available in the specified ranges.")
