@@ -97,9 +97,11 @@ def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
     # Create an existing GID outside the range
     allocation_attribute_factory(allocation_attribute_type=None, value=999)
 
-    # Call the get_new_gid function and expect a ValueError
-    with pytest.raises(ValueError, match="999 is outside all the specified ranges."):
-        get_new_gid()
+    # Call the get_new_gid function
+    gid = get_new_gid()
+
+    # Assert that the returned GID is the start of the range
+    assert gid == 1000
 
 
 @pytest.mark.django_db
