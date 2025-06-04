@@ -18,23 +18,21 @@ def get_new_gid() -> int:
         allocation_attribute_type__name="GID"
     )
 
-    # Get the maximum GID value already assigned
-    try:
-        max_gid = max(eg.typed_value() for eg in existing_gids)
-    except ValueError:
-        # if there are no existing gids
-        max_gid = None
+    max_gid = max(eg.typed_value() for eg in existing_gids)
 
     # Check each range to find the first available GID
-    for gid_range in settings.GID_RANGES:
-        start = gid_range.start
-        end = gid_range.stop
-        if max_gid is None:
-            # If no existing GID, return the start of the first range
-            return start
-
-        elif start <= max_gid < end:
-            return max_gid + 1
-
-        else:
-            raise ValueError("No GID available in the specified ranges.")
+    for index, range in enumerate(settings.GID_RANGES):
+        if max_gid in range:
+            if max_gid != range[-1]:  # If max_gid is not the last in the range
+                return max_gid + 1
+            else:
+                if index + 1 < len(
+                    settings.GID_RANGES
+                ):  # if at the end of the range, get the next range
+                    return settings.GID_RANGES[index + 1][0]
+                else:
+                    raise ValueError(
+                        f"{max_gid} is the last of available \
+                    GIDs in the specified ranges."
+                    )
+    raise ValueError(f"{max_gid} is outside all the specified ranges.")
