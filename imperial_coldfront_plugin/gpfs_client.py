@@ -293,7 +293,7 @@ class GPFSClient(Consumer):
         ]  # denotes the "Number of files in usage": Number of inodes.
 
         retrieved_data = {
-            "block_usage_gb": block_usage / 1024**2,
+            "block_usage_tb": block_usage / 1024**3,
             "files_usage": files_usage,
         }
 
@@ -317,7 +317,7 @@ class GPFSClient(Consumer):
         return {
             quota["objectName"]: {
                 "files_usage": quota["filesUsage"],
-                "block_usage_gb": quota["blockUsage"] / 1024**2,
+                "block_usage_tb": quota["blockUsage"] / 1024**3,
             }
             for quota in data["quotas"]
             if quota["quotaType"] == "FILESET"
@@ -398,9 +398,9 @@ def _update_quota_usages_task():
             allocation_attribute_type__name="RDF Project ID"
         ).value
         storage_attribute_usage = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Storage Quota (GB)"
+            allocation_attribute_type__name="Storage Quota (TB)"
         ).allocationattributeusage
-        storage_attribute_usage.value = usages[rdf_id]["block_usage_gb"]
+        storage_attribute_usage.value = usages[rdf_id]["block_usage_tb"]
         storage_attribute_usage.save()
         files_attribute_usage = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Files Quota"

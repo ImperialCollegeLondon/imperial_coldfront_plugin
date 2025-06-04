@@ -93,7 +93,7 @@ def add_rdf_storage_allocation(request):
     if request.method == "POST":
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
-            storage_size_gb = form.cleaned_data["size"]
+            storage_size_tb = form.cleaned_data["size"]
             faculty = form.cleaned_data["faculty"]
             department = form.cleaned_data["department"]
             dart_id = form.cleaned_data["dart_id"]
@@ -127,12 +127,12 @@ def add_rdf_storage_allocation(request):
             rdf_allocation.resources.add(rdf_resource)
 
             storage_quota_attribute_type = AllocationAttributeType.objects.get(
-                name="Storage Quota (GB)"
+                name="Storage Quota (TB)"
             )
             quota_attribute = AllocationAttribute.objects.create(
                 allocation_attribute_type=storage_quota_attribute_type,
                 allocation=rdf_allocation,
-                value=storage_size_gb,
+                value=storage_size_tb,
             )
             AllocationAttributeUsage.objects.create(
                 allocation_attribute=quota_attribute, value=0
@@ -205,7 +205,7 @@ def add_rdf_storage_allocation(request):
                     parent_fileset_path=parent_fileset_path,
                     relative_projects_path=relative_projects_path,
                     permissions=settings.GPFS_PERMISSIONS,
-                    block_quota=f"{storage_size_gb}G",
+                    block_quota=f"{storage_size_tb}T",
                     files_quota=settings.GPFS_FILES_QUOTA,
                     parent_fileset=faculty,
                 )
