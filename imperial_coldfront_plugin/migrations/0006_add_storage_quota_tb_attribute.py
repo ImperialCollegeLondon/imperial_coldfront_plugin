@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def add_files_quota_attribute(apps, schema_editor):
+def add_storage_quota_tb_attribute(apps, schema_editor):
     AllocationAttributeType = apps.get_model("allocation", "AllocationAttributeType")
     AttributeType = apps.get_model("allocation", "AttributeType")
 
@@ -26,5 +26,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(add_files_quota_attribute)
+        migrations.RunPython(add_storage_quota_tb_attribute)
     ]
