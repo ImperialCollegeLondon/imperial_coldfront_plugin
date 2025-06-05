@@ -341,17 +341,18 @@ def allocation_attribute_factory(allocation_user):
 
     def create_allocation_attribute(
         allocation=None,
-        allocation_attribute_type=None,
+        name=None,
         value=None,
     ):
         """Create an AllocationAttribute instance."""
         if allocation is None:
             allocation = allocation_user.allocation
-        if allocation_attribute_type is None:
-            allocation_attribute_type = AllocationAttributeType.objects.get(name="GID")
+        name = name or random_string()
         return AllocationAttribute.objects.create(
             allocation=allocation,
-            allocation_attribute_type=allocation_attribute_type,
+            allocation_attribute_type=AllocationAttributeType.objects.get_or_create(
+                name=name, defaults={"attribute_type__name": "Text"}
+            )[0],
             value=value,
         )
 

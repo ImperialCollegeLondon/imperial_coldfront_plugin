@@ -31,7 +31,7 @@ def test_get_new_gid_existing_gids(settings, allocation_attribute_factory):
     settings.GID_RANGES = [range(1000, 2000)]
 
     # Create an existing GID in the database
-    allocation_attribute_factory(allocation_attribute_type=None, value=1500)
+    allocation_attribute_factory(name="GID", value=1500)
 
     # Call the get_new_gid function
     gid = get_new_gid()
@@ -51,7 +51,7 @@ def test_get_new_gid_max_gid_in_range(settings, allocation_attribute_factory):
     settings.GID_RANGES = [range(1000, 2000)]
 
     # Create an existing GID at the end of the range
-    allocation_attribute_factory(allocation_attribute_type=None, value=1999)
+    allocation_attribute_factory(name="GID", value=1999)
 
     # Call the get_new_gid function and expect a ValueError
     with pytest.raises(
@@ -67,7 +67,7 @@ def test_when_equal_to_max_range(settings, allocation_attribute_factory):
     settings.GID_RANGES = [range(1000, 2000)]
 
     # Create an existing GID outside the range
-    allocation_attribute_factory(allocation_attribute_type=None, value=2000)
+    allocation_attribute_factory(name="GID", value=2000)
 
     # Call the get_new_gid function and expect a ValueError
     with pytest.raises(ValueError, match="2000 is outside all the specified ranges."):
@@ -81,7 +81,7 @@ def test_when_greater_than_max_range(settings, allocation_attribute_factory):
     settings.GID_RANGES = [range(1000, 2000)]
 
     # Create an existing GID outside the range
-    allocation_attribute_factory(allocation_attribute_type=None, value=2001)
+    allocation_attribute_factory(name="GID", value=2001)
 
     # Call the get_new_gid function and expect a ValueError
     with pytest.raises(ValueError, match="2001 is outside all the specified ranges."):
@@ -95,7 +95,7 @@ def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
     settings.GID_RANGES = [range(1000, 2000)]
 
     # Create an existing GID outside the range
-    allocation_attribute_factory(allocation_attribute_type=None, value=999)
+    allocation_attribute_factory(name="GID", value=999)
 
     # Call the get_new_gid function
     gid = get_new_gid()
@@ -111,7 +111,7 @@ def test_multiple_gid_ranges(settings, allocation_attribute_factory):
     settings.GID_RANGES = [range(1000, 1100), range(2000, 2100)]
 
     # Create an existing GID at the end of the first range
-    allocation_attribute_factory(allocation_attribute_type=None, value=1099)
+    allocation_attribute_factory(name="GID", value=1099)
 
     # Call the get_new_gid function
     gid = get_new_gid()
