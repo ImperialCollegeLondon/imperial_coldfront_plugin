@@ -1,6 +1,6 @@
 import pytest
 
-from imperial_coldfront_plugin.gid import get_new_gid
+from imperial_coldfront_plugin.gid import NoGIDAvailableError, get_new_gid
 
 
 @pytest.mark.django_db
@@ -53,9 +53,9 @@ def test_get_new_gid_max_gid_in_range(settings, allocation_attribute_factory):
     # Create an existing GID at the end of the range
     allocation_attribute_factory(name="GID", value=1999)
 
-    # Call the get_new_gid function and expect a ValueError
+    # Expect the output to be a NoGIDAvailableError when calling get_new_gid
     with pytest.raises(
-        ValueError, match="1999 is the last available GID in the specified ranges."
+        NoGIDAvailableError, match="No available GID found in the configured ranges."
     ):
         get_new_gid()
 
@@ -69,8 +69,10 @@ def test_when_equal_to_max_range(settings, allocation_attribute_factory):
     # Create an existing GID outside the range
     allocation_attribute_factory(name="GID", value=2000)
 
-    # Call the get_new_gid function and expect a ValueError
-    with pytest.raises(ValueError, match="2000 is outside all the specified ranges."):
+    # Expect the output to be a NoGIDAvailableError when calling get_new_gid
+    with pytest.raises(
+        NoGIDAvailableError, match="No available GID found in the configured ranges."
+    ):
         get_new_gid()
 
 
@@ -83,8 +85,10 @@ def test_when_greater_than_max_range(settings, allocation_attribute_factory):
     # Create an existing GID outside the range
     allocation_attribute_factory(name="GID", value=2001)
 
-    # Call the get_new_gid function and expect a ValueError
-    with pytest.raises(ValueError, match="2001 is outside all the specified ranges."):
+    # Expect the output to be a NoGIDAvailableError when calling get_new_gid
+    with pytest.raises(
+        NoGIDAvailableError, match="No available GID found in the configured ranges."
+    ):
         get_new_gid()
 
 

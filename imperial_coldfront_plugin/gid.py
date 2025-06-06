@@ -4,6 +4,10 @@ from coldfront.core.allocation.models import AllocationAttribute
 from django.conf import settings
 
 
+class NoGIDAvailableError(Exception):
+    """Error when no available GID found in the configured ranges."""
+
+
 def get_new_gid() -> int:
     """Get a new GID value.
 
@@ -40,8 +44,10 @@ def get_new_gid() -> int:
                 ):  # if at the end of the range, get the next range
                     return settings.GID_RANGES[index + 1][0]
                 else:
-                    raise ValueError(
-                        f"{max_gid} is the last available GID in the specified ranges."
+                    raise NoGIDAvailableError(
+                        "No available GID found in the configured ranges."
                     )
         else:
-            raise ValueError(f"{max_gid} is outside all the specified ranges.")
+            raise NoGIDAvailableError(
+                "No available GID found in the configured ranges."
+            )
