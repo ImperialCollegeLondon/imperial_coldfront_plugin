@@ -43,11 +43,6 @@ def get_new_gid() -> int:
                     settings.GID_RANGES
                 ):  # if at the end of the range, get the next range
                     return settings.GID_RANGES[index + 1][0]
-                else:
-                    raise NoGIDAvailableError(
-                        "No available GID found in the configured ranges."
-                    )
-        else:
-            raise NoGIDAvailableError(
-                "No available GID found in the configured ranges."
-            )
+        raise NoGIDAvailableError(
+            "No available GID found in the configured ranges."
+        )
