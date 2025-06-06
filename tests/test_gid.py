@@ -3,8 +3,7 @@ import pytest
 from imperial_coldfront_plugin.gid import NoGIDAvailableError, get_new_gid
 
 
-@pytest.mark.django_db
-def test_get_new_gid_no_existing_gids(settings):
+def test_get_new_gid_no_existing_gids(db, settings):
     """Test when no existing GIDs are present.
 
     This test checks that get_new_gid returns the first GID in the range
@@ -29,7 +28,6 @@ def test_get_new_gid_no_existing_gids(settings):
         (2001, True),  # Existing GID is outside the range
     ],
 )
-@pytest.mark.django_db
 def test_get_new_gid(
     settings, allocation_attribute_factory, existing_gid, raised_error
 ):
@@ -55,7 +53,6 @@ def test_get_new_gid(
         assert gid == existing_gid + 1
 
 
-@pytest.mark.django_db
 def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
     """Test when existing GID is smaller than the minimum of the range."""
     # Override the GID_RANGES setting using the fixture
@@ -71,7 +68,6 @@ def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
     assert gid == 1000
 
 
-@pytest.mark.django_db
 def test_multiple_gid_ranges(settings, allocation_attribute_factory):
     """Test when multiple GID ranges are configured."""
     # Override the GID_RANGES setting using the fixture
