@@ -329,3 +329,31 @@ def allocation_user(allocation_user_active_status, rdf_allocation, user):
         user=user,
         status=allocation_user_active_status,
     )
+
+
+@pytest.fixture
+def allocation_attribute_factory(allocation_user):
+    """Factory for creating AllocationAttribute instances for GID."""
+    from coldfront.core.allocation.models import (
+        AllocationAttribute,
+        AllocationAttributeType,
+    )
+
+    def create_allocation_attribute(
+        allocation=None,
+        name=None,
+        value=None,
+    ):
+        """Create an AllocationAttribute instance."""
+        if allocation is None:
+            allocation = allocation_user.allocation
+        name = name or random_string()
+        return AllocationAttribute.objects.create(
+            allocation=allocation,
+            allocation_attribute_type=AllocationAttributeType.objects.get_or_create(
+                name=name, defaults={"attribute_type__name": "Text"}
+            )[0],
+            value=value,
+        )
+
+    return create_allocation_attribute
