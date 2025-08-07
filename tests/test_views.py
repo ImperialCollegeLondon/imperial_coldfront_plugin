@@ -134,6 +134,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         project,
         superuser_client,
         rdf_allocation_dependencies,
+        settings,
     ):
         """Test successful project creation."""
         # mock the chain to inject the group value to check the redirect later
@@ -146,6 +147,11 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         dart_id = "1001"
         group_name = get_next_rdf_project_id()
         gid = get_new_gid()
+
+        # set all of these so they are not empty
+        settings.GPFS_FILESYSTEM_NAME = "fsname"
+        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
+        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
 
         response = superuser_client.post(
             self._get_url(),
@@ -227,12 +233,12 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         )
 
         faculty_path = Path(
-            settings.GPFS_FILESET_PATH, settings.GPFS_FILESYSTEM_NAME, faculty
+            settings.GPFS_FILESYSTEM_MOUNT_PATH,
+            settings.GPFS_FILESYSTEM_NAME,
+            settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+            faculty,
         )
-        relative_projects_path = Path(
-            department,
-            project.pi.username,
-        )
+        relative_projects_path = Path(department)
 
         gpfs_task_mock.assert_called_once_with(
             filesystem_name=settings.GPFS_FILESYSTEM_NAME,

@@ -187,14 +187,12 @@ def add_rdf_storage_allocation(request):
 
             if settings.GPFS_ENABLED:
                 parent_fileset_path = Path(
-                    settings.GPFS_FILESET_PATH,
+                    settings.GPFS_FILESYSTEM_MOUNT_PATH,
                     settings.GPFS_FILESYSTEM_NAME,
+                    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
                     faculty,
                 )
-                relative_projects_path = Path(
-                    department,
-                    project.pi.username,
-                )
+                relative_projects_path = Path(department)
 
                 chain.append(
                     "imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota",
