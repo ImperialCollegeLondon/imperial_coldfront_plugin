@@ -31,7 +31,7 @@ def add_rdf_resource_type(apps, schema_editor):
         defaults=dict(
             attribute_type=text_attribute_type,
             is_unique=True,
-            is_private=True,
+            is_private=False,
             is_changeable=False,
         ),
     )
