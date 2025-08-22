@@ -168,7 +168,7 @@ class ProjectCreationForm(forms.ModelForm):
         """Meta class for the form."""
 
         model = Project
-        fields = ["title", "description", "field_of_science"]
+        fields = ("title", "description", "field_of_science")
 
     username = forms.CharField(
         help_text="Username of group owner (must be a valid imperial username).",

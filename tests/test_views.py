@@ -261,7 +261,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         )
 
     def test_post_unknown_user(self, superuser_client, get_graph_api_client_mock):
-        """"""
+        """Test posting with an invalid username."""
 
         response = superuser_client.post(
             self._get_url(),
@@ -420,6 +420,8 @@ class TestAddDartID(LoginRequiredMixin):
 
 
 class TestProjectCreation(LoginRequiredMixin):
+    """Tests for the projection_creation view."""
+
     @pytest.fixture(autouse=True)
     def get_graph_api_client_mock(self, mocker):
         """Mock out imperial_coldfront_plugin.forms.get_graph_api_client."""
@@ -436,11 +438,13 @@ class TestProjectCreation(LoginRequiredMixin):
         assert response.status_code == 403
 
     def test_get(self, superuser_client):
+        """Test get method."""
         response = superuser_client.get(self._get_url())
         assert response.status_code == 200
         assert isinstance(response.context["form"], ProjectCreationForm)
 
     def test_post(self, superuser_client, user):
+        """Test posting with valid data."""
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
             Project,
@@ -485,6 +489,7 @@ class TestProjectCreation(LoginRequiredMixin):
         assert project_user.role == project_user_role
 
     def test_post_unknown_user(self, superuser_client, get_graph_api_client_mock):
+        """Test posting with an invalid username."""
         from coldfront.core.field_of_science.models import FieldOfScience
 
         get_graph_api_client_mock.user_profile.return_value = dict(username=None)

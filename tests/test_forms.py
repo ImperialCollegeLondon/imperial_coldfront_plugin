@@ -80,6 +80,15 @@ def test_rdf_allocation_form_invalid_dart_id(rdf_form_data):
     assert form.errors == dict(dart_id=["Dart ID outside valid range"])
 
 
+@pytest.fixture
+def get_graph_api_client_mock(mocker, parsed_profile):
+    """Mock out imperial_coldfront_plugin.forms.get_graph_api_client."""
+    mock = mocker.patch("imperial_coldfront_plugin.forms.get_graph_api_client")
+    mock().user_profile.return_value = parsed_profile
+    mock().user_search_by.return_value = [parsed_profile]
+    return mock
+
+
 def test_get_or_create_user(
     get_graph_api_client_mock, parsed_profile, django_user_model
 ):

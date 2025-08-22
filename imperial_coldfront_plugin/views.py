@@ -304,6 +304,7 @@ def add_dart_id_to_allocation(request: HttpRequest, allocation_pk: int):
 
 
 def create_new_project(form: ProjectCreationForm) -> Project:
+    """Create a new project from the form data."""
     project_obj = form.save(commit=False)
     project_obj.status = ProjectStatusChoice.objects.get(name="Active")
     project_obj.pi = form.cleaned_data["user"]
