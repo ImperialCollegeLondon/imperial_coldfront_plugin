@@ -30,7 +30,12 @@ from django.utils import timezone
 from django_q.tasks import Chain, Task
 
 from .dart import create_dart_id_attribute
-from .forms import DartIDForm, RDFAllocationForm, get_department_choices
+from .forms import (
+    DartIDForm,
+    ProjectCreationForm,
+    RDFAllocationForm,
+    get_department_choices,
+)
 from .gid import get_new_gid
 from .microsoft_graph_client import get_graph_api_client
 from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
@@ -113,8 +118,7 @@ def add_rdf_storage_allocation(request):
             allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
 
             # We create a new user and an associated project, if they don't exist.
-            user = get_or_create_user(form.cleaned_data["username"])
-            project = get_or_create_project(user)
+            project = get_or_create_project(form.cleaned_data["user"])
 
             rdf_allocation = Allocation.objects.create(
                 project=project,
@@ -255,29 +259,6 @@ def task_stat_view(request, group: str, allocation_pk: int):
     )
 
 
-def get_or_create_user(username: str) -> User:
-    """Get user from the database or creates one using data from Graph.
-
-    Args:
-        username: The username of the user to be retrieved or created.
-
-    Return:
-        The user, already existing or newly created.
-    """
-    try:
-        user = User.objects.get(username=username)
-    except User.DoesNotExist:
-        client = get_graph_api_client()
-        user_data = client.user_profile(username)
-        user = User.objects.create(
-            username=user_data["username"],
-            first_name=user_data["first_name"],
-            last_name=user_data["last_name"],
-            email=user_data["email"],
-        )
-    return user
-
-
 def get_or_create_project(user: User) -> Project:
     """Get project from the database or creates one.
 
@@ -319,4 +300,38 @@ def add_dart_id_to_allocation(request: HttpRequest, allocation_pk: int):
         form = DartIDForm()
     return render(
         request, "imperial_coldfront_plugin/dart_id_form.html", context=dict(form=form)
+    )
+
+
+def create_new_project(form: ProjectCreationForm) -> Project:
+    project_obj = form.save(commit=False)
+    project_obj.status = ProjectStatusChoice.objects.get(name="Active")
+    project_obj.pi = form.cleaned_data["user"]
+    project_obj.save()
+    ProjectUser.objects.create(
+        user=form.cleaned_data["user"],
+        project=project_obj,
+        role=ProjectUserRoleChoice.objects.get(name="Manager"),
+        status=ProjectUserStatusChoice.objects.get(name="Active"),
+    )
+    return project_obj
+
+
+@login_required
+def project_creation(request: HttpRequest):
+    """View to create a new project for any user."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = ProjectCreationForm(request.POST)
+        if form.is_valid():
+            project = create_new_project(form)
+            return redirect("project-detail", pk=project.pk)
+    else:
+        form = ProjectCreationForm()
+    return render(
+        request,
+        "imperial_coldfront_plugin/project_creation_form.html",
+        context=dict(form=form),
     )

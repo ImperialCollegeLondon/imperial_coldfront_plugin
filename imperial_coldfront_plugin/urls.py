@@ -27,4 +27,5 @@ urlpatterns = [
         views.add_dart_id_to_allocation,
         name="add_dart_id",
     ),
+    path("new_group/", views.project_creation, name="new_group"),
 ]

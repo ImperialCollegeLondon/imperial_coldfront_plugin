@@ -78,3 +78,14 @@ def test_rdf_allocation_form_invalid_dart_id(rdf_form_data):
     form = RDFAllocationForm(data=rdf_form_data)
     assert not form.is_valid()
     assert form.errors == dict(dart_id=["Dart ID outside valid range"])
+
+
+def test_get_or_create_user(
+    get_graph_api_client_mock, parsed_profile, django_user_model
+):
+    """Test get_or_create_user function."""
+    from imperial_coldfront_plugin.forms import get_or_create_user
+
+    assert not django_user_model.objects.filter(username=parsed_profile["username"])
+    user = get_or_create_user(parsed_profile["username"])
+    assert user == django_user_model.objects.get(username=parsed_profile["username"])

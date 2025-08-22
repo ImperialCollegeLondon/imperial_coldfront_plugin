@@ -357,3 +357,13 @@ def allocation_attribute_factory(allocation_user):
         )
 
     return create_allocation_attribute
+
+
+@pytest.fixture(autouse=True)
+def patch_request_session(mocker):
+    """Backstop that raises an error if an un-mocked http request is attempted."""
+
+    def f(*args, **kwargs):
+        raise RuntimeError("Un-mocked HTTP request.")
+
+    return mocker.patch("requests.Session.send", side_effect=f)

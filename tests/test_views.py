@@ -11,7 +11,7 @@ from django.utils import timezone
 from django_q.tasks import Chain
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import RDFAllocationForm
+from imperial_coldfront_plugin.forms import ProjectCreationForm, RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
 from imperial_coldfront_plugin.views import (
@@ -92,6 +92,13 @@ class TestGetNextRdfProjectId:
 
 class TestAddRDFStorageAllocation(LoginRequiredMixin):
     """Tests for the add_rdf_storage_allocation view."""
+
+    @pytest.fixture(autouse=True)
+    def get_graph_api_client_mock(self, mocker):
+        """Mock out imperial_coldfront_plugin.forms.get_graph_api_client."""
+        mock = mocker.patch("imperial_coldfront_plugin.forms.get_graph_api_client")
+        mock().user_profile.return_value = dict(username=None)
+        return mock
 
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:add_rdf_storage_allocation")
@@ -253,6 +260,19 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             parent_fileset=faculty,
         )
 
+    def test_post_unknown_user(self, superuser_client, get_graph_api_client_mock):
+        """"""
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(username="notauser", department="dsde", faculty="foe"),
+        )
+        assert response.status_code == 200
+        assert (
+            response.context["form"].errors["username"][0]
+            == "Username not found locally or in College directory."
+        )
+
     class TestLoadDepartmentsView:
         """Tests for the load_departments view."""
 
@@ -353,17 +373,6 @@ def test_get_or_create_project(user):
     ProjectUserStatusChoice.objects.get(name="Active")
 
 
-def test_get_or_create_user(
-    get_graph_api_client_mock, parsed_profile, django_user_model
-):
-    """Test get_or_create_user function."""
-    from imperial_coldfront_plugin.views import get_or_create_user
-
-    assert not django_user_model.objects.filter(username=parsed_profile["username"])
-    user = get_or_create_user(parsed_profile["username"])
-    assert user == django_user_model.objects.get(username=parsed_profile["username"])
-
-
 class TestAddDartID(LoginRequiredMixin):
     """Tests for the add_dart_id_to_allocation view function."""
 
@@ -407,4 +416,91 @@ class TestAddDartID(LoginRequiredMixin):
             allocation_attribute_type__name="DART ID",
             value=dart_id,
             allocation=rdf_allocation,
+        )
+
+
+class TestProjectCreation(LoginRequiredMixin):
+    @pytest.fixture(autouse=True)
+    def get_graph_api_client_mock(self, mocker):
+        """Mock out imperial_coldfront_plugin.forms.get_graph_api_client."""
+        mock = mocker.patch("imperial_coldfront_plugin.forms.get_graph_api_client")
+        mock().user_profile.return_value = dict(username=None)
+        return mock
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:new_group")
+
+    def test_invalid_user(self, user_client):
+        """Test a standard user cannot access the view."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == 403
+
+    def test_get(self, superuser_client):
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == 200
+        assert isinstance(response.context["form"], ProjectCreationForm)
+
+    def test_post(self, superuser_client, user):
+        from coldfront.core.field_of_science.models import FieldOfScience
+        from coldfront.core.project.models import (
+            Project,
+            ProjectStatusChoice,
+            ProjectUserRoleChoice,
+            ProjectUserStatusChoice,
+        )
+
+        ProjectStatusChoice.objects.create(name="Active")
+        project_user_status = ProjectUserStatusChoice.objects.create(name="Active")
+        project_user_role = ProjectUserRoleChoice.objects.create(name="Manager")
+        FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
+
+        title = "group title"
+        description = "group_description"
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                title=title,
+                description=description,
+                username=user.username,
+                field_of_science=FieldOfScience.DEFAULT_PK,
+            ),
+        )
+
+        project = Project.objects.get()
+        assertRedirects(
+            response,
+            reverse(
+                "project-detail",
+                args=[project.pk],
+            ),
+            fetch_redirect_response=False,
+        )
+
+        assert project.title == title
+        assert project.pi == user
+        assert project.description == description
+
+        project_user = project.projectuser_set.get()
+        assert project_user.status == project_user_status
+        assert project_user.role == project_user_role
+
+    def test_post_unknown_user(self, superuser_client, get_graph_api_client_mock):
+        from coldfront.core.field_of_science.models import FieldOfScience
+
+        get_graph_api_client_mock.user_profile.return_value = dict(username=None)
+        FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                title="a title",
+                description="a description",
+                username="whatever",
+                field_of_science=FieldOfScience.DEFAULT_PK,
+            ),
+        )
+        assert response.status_code == 200
+        assert (
+            response.context["form"].errors["username"][0]
+            == "Username not found locally or in College directory."
         )

@@ -5,12 +5,17 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 
+from coldfront.core.project.models import Project
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 
 from .dart import DartIDValidationError, validate_dart_id
+from .microsoft_graph_client import get_graph_api_client
+
+User = get_user_model()
 
 DEPARTMENTS = {
     "physics": "Physics",
@@ -44,6 +49,39 @@ def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
 def get_initial_department_choices() -> Iterable[tuple[str, str]]:
     """Get all the initial departments in tuple form."""
     return [("", "--------"), *DEPARTMENTS.items()]
+
+
+class UnknownUsernameError(Exception):
+    """Unable to locate a user in the local database or College directory."""
+
+
+def get_or_create_user(username: str) -> User:
+    """Get user from the database or creates one using data from Graph.
+
+    Args:
+        username: The username of the user to be retrieved or created.
+
+    Return:
+        The user, already existing or newly created.
+    """
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        pass
+    else:
+        return user
+    client = get_graph_api_client()
+    user_data = client.user_profile(username)
+    if not user_data["username"]:
+        raise UnknownUsernameError(
+            f"Unable to find or create user with username: '{username}'"
+        )
+    return User.objects.create(
+        username=user_data["username"],
+        first_name=user_data["first_name"],
+        last_name=user_data["last_name"],
+        email=user_data["email"],
+    )
 
 
 class RDFAllocationForm(forms.Form):
@@ -82,6 +120,18 @@ class RDFAllocationForm(forms.Form):
             raise ValidationError(e.args[0])
         return dart_id
 
+    def clean_username(self) -> str:
+        """Clean username field.
+
+        Tries to map username to a user object and adds a user entry to cleaned_data.
+        """
+        try:
+            self.cleaned_data["user"] = get_or_create_user(
+                self.cleaned_data["username"]
+            )
+        except UnknownUsernameError:
+            raise ValidationError("Username not found locally or in College directory.")
+
     def clean(self) -> bool:
         """Check if the faculty and department combination is valid.
 
@@ -109,3 +159,29 @@ class DartIDForm(forms.Form):
         except DartIDValidationError as e:
             raise ValidationError(e.args[0])
         return dart_id
+
+
+class ProjectCreationForm(forms.ModelForm):
+    """Form for creating a new research group (project)."""
+
+    class Meta:
+        """Meta class for the form."""
+
+        model = Project
+        fields = ["title", "description", "field_of_science"]
+
+    username = forms.CharField(
+        help_text="Username of group owner (must be a valid imperial username).",
+    )
+
+    def clean_username(self) -> str:
+        """Clean username field.
+
+        Tries to map username to a user object and adds a user entry to cleaned_data.
+        """
+        try:
+            self.cleaned_data["user"] = get_or_create_user(
+                self.cleaned_data["username"]
+            )
+        except UnknownUsernameError:
+            raise ValidationError("Username not found locally or in College directory.")
