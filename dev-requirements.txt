@@ -14,8 +14,6 @@ asgiref==3.7.2
     #   django
     #   django-simple-history
     #   django-stubs
-attrs==24.3.0
-    # via pytest-mypy
 bibtexparser==1.4.1
     # via
     #   coldfront
@@ -24,7 +22,7 @@ blessed==1.20.0
     # via
     #   coldfront
     #   django-q
-build==1.2.2.post1
+build==1.3.0
     # via pip-tools
 certifi==2024.2.2
     # via
@@ -40,20 +38,19 @@ charset-normalizer==3.3.2
     # via
     #   coldfront
     #   requests
-click==8.1.8
+click==8.2.1
     # via pip-tools
 coldfront==1.1.6
     # via imperial_coldfront_plugin (pyproject.toml)
-coverage[toml]==7.6.10
+coverage[toml]==7.10.5
     # via pytest-cov
 crispy-bootstrap4==2024.1
     # via coldfront
-cryptography==44.0.0
+cryptography==45.0.6
     # via
     #   josepy
     #   mozilla-django-oidc
-    #   pyopenssl
-distlib==0.3.9
+distlib==0.4.0
     # via virtualenv
 django==4.2.11
     # via
@@ -94,7 +91,7 @@ django-sslserver==0.22
     # via coldfront
 django-stubs==5.0.0
     # via imperial_coldfront_plugin (pyproject.toml)
-django-stubs-ext==5.1.1
+django-stubs-ext==5.2.2
     # via
     #   django-stubs
     #   imperial_coldfront_plugin (pyproject.toml)
@@ -108,7 +105,7 @@ faker==24.1.0
     # via
     #   coldfront
     #   factory-boy
-filelock==3.16.1
+filelock==3.19.1
     # via
     #   pytest-mypy
     #   virtualenv
@@ -122,46 +119,50 @@ future==1.0.0
     #   doi2bib
 humanize==4.9.0
     # via coldfront
-identify==2.6.5
+identify==2.6.13
     # via pre-commit
 idna==3.6
     # via
     #   coldfront
     #   requests
-iniconfig==2.0.0
+iniconfig==2.1.0
     # via pytest
-josepy==1.14.0
+josepy==2.1.0
     # via mozilla-django-oidc
 ldap3==2.9.1
     # via imperial_coldfront_plugin (pyproject.toml)
 mozilla-django-oidc==4.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
-mypy==1.14.1
+mypy==1.17.1
     # via
     #   imperial_coldfront_plugin (pyproject.toml)
     #   pytest-mypy
-mypy-extensions==1.0.0
+mypy-extensions==1.1.0
     # via mypy
 nodeenv==1.9.1
     # via pre-commit
-packaging==24.2
+packaging==25.0
     # via
     #   build
     #   pytest
-pip-tools==7.4.1
+pathspec==0.12.1
+    # via mypy
+pip-tools==7.5.0
     # via imperial_coldfront_plugin (pyproject.toml)
-platformdirs==4.3.6
+platformdirs==4.3.8
     # via virtualenv
-pluggy==1.5.0
-    # via pytest
-pre-commit==4.0.1
+pluggy==1.6.0
+    # via
+    #   pytest
+    #   pytest-cov
+pre-commit==4.3.0
     # via imperial_coldfront_plugin (pyproject.toml)
 pyasn1==0.6.1
     # via ldap3
 pycparser==2.22
     # via cffi
-pyopenssl==24.3.0
-    # via josepy
+pygments==2.19.2
+    # via pytest
 pyparsing==3.1.2
     # via
     #   bibtexparser
@@ -170,20 +171,20 @@ pyproject-hooks==1.2.0
     # via
     #   build
     #   pip-tools
-pytest==8.3.4
+pytest==8.4.1
     # via
     #   imperial_coldfront_plugin (pyproject.toml)
     #   pytest-cov
     #   pytest-django
     #   pytest-mock
     #   pytest-mypy
-pytest-cov==6.0.0
+pytest-cov==6.2.1
     # via imperial_coldfront_plugin (pyproject.toml)
-pytest-django==4.9.0
+pytest-django==4.11.1
     # via imperial_coldfront_plugin (pyproject.toml)
-pytest-mock==3.14.0
+pytest-mock==3.14.1
     # via imperial_coldfront_plugin (pyproject.toml)
-pytest-mypy==0.10.3
+pytest-mypy==1.0.1
     # via imperial_coldfront_plugin (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
@@ -207,7 +208,7 @@ requests==2.31.0
     #   imperial_coldfront_plugin (pyproject.toml)
     #   mozilla-django-oidc
     #   uplink
-ruff==0.8.6
+ruff==0.12.10
     # via imperial_coldfront_plugin (pyproject.toml)
 six==1.16.0
     # via
@@ -225,7 +226,7 @@ types-python-dateutil==2.8.19.20240106
     # via
     #   arrow
     #   coldfront
-types-pyyaml==6.0.12.20241230
+types-pyyaml==6.0.12.20250822
     # via django-stubs
 typing-extensions==4.10.0
     # via
@@ -233,15 +234,15 @@ typing-extensions==4.10.0
     #   django-stubs
     #   django-stubs-ext
     #   mypy
-uplink==0.9.7
+uplink==0.10.0
     # via imperial_coldfront_plugin (pyproject.toml)
-uritemplate==4.1.1
+uritemplate==4.2.0
     # via uplink
 urllib3==2.2.1
     # via
     #   coldfront
     #   requests
-virtualenv==20.28.1
+virtualenv==20.34.0
     # via pre-commit
 wcwidth==0.2.13
     # via
