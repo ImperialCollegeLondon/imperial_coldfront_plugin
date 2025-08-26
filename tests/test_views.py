@@ -262,7 +262,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
 
     def test_post_unknown_user(self, superuser_client, get_graph_api_client_mock):
         """Test posting with an invalid username."""
-
         response = superuser_client.post(
             self._get_url(),
             data=dict(username="notauser", department="dsde", faculty="foe"),

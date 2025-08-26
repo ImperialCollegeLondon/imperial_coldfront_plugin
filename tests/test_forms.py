@@ -53,7 +53,6 @@ def rdf_form_data(project):
         department=department_id,
         end_date=datetime.max.date(),
         size=10,
-        dart_id="1",
     )
 
 
