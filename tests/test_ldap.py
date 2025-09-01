@@ -88,13 +88,13 @@ def test_ldap_remove_member_from_group_wrong_error_code(ldap_connection_mock):
 
 
 def test_check_ldap_consistency_no_discrepancies(
-    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_project_id
+    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_ldap_name
 ):
     """Test when everything is in sync between Coldfront and AD."""
     username = allocation_user.user.username
 
     def mock_search(base_dn, search_filter, **kwargs):
-        if f"(cn={rdf_allocation_project_id})" in search_filter:
+        if f"(cn={rdf_allocation_ldap_name})" in search_filter:
             return (
                 True,
                 None,
@@ -133,13 +133,13 @@ def test_check_ldap_consistency_no_discrepancies(
 
 
 def test_check_ldap_consistency_missing_members(
-    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_project_id
+    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_ldap_name
 ):
     """Test when a user is missing from AD group."""
     username = allocation_user.user.username
 
     def mock_search(base_dn, search_filter, **kwargs):
-        if f"(cn={rdf_allocation_project_id})" in search_filter:
+        if f"(cn={rdf_allocation_ldap_name})" in search_filter:
             return (
                 True,
                 None,
@@ -158,7 +158,7 @@ def test_check_ldap_consistency_missing_members(
     assert len(result) == 1
     discrepancy = result[0]
     assert discrepancy["allocation_id"] == rdf_allocation.id
-    assert discrepancy["group_id"] == rdf_allocation_project_id
+    assert discrepancy["group_name"] == rdf_allocation_ldap_name
     assert discrepancy["project_name"] == rdf_allocation.project.title
     assert username in discrepancy["missing_members"]
     assert not discrepancy["extra_members"]
@@ -167,14 +167,14 @@ def test_check_ldap_consistency_missing_members(
 
 
 def test_check_ldap_consistency_extra_members(
-    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_project_id
+    rdf_allocation, allocation_user, ldap_connection_mock, rdf_allocation_ldap_name
 ):
     """Test when there are extra users in AD group."""
     username = allocation_user.user.username
     extra_user = "extra_user"
 
     def mock_search(base_dn, search_filter, **kwargs):
-        if f"(cn={rdf_allocation_project_id})" in search_filter:
+        if f"(cn={rdf_allocation_ldap_name})" in search_filter:
             return (
                 True,
                 None,
@@ -194,29 +194,28 @@ def test_check_ldap_consistency_extra_members(
 
     ldap_connection_mock().search.side_effect = mock_search
 
-    with patch("imperial_coldfront_plugin.ldap.re.search") as mock_re_search:
+    def side_effect(pattern, string, flags=0):
+        mock_match = MagicMock()
+        if username in string:
+            mock_match.group.return_value = username
+            return mock_match
+        elif extra_user in string:
+            mock_match.group.return_value = extra_user
+            return mock_match
+        return None
 
-        def side_effect(pattern, string, flags=0):
-            mock_match = MagicMock()
-            if username in string:
-                mock_match.group.return_value = username
-                return mock_match
-            elif extra_user in string:
-                mock_match.group.return_value = extra_user
-                return mock_match
-            return None
-
-        mock_re_search.side_effect = side_effect
-
-        with patch(
+    with (
+        patch("imperial_coldfront_plugin.ldap.re.search", side_effect=side_effect),
+        patch(
             "imperial_coldfront_plugin.ldap._send_discrepancy_notification"
-        ) as mock_notify:
-            result = check_ldap_consistency()
+        ) as mock_notify,
+    ):
+        result = check_ldap_consistency()
 
     assert len(result) == 1
     discrepancy = result[0]
     assert discrepancy["allocation_id"] == rdf_allocation.id
-    assert discrepancy["group_id"] == rdf_allocation_project_id
+    assert discrepancy["group_name"] == rdf_allocation_ldap_name
     assert not discrepancy["missing_members"]
     assert extra_user in discrepancy["extra_members"]
 

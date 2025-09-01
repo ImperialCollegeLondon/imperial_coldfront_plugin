@@ -14,10 +14,6 @@ from pytest_django.asserts import assertRedirects, assertTemplateUsed
 from imperial_coldfront_plugin.forms import ProjectCreationForm, RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
-from imperial_coldfront_plugin.views import (
-    format_project_number_to_id,
-    get_next_rdf_project_id,
-)
 
 
 class LoginRequiredMixin:
@@ -76,20 +72,6 @@ def message_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.views.messages")
 
 
-class TestGetNextRdfProjectId:
-    """Tests for the get_next_rdf_project_id utility function."""
-
-    def test_next_id(self, project, rdf_allocation, rdf_allocation_project_number):
-        """Check correct next id is generated from existing id values."""
-        assert get_next_rdf_project_id() == format_project_number_to_id(
-            rdf_allocation_project_number + 1
-        )
-
-    def test_first(self, db):
-        """Check initial id generation."""
-        assert get_next_rdf_project_id() == format_project_number_to_id(1)
-
-
 class TestAddRDFStorageAllocation(LoginRequiredMixin):
     """Tests for the add_rdf_storage_allocation view."""
 
@@ -141,6 +123,8 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         project,
         superuser_client,
         rdf_allocation_dependencies,
+        rdf_allocation_shortname,
+        rdf_allocation_ldap_name,
         settings,
     ):
         """Test successful project creation."""
@@ -148,11 +132,10 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         chain_group = "chain_group"
         chain_mock.return_value = Chain(cached=True, group=chain_group)
         end_date = timezone.datetime.max.date()
+        start_date = timezone.now().date()
         size = 10
         faculty = "foe"
         department = "dsde"
-        dart_id = "1001"
-        group_name = get_next_rdf_project_id()
         gid = get_new_gid()
 
         # set all of these so they are not empty
@@ -163,13 +146,14 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         response = superuser_client.post(
             self._get_url(),
             data=dict(
-                username=project.pi.username,
+                project=project.pk,
+                start_date=start_date,
                 end_date=end_date,
                 size=size,
                 department=department,
                 faculty=faculty,
-                dart_id=dart_id,
                 gid=gid,
+                allocation_shortname=rdf_allocation_shortname,
             ),
         )
         from coldfront.core.allocation.models import (
@@ -183,7 +167,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             project=project,
             status__name="Active",
             quantity=1,
-            start_date=timezone.now().date(),
+            start_date=start_date,
             end_date=end_date,
         )
         assertRedirects(
@@ -195,7 +179,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             fetch_redirect_response=False,
         )
 
-        project_id = format_project_number_to_id(1)
         storage_attribute = AllocationAttribute.objects.get(
             allocation_attribute_type__name="Storage Quota (TB)",
             allocation=allocation,
@@ -213,30 +196,30 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             allocation_attribute=files_attribute, value=0
         )
         AllocationAttribute.objects.get(
-            allocation_attribute_type__name="RDF Project ID",
+            allocation_attribute_type__name="Shortname",
             allocation=allocation,
-            value=format_project_number_to_id(1),
+            value=rdf_allocation_shortname,
         )
-        AllocationAttribute.objects.get(
-            allocation_attribute_type__name="DART ID",
-            allocation=allocation,
-            value=dart_id,
-        )
+        # AllocationAttribute.objects.get(
+        #     allocation_attribute_type__name="DART ID",
+        #     allocation=allocation,
+        #     value=dart_id,
+        # )
         AllocationUser.objects.get(
             allocation=allocation, user=project.pi, status__name="Active"
         )
         post_ldap_conn_mock().add.assert_called_once_with(
-            group_dn_from_name(group_name),
+            group_dn_from_name(rdf_allocation_ldap_name),
             object_class=["top", "group"],
             attributes=dict(
-                cn=group_name,
+                cn=rdf_allocation_ldap_name,
                 groupType=LDAP_GROUP_TYPE,
-                sAMAccountName=group_name,
+                sAMAccountName=rdf_allocation_ldap_name,
                 gidNumber=min(settings.GID_RANGES[0]),
             ),
         )
         ldap_add_member_mock.assert_called_once_with(
-            project_id, project.pi.username, allow_already_present=True
+            rdf_allocation_ldap_name, project.pi.username, allow_already_present=True
         )
 
         faculty_path = Path(
@@ -251,25 +234,13 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             filesystem_name=settings.GPFS_FILESYSTEM_NAME,
             owner_id="root",
             group_id="root",
-            fileset_name=project_id,
+            fileset_name=rdf_allocation_shortname,
             parent_fileset_path=faculty_path,
             relative_projects_path=relative_projects_path,
             permissions=settings.GPFS_PERMISSIONS,
             block_quota=f"{size}T",
             files_quota=settings.GPFS_FILES_QUOTA,
             parent_fileset=faculty,
-        )
-
-    def test_post_unknown_user(self, superuser_client, get_graph_api_client_mock):
-        """Test posting with an invalid username."""
-        response = superuser_client.post(
-            self._get_url(),
-            data=dict(username="notauser", department="dsde", faculty="foe"),
-        )
-        assert response.status_code == 200
-        assert (
-            response.context["form"].errors["username"][0]
-            == "Username not found locally or in College directory."
         )
 
     class TestLoadDepartmentsView:

@@ -86,7 +86,7 @@ def _send_discrepancy_notification(discrepancies):
     message += "Membership Discrepancies:\n"
     for discrepancy in discrepancies:
         project_name = discrepancy["project_name"]
-        group_id = discrepancy["group_id"]
+        group_id = discrepancy["group_name"]
         message += f"\n- Project: {project_name} (Group: {group_id})\n"
 
         if discrepancy["missing_members"]:

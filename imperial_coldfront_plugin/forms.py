@@ -7,9 +7,14 @@ from collections.abc import Iterable
 
 from coldfront.core.project.models import Project
 from django import forms
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import (
+    MaxLengthValidator,
+    MinLengthValidator,
+    MinValueValidator,
+)
 from django.utils import timezone
 
 from .dart import DartIDValidationError, validate_dart_id
@@ -84,23 +89,40 @@ def get_or_create_user(username: str) -> User:
     )
 
 
+def _todays_date():
+    """Get today's date."""
+    return timezone.now().date()
+
+
+def _js_select_widget():
+    """Get a select widget with the class for select2."""
+    return forms.Select(attrs={"class": "js-example-basic-single"})
+
+
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    username = forms.CharField(
-        help_text="Name of the user associated to this allocation.",
+    project = forms.ModelChoiceField(
+        queryset=Project.objects.filter(status__name="Active"),
+        widget=_js_select_widget(),
+    )
+    start_date = forms.DateField(
+        validators=[MinValueValidator(_todays_date)],
+        initial=_todays_date,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    end_date = forms.DateField(
+        validators=[MinValueValidator(_todays_date)],
+        initial=_todays_date,
+        widget=forms.DateInput(attrs={"type": "date"}),
     )
     faculty = forms.ChoiceField(
         choices=get_faculty_choices,
-        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
+        widget=_js_select_widget(),
     )
     department = forms.ChoiceField(
         choices=get_initial_department_choices,
-        widget=forms.Select(attrs={"class": "js-example-basic-single"}),
-    )
-    end_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date"}),
-        validators=[MinValueValidator(timezone.now().date())],
+        widget=_js_select_widget(),
     )
     size = forms.IntegerField(
         validators=[MinValueValidator(1)], help_text="In terabytes"
@@ -110,6 +132,18 @@ class RDFAllocationForm(forms.Form):
         disabled=False,
         required=False,
         widget=forms.HiddenInput(),
+    )
+    allocation_shortname = forms.CharField(
+        help_text=(
+            "Used to identify individual allocations and in the filesystem path."
+            " Lower case letters and numbers only. Must contain between "
+            f"{settings.ALLOCATION_SHORTNAME_MIN_LENGTH} and "
+            f"{settings.ALLOCATION_SHORTNAME_MAX_LENGTH} characters."
+        ),
+        validators=[
+            MinLengthValidator(settings.ALLOCATION_SHORTNAME_MIN_LENGTH),
+            MaxLengthValidator(settings.ALLOCATION_SHORTNAME_MAX_LENGTH),
+        ],
     )
 
     def clean_dart_id(self) -> str:
@@ -123,17 +157,19 @@ class RDFAllocationForm(forms.Form):
                 raise ValidationError(e.args[0])
         return dart_id
 
-    def clean_username(self) -> str:
-        """Clean username field.
+    def clean_allocation_shortname(self) -> str:
+        """Validate allocation shortname contains only valid characters."""
+        shortname = self.cleaned_data.get("allocation_shortname")
+        if not settings.ALLOCATION_SHORTNAME_VALID_CHARACTERS.issuperset(shortname):
+            raise ValidationError("Name must contain only lowercase letters or numbers")
+        from coldfront.core.allocation.models import AllocationAttribute
 
-        Tries to map username to a user object and adds a user entry to cleaned_data.
-        """
-        try:
-            self.cleaned_data["user"] = get_or_create_user(
-                self.cleaned_data["username"]
-            )
-        except UnknownUsernameError:
-            raise ValidationError("Username not found locally or in College directory.")
+        if AllocationAttribute.objects.filter(
+            allocation_attribute_type__name="Shortname", value=shortname
+        ):
+            raise ValidationError("Name already in use.")
+
+        return shortname
 
     def clean(self) -> bool:
         """Check if the faculty and department combination is valid.
@@ -142,9 +178,9 @@ class RDFAllocationForm(forms.Form):
             ValidationError: If the combination is invalid.
         """
         cleaned_data = super().clean()
-        faculty_id = cleaned_data["faculty"]
-        department_id = cleaned_data["department"]
-        if department_id not in DEPARTMENTS_IN_FACULTY[faculty_id]:
+        faculty_id = cleaned_data.get("faculty")
+        department_id = cleaned_data.get("department")
+        if department_id not in DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
             raise ValidationError("Invalid faculty and department combination.")
 
 

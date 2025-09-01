@@ -2,7 +2,7 @@
 
 from coldfront.core.allocation.models import AllocationAttribute, AllocationUser
 from django.conf import settings
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from .ldap import (
@@ -11,17 +11,28 @@ from .ldap import (
 )
 
 
-def _get_group_id_from_allocation(allocation):
+def _get_shortname_from_allocation(allocation):
     try:
-        return allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="RDF Project ID"
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
         ).value
+        return f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
     except AllocationAttribute.MultipleObjectsReturned:
-        raise ValueError(
-            f"Multiple RDF project ids found for allocation - {allocation}"
-        )
+        raise ValueError(f"Multiple shortnames found for allocation - {allocation}")
     except AllocationAttribute.DoesNotExist:
         return
+
+
+@receiver(pre_save, sender=AllocationAttribute)
+def ensure_unique_shortname(sender, instance, **kwargs):
+    """Prevent saving of shortname attribute if it is not unique."""
+    if (
+        instance.allocation_attribute_type.name == "Shortname"
+        and AllocationAttribute.objects.filter(
+            allocation_attribute_type__name="Shortname", value=instance.value
+        )
+    ):
+        raise ValueError(f"An allocation with {instance.value} already exists.")
 
 
 @receiver(post_save, sender=AllocationUser)
@@ -30,7 +41,7 @@ def sync_ldap_group_membership(sender, instance, **kwargs):
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_group_id_from_allocation(instance.allocation)) is None:
+    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
         return
 
     if instance.status.name == "Active":
@@ -53,7 +64,7 @@ def remove_ldap_group_membership(sender, instance, **kwargs):
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_group_id_from_allocation(instance.allocation)) is None:
+    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
         return
 
     ldap_remove_member_from_group_in_background(

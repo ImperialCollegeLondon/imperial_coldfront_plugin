@@ -1,4 +1,5 @@
 from datetime import datetime
+from random import choices
 
 import pytest
 
@@ -48,11 +49,13 @@ def rdf_form_data(project):
     faculty_id = "foe"
     department_id = DEPARTMENTS_IN_FACULTY[faculty_id][0]
     return dict(
-        username=project.pi.username,
+        project=project.pk,
         faculty=faculty_id,
         department=department_id,
+        start_date=datetime.now().date(),
         end_date=datetime.max.date(),
         size=10,
+        allocation_shortname="shorty",
     )
 
 
@@ -77,6 +80,66 @@ def test_rdf_allocation_form_invalid_dart_id(rdf_form_data):
     form = RDFAllocationForm(data=rdf_form_data)
     assert not form.is_valid()
     assert form.errors == dict(dart_id=["Dart ID outside valid range"])
+
+
+@pytest.mark.parametrize(
+    "shortname,passes",
+    (
+        ("abcd", True),
+        ("123", True),
+        ("abc123", True),
+        ("12AOE", False),
+        ("ab_", False),
+        ("$tete", False),
+        ("tete$", False),
+    ),
+)
+def test_rdf_allocation_shortname_characters(shortname, passes, db):
+    """Test that valid characters are being checked for allocation_shortname field."""
+    form = RDFAllocationForm(data=dict(allocation_shortname=shortname))
+    form.is_valid()
+    if passes:
+        assert not form.errors.get("allocation_shortname")
+    else:
+        assert form.errors["allocation_shortname"] == [
+            "Name must contain only lowercase letters or numbers"
+        ]
+
+
+def test_rdf_allocation_unique(project, rdf_allocation, rdf_allocation_shortname):
+    """Test that uniqueness is being checked for allocation_shortname field."""
+    form = RDFAllocationForm(data=dict(allocation_shortname=rdf_allocation_shortname))
+    form.is_valid()
+    assert form.errors["allocation_shortname"] == ["Name already in use."]
+
+
+def test_rdf_allocation_shortname_min_length(settings):
+    """Test that min length is being checked for allocation_shortname field."""
+    min_length = settings.ALLOCATION_SHORTNAME_MIN_LENGTH
+    test_length = min_length - 1
+    shortname = "".join(
+        choices(list(settings.ALLOCATION_SHORTNAME_VALID_CHARACTERS), k=test_length)
+    )
+    form = RDFAllocationForm(data=dict(allocation_shortname=shortname))
+    form.is_valid()
+    assert form.errors["allocation_shortname"] == [
+        f"Ensure this value has at least {min_length} characters (it has {test_length})"
+        "."
+    ]
+
+
+def test_rdf_allocation_shortname_max_length(settings):
+    """Test that max length is being checked for allocation_shortname field."""
+    max_length = settings.ALLOCATION_SHORTNAME_MAX_LENGTH
+    test_length = max_length + 1
+    shortname = "".join(
+        choices(list(settings.ALLOCATION_SHORTNAME_VALID_CHARACTERS), k=test_length)
+    )
+    form = RDFAllocationForm(data=dict(allocation_shortname=shortname))
+    form.is_valid()
+    assert form.errors["allocation_shortname"] == [
+        f"Ensure this value has at most {max_length} characters (it has {test_length})."
+    ]
 
 
 @pytest.fixture

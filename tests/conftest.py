@@ -270,21 +270,19 @@ def rdf_allocation_dependencies(db):
 
 
 @pytest.fixture
-def rdf_allocation_project_number():
-    """Project number for generating an rdf project id."""
-    return 23
+def rdf_allocation_shortname(settings):
+    """Shortname applied to rdf_allocation fixture."""
+    return "shorty"
 
 
 @pytest.fixture
-def rdf_allocation_project_id(rdf_allocation_project_number):
-    """RDF project id built from rdf_allocation_project_number."""
-    from imperial_coldfront_plugin.views import format_project_number_to_id
-
-    return format_project_number_to_id(rdf_allocation_project_number)
+def rdf_allocation_ldap_name(settings, rdf_allocation_shortname):
+    """LDAP group name associated with rdf_allocation fixture."""
+    return f"{settings.LDAP_SHORTNAME_PREFIX}{rdf_allocation_shortname}"
 
 
 @pytest.fixture
-def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_project_id):
+def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_shortname):
     """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.allocation.models import (
         Allocation,
@@ -295,7 +293,7 @@ def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_project_
     from coldfront.core.resource.models import Resource
 
     rdf_resource = Resource.objects.get(name="RDF Active")
-    rdf_id_attribute_type = AllocationAttributeType.objects.get(name="RDF Project ID")
+    shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
     allocation = Allocation.objects.create(
@@ -304,9 +302,9 @@ def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_project_
     allocation.resources.add(rdf_resource)
 
     AllocationAttribute.objects.create(
-        allocation_attribute_type=rdf_id_attribute_type,
+        allocation_attribute_type=shortname_attribute_type,
         allocation=allocation,
-        value=rdf_allocation_project_id,
+        value=rdf_allocation_shortname,
     )
     return allocation
 

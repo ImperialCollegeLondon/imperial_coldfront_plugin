@@ -26,7 +26,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render, reverse
-from django.utils import timezone
 from django_q.tasks import Chain, Task
 
 from .dart import create_dart_id_attribute
@@ -69,21 +68,6 @@ PROJECT_ID_PREFIX = "rdf-"
 PROJECT_ID_REGEX = re.compile(PROJECT_ID_PREFIX + r"(?P<number>\d{6})")
 
 
-def get_next_rdf_project_id():
-    """Get the next available RDF project id value."""
-    rdf_id_attribute_type = AllocationAttributeType.objects.get(name="RDF Project ID")
-    group_ids = AllocationAttribute.objects.filter(
-        allocation_attribute_type=rdf_id_attribute_type,
-    ).values_list("value", flat=True)
-    id_numbers = [
-        int(PROJECT_ID_REGEX.match(group_id).groupdict()["number"])
-        for group_id in group_ids
-    ]
-    new_project_number = max(id_numbers) + 1 if id_numbers else 1
-
-    return format_project_number_to_id(new_project_number)
-
-
 def format_project_number_to_id(num):
     """Format an rdf project number into a full id string."""
     return f"{PROJECT_ID_PREFIX}{num:06d}"
@@ -101,30 +85,21 @@ def add_rdf_storage_allocation(request):
             storage_size_tb = form.cleaned_data["size"]
             faculty = form.cleaned_data["faculty"]
             department = form.cleaned_data["department"]
-            dart_id = form.cleaned_data["dart_id"]
+            # dart_id = form.cleaned_data["dart_id"]
+            project = form.cleaned_data["project"]
+            shortname = form.cleaned_data["allocation_shortname"]
+            ldap_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
 
-            rdf_id_attribute_type = AllocationAttributeType.objects.get(
-                name="RDF Project ID"
+            shortname_attribute_type = AllocationAttributeType.objects.get(
+                name="Shortname"
             )
-            project_id = get_next_rdf_project_id()
-            if AllocationAttribute.objects.filter(
-                allocation_attribute_type=rdf_id_attribute_type,
-                value=project_id,
-            ):
-                raise ValueError("RDF project with ID already exists.")
-
             rdf_resource = Resource.objects.get(name="RDF Active")
 
             allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-
-            # We create a new user and an associated project, if they don't exist.
-            project = get_or_create_project(form.cleaned_data["user"])
-
             rdf_allocation = Allocation.objects.create(
                 project=project,
                 status=allocation_active_status,
-                quantity=1,
-                start_date=timezone.now().date(),
+                start_date=form.cleaned_data["start_date"],
                 end_date=form.cleaned_data["end_date"],
                 is_changeable=True,
             )
@@ -155,12 +130,12 @@ def add_rdf_storage_allocation(request):
             )
 
             AllocationAttribute.objects.create(
-                allocation_attribute_type=rdf_id_attribute_type,
+                allocation_attribute_type=shortname_attribute_type,
                 allocation=rdf_allocation,
-                value=project_id,
+                value=shortname,
             )
 
-            create_dart_id_attribute(dart_id, rdf_allocation)
+            # create_dart_id_attribute(dart_id, rdf_allocation)
 
             gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
             gid = get_new_gid()
@@ -174,7 +149,7 @@ def add_rdf_storage_allocation(request):
             if settings.LDAP_ENABLED:
                 chain.append(
                     "imperial_coldfront_plugin.ldap._ldap_create_group",
-                    project_id,
+                    ldap_name,
                     gid,
                 )
 
@@ -203,7 +178,7 @@ def add_rdf_storage_allocation(request):
                     filesystem_name=settings.GPFS_FILESYSTEM_NAME,
                     owner_id="root",
                     group_id="root",
-                    fileset_name=project_id,
+                    fileset_name=shortname,
                     parent_fileset_path=parent_fileset_path,
                     relative_projects_path=relative_projects_path,
                     permissions=settings.GPFS_PERMISSIONS,

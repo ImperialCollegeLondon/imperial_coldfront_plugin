@@ -4,6 +4,7 @@ These are imported into the project level settings by the Coldfront plugin mecha
 """
 
 from datetime import timedelta
+from string import ascii_lowercase, digits
 
 from coldfront.config.env import ENV
 
@@ -60,6 +61,8 @@ LDAP_GROUP_OU = ENV.str(
     default="OU=RCS,OU=Groups,OU=Imperial College (London),DC=ic,DC=ac,DC=uk",
 )
 """The organisational unit containing RDF access groups."""
+LDAP_SHORTNAME_PREFIX = "rdf-"
+"""Prefix added to allocation shortname for corresponding Active Directory group."""
 
 LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
 
@@ -68,3 +71,10 @@ GID_RANGES = [
 ]
 
 LOGOUT_REDIRECT_URL = "/"
+
+ALLOCATION_SHORTNAME_VALID_CHARACTERS = set(ascii_lowercase + digits)
+"""Characters that are valid to include as part of an allocation shortname."""
+ALLOCATION_SHORTNAME_MIN_LENGTH = 3
+"""Minimum length of an allocation shortname."""
+ALLOCATION_SHORTNAME_MAX_LENGTH = 12
+"""Maximum length of an allocation shortname."""

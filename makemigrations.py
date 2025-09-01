@@ -11,6 +11,7 @@ settings.configure(
         "django.contrib.admin",
         "django.contrib.contenttypes",
         "django.contrib.sites",
+        "django_q",
         "imperial_coldfront_plugin",
         "coldfront.core.field_of_science",
         "coldfront.core.project",

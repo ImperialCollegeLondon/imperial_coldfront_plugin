@@ -141,14 +141,15 @@ def check_ldap_consistency():
     allocations = Allocation.objects.filter(
         resources__name="RDF Active",
         status__name="Active",
-        allocationattribute__allocation_attribute_type__name="RDF Project ID",
+        allocationattribute__allocation_attribute_type__name="Shortname",
     ).distinct()
 
     conn = _get_ldap_connection()
     for allocation in allocations:
-        group_id = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="RDF Project ID"
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
         ).value
+        group_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
 
         active_users = AllocationUser.objects.filter(
             allocation=allocation, status__name="Active"
@@ -156,7 +157,7 @@ def check_ldap_consistency():
         expected_usernames = [au.user.username for au in active_users]
 
         success, _, group_search, _ = conn.search(
-            settings.LDAP_GROUP_OU, f"(cn={group_id})", attributes=["member"]
+            settings.LDAP_GROUP_OU, f"(cn={group_name})", attributes=["member"]
         )
 
         actual_members = []
@@ -173,7 +174,7 @@ def check_ldap_consistency():
             discrepancies.append(
                 {
                     "allocation_id": allocation.id,
-                    "group_id": group_id,
+                    "group_name": group_name,
                     "project_name": allocation.project.title,
                     "missing_members": list(missing_members),
                     "extra_members": list(extra_members),
