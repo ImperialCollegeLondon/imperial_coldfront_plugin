@@ -11,6 +11,7 @@ from coldfront.core.allocation.models import (
     AllocationStatusChoice,
     AllocationUserStatusChoice,
 )
+from coldfront.core.project.forms import ProjectAddUserForm
 from coldfront.core.project.models import (
     Project,
     ProjectStatusChoice,
@@ -18,12 +19,14 @@ from coldfront.core.project.models import (
     ProjectUserRoleChoice,
     ProjectUserStatusChoice,
 )
+from coldfront.core.project.views import ProjectAddUsersSearchResultsView
 from coldfront.core.resource.models import Resource
-from coldfront.core.user.utils import UserSearch
+from coldfront.core.user.utils import CombinedUserSearch, UserSearch
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.forms import formset_factory
 from django.http import HttpRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django_q.tasks import Chain, Task
@@ -31,6 +34,7 @@ from django_q.tasks import Chain, Task
 from .dart import create_dart_id_attribute
 from .forms import (
     DartIDForm,
+    ProjectAddUsersToAllocationShortnameForm,
     ProjectCreationForm,
     RDFAllocationForm,
     get_department_choices,
@@ -311,3 +315,68 @@ def project_creation(request: HttpRequest):
         "imperial_coldfront_plugin/project_creation_form.html",
         context=dict(form=form),
     )
+
+
+class ProjectAddUsersSearchResultsShortnameView(ProjectAddUsersSearchResultsView):
+    """View to search for users to add to a project, with allocation shortname.
+
+    This is an override of the Coldfront view due to the need to customise the display
+    of allocation attributes. Unfortunately most of the code is a copy-paste job with
+    only the allocation form being updated to customise the display.
+    """
+
+    template_name = "imperial_coldfront_plugin/project_add_user_search_results.html"
+
+    def post(self, request, *args, **kwargs):
+        """Handle POST requests: process the search form and display results."""
+        user_search_string = request.POST.get("q")
+        search_by = request.POST.get("search_by")
+        pk = self.kwargs.get("pk")
+
+        project_obj = get_object_or_404(Project, pk=pk)
+
+        users_to_exclude = [
+            ele.user.username
+            for ele in project_obj.projectuser_set.filter(status__name="Active")
+        ]
+
+        cobmined_user_search_obj = CombinedUserSearch(
+            user_search_string, search_by, users_to_exclude
+        )
+
+        context = cobmined_user_search_obj.search()
+
+        matches = context.get("matches")
+        for match in matches:
+            match.update({"role": ProjectUserRoleChoice.objects.get(name="User")})
+
+        if matches:
+            formset = formset_factory(ProjectAddUserForm, max_num=len(matches))
+            formset = formset(initial=matches, prefix="userform")
+            context["formset"] = formset
+            context["user_search_string"] = user_search_string
+            context["search_by"] = search_by
+
+        if len(user_search_string.split()) > 1:
+            users_already_in_project = []
+            for ele in user_search_string.split():
+                if ele in users_to_exclude:
+                    users_already_in_project.append(ele)
+            context["users_already_in_project"] = users_already_in_project
+
+        # The following block of code is used to hide/show the allocation div.
+        if project_obj.allocation_set.filter(
+            status__name__in=["Active", "New", "Renewal Requested"]
+        ).exists():
+            div_allocation_class = "placeholder_div_class"
+        else:
+            div_allocation_class = "d-none"
+        context["div_allocation_class"] = div_allocation_class
+        ###
+
+        allocation_form = ProjectAddUsersToAllocationShortnameForm(
+            request.user, project_obj.pk, prefix="allocationform"
+        )
+        context["pk"] = pk
+        context["allocation_form"] = allocation_form
+        return render(request, self.template_name, context)

@@ -5,6 +5,7 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 
+from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
 from coldfront.core.project.models import Project
 from django import forms
 from django.conf import settings
@@ -15,10 +16,12 @@ from django.core.validators import (
     MinLengthValidator,
     MinValueValidator,
 )
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
+from .utils import get_allocation_shortname
 
 User = get_user_model()
 
@@ -224,3 +227,50 @@ class ProjectCreationForm(forms.ModelForm):
             )
         except UnknownUsernameError:
             raise ValidationError("Username not found locally or in College directory.")
+
+
+class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
+    """Form for adding users to allocations within a project.
+
+    This is an override of a Coldfront form class that we use to customise the display
+    of the allocation choices to include the shortname attribute.
+    """
+
+    def __init__(self, request_user, project_pk, *args, **kwargs):
+        """Initialize the form."""
+        super().__init__(request_user, project_pk, *args, **kwargs)
+        project_obj = get_object_or_404(Project, pk=project_pk)
+
+        allocation_query_set = project_obj.allocation_set.filter(
+            resources__is_allocatable=True,
+            is_locked=False,
+            status__name__in=[
+                "Active",
+                "New",
+                "Renewal Requested",
+                "Payment Pending",
+                "Payment Requested",
+                "Paid",
+            ],
+        )
+        allocation_choices = [
+            (
+                allocation.id,
+                f"{allocation.get_parent_resource.name} "
+                f"({allocation.get_parent_resource.resource_type.name}) "
+                f"{get_allocation_shortname(allocation)}",
+            )
+            for allocation in allocation_query_set
+        ]
+        allocation_choices_sorted = []
+        allocation_choices_sorted = sorted(
+            allocation_choices, key=lambda x: x[1][0].lower()
+        )
+        allocation_choices.insert(0, ("__select_all__", "Select All"))
+        if allocation_query_set:
+            self.fields["allocation"].choices = allocation_choices_sorted
+            self.fields[
+                "allocation"
+            ].help_text = "<br/>Select allocations to add selected users to."
+        else:
+            self.fields["allocation"].widget = forms.HiddenInput()

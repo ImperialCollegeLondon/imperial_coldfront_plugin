@@ -28,4 +28,9 @@ urlpatterns = [
         name="add_dart_id",
     ),
     path("new_group/", views.project_creation, name="new_group"),
+    path(
+        "<int:pk>/add-users-search-results/",
+        views.ProjectAddUsersSearchResultsShortnameView.as_view(),
+        name="project-add-users-search-results",
+    ),
 ]
