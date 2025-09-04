@@ -95,6 +95,9 @@ def add_rdf_storage_allocation(request):
             shortname_attribute_type = AllocationAttributeType.objects.get(
                 name="Shortname"
             )
+            location_attribute_type = AllocationAttributeType.objects.get(
+                name="Filesystem location"
+            )
             rdf_resource = Resource.objects.get(name="RDF Active")
 
             allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
@@ -176,15 +179,20 @@ def add_rdf_storage_allocation(request):
                 proj_attr_type__name="Group ID"
             ).value
 
-            if settings.GPFS_ENABLED:
-                parent_fileset_path = Path(
-                    settings.GPFS_FILESYSTEM_MOUNT_PATH,
-                    settings.GPFS_FILESYSTEM_NAME,
-                    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-                    faculty,
-                )
-                relative_projects_path = Path(department, group_id)
+            parent_fileset_path = Path(
+                settings.GPFS_FILESYSTEM_MOUNT_PATH,
+                settings.GPFS_FILESYSTEM_NAME,
+                settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+                faculty,
+            )
+            relative_projects_path = Path(department, group_id)
+            AllocationAttribute.objects.create(
+                allocation_attribute_type=location_attribute_type,
+                allocation=rdf_allocation,
+                value=str(parent_fileset_path / relative_projects_path / shortname),
+            )
 
+            if settings.GPFS_ENABLED:
                 chain.append(
                     "imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota",
                     filesystem_name=settings.GPFS_FILESYSTEM_NAME,

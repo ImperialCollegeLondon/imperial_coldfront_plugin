@@ -141,6 +141,22 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
         settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
 
+        # get some metadata from the project level
+        faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
+        department = project.projectattribute_set.get(
+            proj_attr_type__name="Department"
+        ).value
+        group_id = project.projectattribute_set.get(
+            proj_attr_type__name="Group ID"
+        ).value
+        faculty_path = Path(
+            settings.GPFS_FILESYSTEM_MOUNT_PATH,
+            settings.GPFS_FILESYSTEM_NAME,
+            settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+            faculty,
+        )
+        relative_projects_path = Path(department, group_id)
+
         response = superuser_client.post(
             self._get_url(),
             data=dict(
@@ -196,6 +212,11 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             allocation=allocation,
             value=rdf_allocation_shortname,
         )
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="Filesystem location",
+            allocation=allocation,
+            value=str(faculty_path / relative_projects_path / rdf_allocation_shortname),
+        )
         # AllocationAttribute.objects.get(
         #     allocation_attribute_type__name="DART ID",
         #     allocation=allocation,
@@ -217,22 +238,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         ldap_add_member_mock.assert_called_once_with(
             rdf_allocation_ldap_name, project.pi.username, allow_already_present=True
         )
-
-        faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
-        department = project.projectattribute_set.get(
-            proj_attr_type__name="Department"
-        ).value
-        group_id = project.projectattribute_set.get(
-            proj_attr_type__name="Group ID"
-        ).value
-
-        faculty_path = Path(
-            settings.GPFS_FILESYSTEM_MOUNT_PATH,
-            settings.GPFS_FILESYSTEM_NAME,
-            settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-            faculty,
-        )
-        relative_projects_path = Path(department, group_id)
 
         gpfs_task_mock.assert_called_once_with(
             filesystem_name=settings.GPFS_FILESYSTEM_NAME,
