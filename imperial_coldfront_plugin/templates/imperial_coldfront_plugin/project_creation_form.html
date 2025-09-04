@@ -16,4 +16,29 @@
       </div>
     </div>
   </div>
+  <script>
+  // When the faculty select changes, update the department selection
+$("#id_faculty").change(function () {
+    var url = "{% url 'imperial_coldfront_plugin:load_departments' %}";
+    var faculty = $(this).val();
+
+    $.ajax({                       // initialize an AJAX request
+      url: url,                    // set the url of the request
+      data: {
+        'faculty': faculty         // add the faculty to the GET parameters
+      },
+      success: function (data) {   // `data` is the return of the `load_departments` view function
+        $("#id_department").html(data);  // replace the contents of the department input with the data that came from the server
+      }
+    });
+
+  });
+
+  // Trigger the change event on page load to populate the department field based on the selected faculty
+  window.onload = function() {
+      $('#id_faculty').trigger('change');
+};
+
+
+  </script>
 {% endblock content %}

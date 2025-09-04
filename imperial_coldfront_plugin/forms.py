@@ -11,11 +11,8 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.validators import (
-    MaxLengthValidator,
-    MinLengthValidator,
-    MinValueValidator,
-)
+from django.core.validators import MinValueValidator
+from django.http.request import QueryDict
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -61,6 +58,12 @@ def get_initial_department_choices() -> Iterable[tuple[str, str]]:
 
 class UnknownUsernameError(Exception):
     """Unable to locate a user in the local database or College directory."""
+
+
+def filesystem_path_component_validator(value: str) -> str:
+    """Ensure filesystem path components only contain valid chars."""
+    if not settings.PATH_COMPONENT_VALID_CHARACTERS.issuperset(value):
+        raise ValidationError("Name must contain only lowercase letters or numbers")
 
 
 def get_or_create_user(username: str) -> User:
@@ -119,14 +122,6 @@ class RDFAllocationForm(forms.Form):
         initial=_todays_date,
         widget=forms.DateInput(attrs={"type": "date"}),
     )
-    faculty = forms.ChoiceField(
-        choices=get_faculty_choices,
-        widget=_js_select_widget(),
-    )
-    department = forms.ChoiceField(
-        choices=get_initial_department_choices,
-        widget=_js_select_widget(),
-    )
     size = forms.IntegerField(
         validators=[MinValueValidator(1)], help_text="In terabytes"
     )
@@ -143,10 +138,9 @@ class RDFAllocationForm(forms.Form):
             f"{settings.ALLOCATION_SHORTNAME_MIN_LENGTH} and "
             f"{settings.ALLOCATION_SHORTNAME_MAX_LENGTH} characters."
         ),
-        validators=[
-            MinLengthValidator(settings.ALLOCATION_SHORTNAME_MIN_LENGTH),
-            MaxLengthValidator(settings.ALLOCATION_SHORTNAME_MAX_LENGTH),
-        ],
+        min_length=settings.ALLOCATION_SHORTNAME_MIN_LENGTH,
+        max_length=settings.ALLOCATION_SHORTNAME_MAX_LENGTH,
+        validators=[filesystem_path_component_validator],
     )
 
     def clean_dart_id(self) -> str:
@@ -163,8 +157,6 @@ class RDFAllocationForm(forms.Form):
     def clean_allocation_shortname(self) -> str:
         """Validate allocation shortname contains only valid characters."""
         shortname = self.cleaned_data.get("allocation_shortname")
-        if not settings.ALLOCATION_SHORTNAME_VALID_CHARACTERS.issuperset(shortname):
-            raise ValidationError("Name must contain only lowercase letters or numbers")
         from coldfront.core.allocation.models import AllocationAttribute
 
         if AllocationAttribute.objects.filter(
@@ -173,18 +165,6 @@ class RDFAllocationForm(forms.Form):
             raise ValidationError("Name already in use.")
 
         return shortname
-
-    def clean(self) -> bool:
-        """Check if the faculty and department combination is valid.
-
-        Raises:
-            ValidationError: If the combination is invalid.
-        """
-        cleaned_data = super().clean()
-        faculty_id = cleaned_data.get("faculty")
-        department_id = cleaned_data.get("department")
-        if department_id not in DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
-            raise ValidationError("Invalid faculty and department combination.")
 
 
 class DartIDForm(forms.Form):
@@ -215,18 +195,75 @@ class ProjectCreationForm(forms.ModelForm):
     username = forms.CharField(
         help_text="Username of group owner (must be a valid imperial username).",
     )
+    faculty = forms.ChoiceField(choices=get_faculty_choices)
+    department = forms.ChoiceField(choices=get_initial_department_choices)
+    group_id = forms.CharField(
+        required=False,
+        min_length=3,
+        max_length=12,
+        help_text=(
+            "Provide an ID value for the group. This is used as the directory name on "
+            "the RDF to contain all allocations of the group. If left blank, the "
+            "username field will be used instead. Must contain only lowercase letters "
+            "and numbers and be between 3 and 12 characters."
+        ),
+        label="Group ID",
+        validators=[filesystem_path_component_validator],
+    )
+
+    def __init__(self, data: QueryDict | None = None, **kwargs):
+        """Initialise new form instance.
+
+        Performs some manipulation of the input data such that if group_id is not
+        provided the value of username is written into that field.
+        """
+        if data:
+            new_data = data.copy()
+            group_id = (
+                form_group_id
+                if (form_group_id := data.get("group_id"))
+                else data.get("username")
+            )
+            if group_id:
+                new_data["group_id"] = group_id
+                data = new_data
+        super().__init__(data=data, **kwargs)
 
     def clean_username(self) -> str:
         """Clean username field.
 
         Tries to map username to a user object and adds a user entry to cleaned_data.
         """
+        username = self.cleaned_data["username"]
         try:
-            self.cleaned_data["user"] = get_or_create_user(
-                self.cleaned_data["username"]
-            )
+            self.cleaned_data["user"] = get_or_create_user(username)
         except UnknownUsernameError:
             raise ValidationError("Username not found locally or in College directory.")
+        return username
+
+    def clean_group_id(self) -> str | None:
+        """Derive group_id value, check characters and ensure uniqueness."""
+        from coldfront.core.project.models import ProjectAttribute
+
+        group_id = self.cleaned_data["group_id"]
+
+        if ProjectAttribute.objects.filter(
+            proj_attr_type__name="Group ID", value=group_id
+        ):
+            raise ValidationError("Name already in use.")
+        return group_id
+
+    def clean(self) -> bool:
+        """Check if the faculty and department combination is valid.
+
+        Raises:
+            ValidationError: If the combination is invalid.
+        """
+        cleaned_data = super().clean()
+        faculty_id = cleaned_data.get("faculty")
+        department_id = cleaned_data.get("department")
+        if department_id not in DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
+            raise ValidationError("Invalid faculty and department combination.")
 
 
 class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):

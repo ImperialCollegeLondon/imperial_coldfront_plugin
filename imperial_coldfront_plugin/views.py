@@ -87,8 +87,6 @@ def add_rdf_storage_allocation(request):
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
             storage_size_tb = form.cleaned_data["size"]
-            faculty = form.cleaned_data["faculty"]
-            department = form.cleaned_data["department"]
             # dart_id = form.cleaned_data["dart_id"]
             project = form.cleaned_data["project"]
             shortname = form.cleaned_data["allocation_shortname"]
@@ -168,6 +166,16 @@ def add_rdf_storage_allocation(request):
                 status=allocation_user_active_status,
             )
 
+            faculty = project.projectattribute_set.get(
+                proj_attr_type__name="Faculty"
+            ).value
+            department = project.projectattribute_set.get(
+                proj_attr_type__name="Department"
+            ).value
+            group_id = project.projectattribute_set.get(
+                proj_attr_type__name="Group ID"
+            ).value
+
             if settings.GPFS_ENABLED:
                 parent_fileset_path = Path(
                     settings.GPFS_FILESYSTEM_MOUNT_PATH,
@@ -175,7 +183,7 @@ def add_rdf_storage_allocation(request):
                     settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
                     faculty,
                 )
-                relative_projects_path = Path(department)
+                relative_projects_path = Path(department, group_id)
 
                 chain.append(
                     "imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota",
@@ -284,6 +292,8 @@ def add_dart_id_to_allocation(request: HttpRequest, allocation_pk: int):
 
 def create_new_project(form: ProjectCreationForm) -> Project:
     """Create a new project from the form data."""
+    from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
+
     project_obj = form.save(commit=False)
     project_obj.status = ProjectStatusChoice.objects.get(name="Active")
     project_obj.pi = form.cleaned_data["user"]
@@ -293,6 +303,41 @@ def create_new_project(form: ProjectCreationForm) -> Project:
         project=project_obj,
         role=ProjectUserRoleChoice.objects.get(name="Manager"),
         status=ProjectUserStatusChoice.objects.get(name="Active"),
+    )
+    group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
+    location_attribute_type = ProjectAttributeType.objects.get(
+        name="Filesystem location"
+    )
+    department_attribute_type = ProjectAttributeType.objects.get(name="Department")
+    faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
+    ProjectAttribute.objects.create(
+        proj_attr_type=department_attribute_type,
+        project=project_obj,
+        value=form.cleaned_data["department"],
+    )
+    ProjectAttribute.objects.create(
+        proj_attr_type=faculty_attribute_type,
+        project=project_obj,
+        value=form.cleaned_data["faculty"],
+    )
+    ProjectAttribute.objects.create(
+        proj_attr_type=group_id_attribute_type,
+        project=project_obj,
+        value=form.cleaned_data["group_id"],
+    )
+    ProjectAttribute.objects.create(
+        proj_attr_type=location_attribute_type,
+        project=project_obj,
+        value=str(
+            Path(
+                settings.GPFS_FILESYSTEM_MOUNT_PATH,
+                settings.GPFS_FILESYSTEM_NAME,
+                settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+                form.cleaned_data["faculty"],
+                form.cleaned_data["department"],
+                form.cleaned_data["group_id"],
+            )
+        ),
     )
     return project_obj
 

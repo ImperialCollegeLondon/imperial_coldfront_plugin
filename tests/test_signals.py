@@ -116,3 +116,24 @@ def test_ensure_unique_shortname(rdf_allocation, rdf_allocation_shortname):
         allocation_attribute_type=shortname_attribute_type,
         value=rdf_allocation_shortname,
     )
+
+
+def test_ensure_unique_group_id(project):
+    """Test creating a second project with the same Group ID raises an error."""
+    from coldfront.core.project.models import (
+        ProjectAttribute,
+        ProjectAttributeType,
+    )
+
+    group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
+    with pytest.raises(ValueError):
+        ProjectAttribute.objects.create(
+            proj_attr_type=group_id_attribute_type,
+            project=project,
+            value=project.pi.username,
+        )
+    # check there is still only one group id with the shortname
+    assert ProjectAttribute.objects.get(
+        proj_attr_type=group_id_attribute_type,
+        value=project.pi.username,
+    )

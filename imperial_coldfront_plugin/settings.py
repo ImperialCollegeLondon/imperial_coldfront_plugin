@@ -72,7 +72,7 @@ GID_RANGES = [
 
 LOGOUT_REDIRECT_URL = "/"
 
-ALLOCATION_SHORTNAME_VALID_CHARACTERS = set(ascii_lowercase + digits)
+PATH_COMPONENT_VALID_CHARACTERS = set(ascii_lowercase + digits)
 """Characters that are valid to include as part of an allocation shortname."""
 ALLOCATION_SHORTNAME_MIN_LENGTH = 3
 """Minimum length of an allocation shortname."""

@@ -1,6 +1,7 @@
 """Django signals."""
 
 from coldfront.core.allocation.models import AllocationAttribute, AllocationUser
+from coldfront.core.project.models import ProjectAttribute
 from django.conf import settings
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
@@ -33,6 +34,15 @@ def ensure_unique_shortname(sender, instance, **kwargs):
         )
     ):
         raise ValueError(f"An allocation with {instance.value} already exists.")
+
+
+@receiver(pre_save, sender=ProjectAttribute)
+def ensure_unique_group_id(sender, instance, **kwargs):
+    """Prevent saving of project group name if it is not unique."""
+    if instance.proj_attr_type.name == "Group ID" and ProjectAttribute.objects.filter(
+        proj_attr_type__name="Group ID", value=instance.value
+    ):
+        raise ValueError(f"A project with {instance.value} already exists.")
 
 
 @receiver(post_save, sender=AllocationUser)

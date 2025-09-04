@@ -64,6 +64,14 @@ def pytest_configure():
         TOKEN_TIMEOUT=60,
         Q_CLUSTER={"sync": True},
         CRISPY_TEMPLATE_PACK="bootstrap4",
+        EMAIL_DIRECTOR_PENDING_PROJECT_REVIEW_EMAIL=False,
+        EMAIL_DEVELOPMENT_EMAIL_LIST=[],
+        EMAIL_SENDER=None,
+        EMAIL_TICKET_SYSTEM_ADDRESS="",
+        EMAIL_OPT_OUT_INSTRUCTION_URL="",
+        EMAIL_SIGNATURE="",
+        CENTER_NAME="",
+        CENTER_BASE_URL="",
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
@@ -238,17 +246,35 @@ def ldap_connection_mock(mocker):
 def project(user):
     """Provides a Coldfront project owned by a user."""
     from coldfront.core.field_of_science.models import FieldOfScience
-    from coldfront.core.project.models import Project, ProjectStatusChoice
+    from coldfront.core.project.models import (
+        Project,
+        ProjectAttribute,
+        ProjectAttributeType,
+        ProjectStatusChoice,
+    )
 
     project_active_status = ProjectStatusChoice.objects.create(name="Active")
     field_of_science_other = FieldOfScience.objects.create(description="Other")
 
-    return Project.objects.create(
+    project = Project.objects.create(
         pi=user,
         title=f"{user.get_full_name()}'s Research Group",
         status=project_active_status,
         field_of_science=field_of_science_other,
     )
+    department_attribute_type = ProjectAttributeType.objects.get(name="Department")
+    faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
+    group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
+    ProjectAttribute.objects.create(
+        proj_attr_type=department_attribute_type, project=project, value="dsde"
+    )
+    ProjectAttribute.objects.create(
+        proj_attr_type=faculty_attribute_type, project=project, value="foe"
+    )
+    ProjectAttribute.objects.create(
+        proj_attr_type=group_id_attribute_type, project=project, value=user.username
+    )
+    return project
 
 
 @pytest.fixture

@@ -134,8 +134,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         end_date = timezone.datetime.max.date()
         start_date = timezone.now().date()
         size = 10
-        faculty = "foe"
-        department = "dsde"
         gid = get_new_gid()
 
         # set all of these so they are not empty
@@ -150,8 +148,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 start_date=start_date,
                 end_date=end_date,
                 size=size,
-                department=department,
-                faculty=faculty,
                 gid=gid,
                 allocation_shortname=rdf_allocation_shortname,
             ),
@@ -222,13 +218,21 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             rdf_allocation_ldap_name, project.pi.username, allow_already_present=True
         )
 
+        faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
+        department = project.projectattribute_set.get(
+            proj_attr_type__name="Department"
+        ).value
+        group_id = project.projectattribute_set.get(
+            proj_attr_type__name="Group ID"
+        ).value
+
         faculty_path = Path(
             settings.GPFS_FILESYSTEM_MOUNT_PATH,
             settings.GPFS_FILESYSTEM_NAME,
             settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
             faculty,
         )
-        relative_projects_path = Path(department)
+        relative_projects_path = Path(department, group_id)
 
         gpfs_task_mock.assert_called_once_with(
             filesystem_name=settings.GPFS_FILESYSTEM_NAME,
@@ -390,7 +394,7 @@ class TestAddDartID(LoginRequiredMixin):
 
 
 class TestProjectCreation(LoginRequiredMixin):
-    """Tests for the projection_creation view."""
+    """Tests for the project_creation view."""
 
     @pytest.fixture(autouse=True)
     def get_graph_api_client_mock(self, mocker):
@@ -413,11 +417,12 @@ class TestProjectCreation(LoginRequiredMixin):
         assert response.status_code == 200
         assert isinstance(response.context["form"], ProjectCreationForm)
 
-    def test_post(self, superuser_client, user):
+    def test_post(self, superuser_client, user, settings):
         """Test posting with valid data."""
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
             Project,
+            ProjectAttribute,
             ProjectStatusChoice,
             ProjectUserRoleChoice,
             ProjectUserStatusChoice,
@@ -428,6 +433,12 @@ class TestProjectCreation(LoginRequiredMixin):
         project_user_role = ProjectUserRoleChoice.objects.create(name="Manager")
         FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
 
+        settings.GPFS_FILESYSTEM_NAME = "fsname"
+        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
+        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
+        faculty = "foe"
+        department = "dsde"
+
         title = "group title"
         description = "group_description"
         response = superuser_client.post(
@@ -437,6 +448,8 @@ class TestProjectCreation(LoginRequiredMixin):
                 description=description,
                 username=user.username,
                 field_of_science=FieldOfScience.DEFAULT_PK,
+                department=department,
+                faculty=faculty,
             ),
         )
 
@@ -457,6 +470,37 @@ class TestProjectCreation(LoginRequiredMixin):
         project_user = project.projectuser_set.get()
         assert project_user.status == project_user_status
         assert project_user.role == project_user_role
+
+        ProjectAttribute.objects.get(proj_attr_type__name="Faculty", value=faculty)
+        ProjectAttribute.objects.get(
+            proj_attr_type__name="Department", value=department
+        )
+        group_id = ProjectAttribute.objects.get(
+            proj_attr_type__name="Group ID", value=project.pi.username
+        ).value
+        ProjectAttribute.objects.get(
+            proj_attr_type__name="Filesystem location",
+            value=str(
+                Path(
+                    settings.GPFS_FILESYSTEM_MOUNT_PATH,
+                    settings.GPFS_FILESYSTEM_NAME,
+                    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+                    faculty,
+                    department,
+                    group_id,
+                )
+            ),
+        )
+
+    def test_post_existing_username_group_id(self, superuser_client, user, project):
+        """Test project creation is blocked if there is already a group with that id."""
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(username=user.username),
+        )
+        assert response.status_code == 200
+        form = response.context["form"]
+        assert form.errors["group_id"] == ["Name already in use."]
 
     def test_post_unknown_user(self, superuser_client, get_graph_api_client_mock):
         """Test posting with an invalid username."""
