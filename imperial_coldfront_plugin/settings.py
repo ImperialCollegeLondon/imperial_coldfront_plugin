@@ -78,3 +78,5 @@ ALLOCATION_SHORTNAME_MIN_LENGTH = 3
 """Minimum length of an allocation shortname."""
 ALLOCATION_SHORTNAME_MAX_LENGTH = 12
 """Maximum length of an allocation shortname."""
+ALLOCATION_DEFAULT_PERIOD_DAYS = 365
+"""Days from current date for the initial form default end date for an allocation."""

@@ -4,6 +4,7 @@ This module contains form classes used for research group management.
 """
 
 from collections.abc import Iterable
+from datetime import timedelta
 
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
 from coldfront.core.project.models import Project
@@ -107,6 +108,10 @@ def _todays_date():
     return timezone.now().date()
 
 
+def _initial_end_date():
+    return _todays_date() + timedelta(days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS)
+
+
 def _js_select_widget():
     """Get a select widget with the class for select2."""
     return forms.Select(attrs={"class": "js-example-basic-single"})
@@ -126,7 +131,7 @@ class RDFAllocationForm(forms.Form):
     )
     end_date = forms.DateField(
         validators=[MinValueValidator(_todays_date)],
-        initial=_todays_date,
+        initial=_initial_end_date,
         widget=forms.DateInput(attrs={"type": "date"}),
     )
     size = forms.IntegerField(

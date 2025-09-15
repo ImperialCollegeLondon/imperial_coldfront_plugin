@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from random import choices
 
 import pytest
@@ -126,6 +126,14 @@ def test_rdf_allocation_shortname_max_length(settings):
     assert form.errors["allocation_shortname"] == [
         f"Ensure this value has at most {max_length} characters (it has {test_length})."
     ]
+
+
+def test_rdf_allocation_end_date_initial_value(rdf_form_data, settings):
+    """Test that the default end_date is set correctly."""
+    form = RDFAllocationForm(data=rdf_form_data)
+    assert form["end_date"].initial == datetime.now().date() + timedelta(
+        days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS
+    )
 
 
 @pytest.fixture
