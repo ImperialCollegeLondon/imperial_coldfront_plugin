@@ -29,7 +29,14 @@ DEPARTMENTS = {
     "aero": "Aeronautics",
 }
 
-FACULTIES = {"foe": "Faculty of Engineering", "fons": "Faculty of Natural Sciences"}
+FACULTIES = {
+    "buss": "Business School",
+    "facility": "Facility",
+    "foe": "Faculty of Engineering",
+    "fom": "Faculty of Medicine",
+    "fons": "Faculty of Natural Sciences",
+    "ict": "ICT",
+}
 
 DEPARTMENTS_IN_FACULTY = {
     "foe": ["dsde", "aero"],
