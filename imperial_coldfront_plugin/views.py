@@ -347,6 +347,14 @@ def create_new_project(form: ProjectCreationForm) -> Project:
             )
         ),
     )
+    if ticket_id := form.cleaned_data.get("ticket_id"):
+        ticket_attribute_type = ProjectAttributeType.objects.get(
+            name="ASK Ticket Reference"
+        )
+        ProjectAttribute.objects.create(
+            proj_attr_type=ticket_attribute_type, project=project_obj, value=ticket_id
+        )
+
     return project_obj
 
 

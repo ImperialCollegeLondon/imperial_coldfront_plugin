@@ -222,6 +222,11 @@ class ProjectCreationForm(forms.ModelForm):
         label="Group ID",
         validators=[filesystem_path_component_validator],
     )
+    ticket_id = forms.CharField(
+        required=False,
+        help_text="The ASK ticket used to request creation of this group, if relevant.",
+        label="ASK Ticket Reference",
+    )
 
     def __init__(self, data: QueryDict | None = None, **kwargs):
         """Initialise new form instance.

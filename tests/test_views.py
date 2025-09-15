@@ -427,7 +427,6 @@ class TestProjectCreation(LoginRequiredMixin):
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
             Project,
-            ProjectAttribute,
             ProjectStatusChoice,
             ProjectUserRoleChoice,
             ProjectUserStatusChoice,
@@ -446,6 +445,7 @@ class TestProjectCreation(LoginRequiredMixin):
 
         title = "group title"
         description = "group_description"
+        ticket_id = "RQST3939393"
         response = superuser_client.post(
             self._get_url(),
             data=dict(
@@ -455,6 +455,7 @@ class TestProjectCreation(LoginRequiredMixin):
                 field_of_science=FieldOfScience.DEFAULT_PK,
                 department=department,
                 faculty=faculty,
+                ticket_id=ticket_id,
             ),
         )
 
@@ -475,15 +476,15 @@ class TestProjectCreation(LoginRequiredMixin):
         project_user = project.projectuser_set.get()
         assert project_user.status == project_user_status
         assert project_user.role == project_user_role
-
-        ProjectAttribute.objects.get(proj_attr_type__name="Faculty", value=faculty)
-        ProjectAttribute.objects.get(
+        project.projectattribute_set.get
+        project.projectattribute_set.get(proj_attr_type__name="Faculty", value=faculty)
+        project.projectattribute_set.get(
             proj_attr_type__name="Department", value=department
         )
-        group_id = ProjectAttribute.objects.get(
+        group_id = project.projectattribute_set.get(
             proj_attr_type__name="Group ID", value=project.pi.username
         ).value
-        ProjectAttribute.objects.get(
+        project.projectattribute_set.get(
             proj_attr_type__name="Filesystem location",
             value=str(
                 Path(
@@ -495,6 +496,9 @@ class TestProjectCreation(LoginRequiredMixin):
                     group_id,
                 )
             ),
+        )
+        project.projectattribute_set.get(
+            proj_attr_type__name="ASK Ticket Reference", value=ticket_id
         )
 
     def test_post_existing_username_group_id(self, superuser_client, user, project):
