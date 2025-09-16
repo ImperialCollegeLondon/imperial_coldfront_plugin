@@ -107,6 +107,7 @@ def add_rdf_storage_allocation(request):
                 start_date=form.cleaned_data["start_date"],
                 end_date=form.cleaned_data["end_date"],
                 is_changeable=True,
+                justification=form.cleaned_data["description"],
             )
             rdf_allocation.resources.add(rdf_resource)
 

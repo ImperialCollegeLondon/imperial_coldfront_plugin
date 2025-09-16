@@ -6,6 +6,7 @@ This module contains form classes used for research group management.
 from collections.abc import Iterable
 from datetime import timedelta
 
+from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
 from coldfront.core.project.models import Project
 from django import forms
@@ -124,6 +125,7 @@ class RDFAllocationForm(forms.Form):
         queryset=Project.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
+    description = forms.CharField(widget=forms.Textarea())
     start_date = forms.DateField(
         validators=[MinValueValidator(_todays_date)],
         initial=_todays_date,
@@ -169,8 +171,6 @@ class RDFAllocationForm(forms.Form):
     def clean_allocation_shortname(self) -> str:
         """Validate allocation shortname contains only valid characters."""
         shortname = self.cleaned_data.get("allocation_shortname")
-        from coldfront.core.allocation.models import AllocationAttribute
-
         if AllocationAttribute.objects.filter(
             allocation_attribute_type__name="Shortname", value=shortname
         ):

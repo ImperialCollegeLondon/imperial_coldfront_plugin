@@ -57,6 +57,7 @@ def rdf_form_data(project):
         end_date=datetime.max.date(),
         size=10,
         allocation_shortname="shorty",
+        description="The allocation description",
     )
 
 

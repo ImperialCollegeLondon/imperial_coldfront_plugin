@@ -134,6 +134,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         end_date = timezone.datetime.max.date()
         start_date = timezone.now().date()
         size = 10
+        description = "A longer description text."
         gid = get_new_gid()
 
         # set all of these so they are not empty
@@ -166,6 +167,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 size=size,
                 gid=gid,
                 allocation_shortname=rdf_allocation_shortname,
+                description=description,
             ),
         )
         from coldfront.core.allocation.models import (
@@ -181,6 +183,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             quantity=1,
             start_date=start_date,
             end_date=end_date,
+            justification=description,
         )
         assertRedirects(
             response,
