@@ -1,11 +1,12 @@
 """Interface for interacting with the GPFS API."""
 
 from collections.abc import Generator
+from dataclasses import dataclass
 from pathlib import Path
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, get, json, post, response_handler, retry
+from uplink import Body, Consumer, get, json, post, put, response_handler, retry
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -139,7 +140,7 @@ class GPFSClient(Consumer):
         fileset_name: str,
         owner_id: str,
         group_id: str,
-        path: str,
+        path: str | Path,
         permissions: str,
         parent_fileset: str,
     ) -> requests.Response:
@@ -150,7 +151,7 @@ class GPFSClient(Consumer):
             fileset_name: Name of the fileset to create (rdf project id).
             owner_id: ID of the owner (pi username).
             group_id: ID of the group (rdf project id).
-            path: Path.
+            path: Absolute path where the fileset will be created.
             permissions: Permissions.
             parent_fileset: Name of the fileset the new fileset will belong to.
 
@@ -161,7 +162,7 @@ class GPFSClient(Consumer):
             filesystemName=filesystem_name,
             filesetName=fileset_name,
             owner=f"{owner_id}:{group_id}",
-            path=path,
+            path=str(path),
             permissions=permissions,
             inodeSpace=parent_fileset,
             permissionChangeMode="chmodAndSetAcl",
@@ -227,7 +228,8 @@ class GPFSClient(Consumer):
         self,
         filesystem_name: str,
         fileset_name: str,
-        path: str,
+        path: str | Path,
+        permissions: str,
         allow_existing: bool = False,
     ):
         """Create a new directory within a fileset.
@@ -237,22 +239,27 @@ class GPFSClient(Consumer):
           fileset_name: name of the fileset in which to create the directory.
           path: location of the directory as a relative path w.r.t the fileset path,
             will create new directories recursively as required.
+          permissions: POSIX permissions to set on the new directory.
           allow_existing: if True do not raise an error if the directory already exists.
         """
         try:
             return self._create_fileset_directory(
                 filesystem_name,
                 fileset_name,
-                path,
+                str(path),
                 user="root",
                 group="root",
-                permissions="750",
+                permissions=permissions,
                 recursive=True,
             )
         except ErrorWhenProcessingJob as e:
             task_data = e.args[0]
-            if allow_existing and task_data["exitCode"] == 6:
-                return task_data
+            if task_data["exitCode"] == 6:
+                if allow_existing:
+                    return task_data
+                raise DirectoryExistsError(
+                    f"Directory {path} already exists in fileset {fileset_name}."
+                )
             raise
 
     @json
@@ -323,6 +330,70 @@ class GPFSClient(Consumer):
             if quota["quotaType"] == "FILESET"
         }
 
+    @json
+    @get("filesystems/{filesystem_name}/acl/{path}")
+    def get_directory_acl(self, filesystem_name: str, path: str):
+        """Get the ACL of a directory within a filesystem."""
+
+    @check_job_status
+    @json
+    @put("filesystems/{filesystem_name}/acl/{path}")
+    def _set_directory_acl(self, filesystem_name: str, path: str, **data: Body):
+        pass
+
+    def set_directory_acl(
+        self,
+        filesystem_name: str,
+        path: str | Path,
+        owner_allow_permissions: str = "",
+        group_allow_permissions: str = "",
+        other_allow_permissions: str = "",
+    ):
+        """Set the ACL of a directory within a filesystem.
+
+        These ACL's can be applied to both filesets and any directory within the
+        filesystem. See the GPFS docs for detail on valid permissions strings. This
+        interface only supports setting a single 'allow' entry for owner, group and
+        other. Deny entries or multiple entries for any of owner, group or other are
+        not supported. Setting flags for any entry is not supported.
+
+        Args:
+            filesystem_name: Name of the filesystem containing the directory.
+            path: Relative path of the directory within the filesystem.
+            owner_allow_permissions: Permissions string for the owner entry.
+            group_allow_permissions: Permissions string for the group entry.
+            other_allow_permissions: Permissions string for the other entry.
+        """
+        entries = []
+        if owner_allow_permissions:
+            entries.append(
+                dict(
+                    type="allow",
+                    who="special:owner@",
+                    permissions=owner_allow_permissions,
+                    flags="",
+                )
+            )
+        if group_allow_permissions:
+            entries.append(
+                dict(
+                    type="allow",
+                    who="special:group@",
+                    permissions=group_allow_permissions,
+                    flags="",
+                )
+            )
+        if other_allow_permissions:
+            entries.append(
+                dict(
+                    type="allow",
+                    who="special:everyone@",
+                    permissions=other_allow_permissions,
+                    flags="",
+                )
+            )
+        return self._set_directory_acl(filesystem_name, str(path), entries=entries)
+
 
 class FilesetCreationError(Exception):
     """Raised when a problem is encountered when creating a fileset."""
@@ -332,49 +403,157 @@ class FilesetQuotaError(Exception):
     """Raised when a problem is encountered when setting a fileset quota."""
 
 
+class DirectoryExistsError(Exception):
+    """Raised when a directory already exists and allow_existing is False."""
+
+
+@dataclass
+class FilesetPathInfo:
+    """Holds information about a fileset path and provides methods to manipulate it.
+
+    The GPFS API requires paths to be specified in different ways for different
+    operations. This class provides a single place to manage the logic for this.
+    The absolute path of the fileset follows the structure:
+        <filesystem_mount_path>/<filesystem_name>/<top_level_directories>/
+        <faculty>/<department>/<group_id>/<fileset_name>
+    """
+
+    filesystem_mount_path: Path
+    filesystem_name: str
+    top_level_directories: Path
+    faculty: str
+    department: str
+    group_id: str
+    fileset_name: str
+
+    @property
+    def parent_fileset_absolute_path(self) -> Path:
+        """Get the absolute path of the parent fileset."""
+        return Path(
+            self.filesystem_mount_path,
+            self.filesystem_name,
+            self.parent_fileset_path_relative_to_filesystem,
+        )
+
+    @property
+    def parent_fileset_path_relative_to_filesystem(self) -> Path:
+        """Get the path of the parent fileset relative to the filesystem root."""
+        return Path(self.top_level_directories, self.faculty)
+
+    @property
+    def group_directory_path_relative_to_parent_fileset(self) -> Path:
+        """Get the path of the group directory relative to the parent fileset."""
+        return Path(self.department, self.group_id)
+
+    def iter_intermediate_relative_directory_paths(self) -> Generator[Path, None, None]:
+        """Descend directory tree yielding relative paths w.r.t parent fileset.
+
+        As an example, given the following directory structure:
+            /.../parent_fileset/top_level/department/group_id/fileset_name
+        This method would yield:
+            Path("department")
+            Path("department/group_id")
+        """
+        parts = self.group_directory_path_relative_to_parent_fileset.parts
+        for i in range(1, len(parts) + 1):
+            yield Path(*parts[:i])
+
+    @property
+    def fileset_path_relative_to_parent_fileset(self) -> Path:
+        """Get the path of the fileset relative to the parent fileset."""
+        return self.group_directory_path_relative_to_parent_fileset / self.fileset_name
+
+    @property
+    def fileset_absolute_path(self) -> Path:
+        """Get the absolute path of the fileset."""
+        return (
+            self.parent_fileset_absolute_path
+            / self.fileset_path_relative_to_parent_fileset
+        )
+
+    @property
+    def fileset_path_relative_to_filesystem(self) -> Path:
+        """Get the path of the fileset relative to the filesystem root."""
+        return (
+            self.parent_fileset_path_relative_to_filesystem
+            / self.fileset_path_relative_to_parent_fileset
+        )
+
+
 def _create_fileset_set_quota(
-    filesystem_name: str,
-    fileset_name: str,
+    fileset_path_info: FilesetPathInfo,
     owner_id: str,
     group_id: str,
-    parent_fileset_path: Path,
-    relative_projects_path: Path,
-    permissions: str,
+    fileset_posix_permissions: str,
+    fileset_owner_acl: str,
+    fileset_group_acl: str,
+    fileset_other_acl: str,
+    parent_posix_permissions: str,
+    parent_owner_acl: str,
+    parent_group_acl: str,
+    parent_other_acl: str,
     block_quota: str,
     files_quota: str,
-    parent_fileset: str,
 ):
     """Create a fileset and set a quota in the requested filesystem."""
     client = GPFSClient()
-    client.create_fileset_directory(
-        filesystem_name,
-        parent_fileset,
-        relative_projects_path,
-        allow_existing=True,
-    )
+
+    for dir_path in fileset_path_info.iter_intermediate_relative_directory_paths():
+        try:
+            client.create_fileset_directory(
+                fileset_path_info.filesystem_name,
+                fileset_path_info.faculty,
+                dir_path,
+                allow_existing=False,
+                permissions=parent_posix_permissions,
+            )
+        except DirectoryExistsError:
+            continue
+        else:
+            # only set ACL if we created the directory
+            client.set_directory_acl(
+                fileset_path_info.filesystem_name,
+                fileset_path_info.parent_fileset_path_relative_to_filesystem / dir_path,
+                owner_allow_permissions=parent_owner_acl,
+                group_allow_permissions=parent_group_acl,
+                other_allow_permissions=parent_other_acl,
+            )
 
     try:
         client.create_fileset(
-            filesystem_name,
-            fileset_name,
+            fileset_path_info.filesystem_name,
+            fileset_path_info.fileset_name,
             owner_id,
-            group_id,
-            str(parent_fileset_path / relative_projects_path / fileset_name),
-            permissions,
-            parent_fileset,
+            f"IC\\{group_id}",
+            fileset_path_info.fileset_absolute_path,
+            fileset_posix_permissions,
+            fileset_path_info.faculty,
         ).raise_for_status()
     except requests.HTTPError as e:
         raise FilesetCreationError(
-            f"Error when creating fileset '{fileset_name}' - {e.response.content}"
+            "Error when creating fileset "
+            f"'{fileset_path_info.fileset_name}' - {e.response.content}"
         ) from e
+
+    client.set_directory_acl(
+        fileset_path_info.filesystem_name,
+        fileset_path_info.fileset_path_relative_to_filesystem,
+        owner_allow_permissions=fileset_owner_acl,
+        group_allow_permissions=fileset_group_acl,
+        other_allow_permissions=fileset_other_acl,
+    )
 
     try:
         client.set_quota(
-            filesystem_name, fileset_name, block_quota, files_quota
+            fileset_path_info.filesystem_name,
+            fileset_path_info.fileset_name,
+            block_quota,
+            files_quota,
         ).raise_for_status()
     except requests.HTTPError as e:
         raise FilesetQuotaError(
-            f"Error when setting fileset '{fileset_name}' quota  - {e.response.content}"
+            "Error when setting fileset "
+            f"'{fileset_path_info.fileset_name}' quota  - {e.response.content}"
         ) from e
 
 
@@ -395,7 +574,7 @@ def _update_quota_usages_task():
     # below could use some more error handling but is a reasonable first pass
     for allocation in allocations:
         rdf_id = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="RDF Project ID"
+            allocation_attribute_type__name="Shortname"
         ).value
         storage_attribute_usage = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Storage Quota (TB)"
@@ -405,5 +584,8 @@ def _update_quota_usages_task():
         files_attribute_usage = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Files Quota"
         ).allocationattributeusage
-        files_attribute_usage.value = usages[rdf_id]["files_usage"]
-        files_attribute_usage.save()
+        try:
+            files_attribute_usage.value = usages[rdf_id]["files_usage"]
+            files_attribute_usage.save()
+        except IndexError:
+            pass

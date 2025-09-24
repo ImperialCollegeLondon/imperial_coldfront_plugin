@@ -40,6 +40,7 @@ from .forms import (
     get_department_choices,
 )
 from .gid import get_new_gid
+from .gpfs_client import FilesetPathInfo
 from .microsoft_graph_client import get_graph_api_client
 from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
 
@@ -180,32 +181,37 @@ def add_rdf_storage_allocation(request):
                 proj_attr_type__name="Group ID"
             ).value
 
-            parent_fileset_path = Path(
-                settings.GPFS_FILESYSTEM_MOUNT_PATH,
-                settings.GPFS_FILESYSTEM_NAME,
-                settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-                faculty,
+            fileset_path_info = FilesetPathInfo(
+                filesystem_mount_path=settings.GPFS_FILESYSTEM_MOUNT_PATH,
+                filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+                top_level_directories=settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+                faculty=faculty,
+                department=department,
+                group_id=group_id,
+                fileset_name=shortname,
             )
-            relative_projects_path = Path(department, group_id)
             AllocationAttribute.objects.create(
                 allocation_attribute_type=location_attribute_type,
                 allocation=rdf_allocation,
-                value=str(parent_fileset_path / relative_projects_path / shortname),
+                value=fileset_path_info.fileset_absolute_path,
             )
 
             if settings.GPFS_ENABLED:
                 chain.append(
                     "imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota",
-                    filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+                    fileset_path_info=fileset_path_info,
                     owner_id="root",
-                    group_id="root",
-                    fileset_name=shortname,
-                    parent_fileset_path=parent_fileset_path,
-                    relative_projects_path=relative_projects_path,
-                    permissions=settings.GPFS_PERMISSIONS,
+                    group_id=ldap_name,
+                    fileset_posix_permissions=settings.GPFS_FILESET_POSIX_PERMISSIONS,
+                    fileset_owner_acl=settings.GPFS_FILESET_OWNER_ACL,
+                    fileset_group_acl=settings.GPFS_FILESET_GROUP_ACL,
+                    fileset_other_acl=settings.GPFS_FILESET_OTHER_ACL,
+                    parent_posix_permissions=settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
+                    parent_owner_acl=settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
+                    parent_group_acl=settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
+                    parent_other_acl=settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
                     block_quota=f"{storage_size_tb}T",
                     files_quota=settings.GPFS_FILES_QUOTA,
-                    parent_fileset=faculty,
                 )
 
             group = chain.run()

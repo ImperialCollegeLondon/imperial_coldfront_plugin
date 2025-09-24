@@ -4,6 +4,7 @@ These are imported into the project level settings by the Coldfront plugin mecha
 """
 
 from datetime import timedelta
+from pathlib import Path
 from string import ascii_lowercase, digits
 
 from coldfront.config.env import ENV
@@ -28,16 +29,38 @@ GPFS_API_TIMEOUT = ENV.int("GPFS_API_TIMEOUT", default=300)
 GPFS_FILESYSTEM_NAME = ENV.str("GPFS_FILESYSTEM_NAME", default="")
 """Name of the GPFS filesystem."""
 
-GPFS_FILESYSTEM_MOUNT_PATH = ENV.str("GPFS_FILESYSTEM_MOUNT_PATH", default="")
+GPFS_FILESYSTEM_MOUNT_PATH = Path(ENV.str("GPFS_FILESYSTEM_MOUNT_PATH", default=""))
 """Path to the directory in which the filesystem is mounted."""
 
-GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = ENV.str(
-    "GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES", default=""
+GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = Path(
+    ENV.str("GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES", default="")
 )
 """Top-level directory within a filesystem which contains faculty filesets."""
 
-GPFS_PERMISSIONS = ENV.str("GPFS_PERMISSIONS", default="700")
-"""Permissions for the fileset."""
+GPFS_FILESET_POSIX_PERMISSIONS = ENV.str(
+    "GPFS_FILESET_POSIX_PERMISSIONS", default="2770"
+)
+"""Posix permissions for the fileset."""
+
+GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS = ENV.str(
+    "GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS", default="755"
+)
+"""Posix permissions for fileset parent directories."""
+
+GPFS_PARENT_DIRECTORY_OWNER_ACL = ENV.str(
+    "GPFS_PARENT_DIRECTORY_OWNER_ACL", "rwmxDaAnNcCos"
+)
+"""ACL allow permission bits for the owner of fileset parent directories."""
+GPFS_PARENT_DIRECTORY_GROUP_ACL = ENV.str("GPFS_PARENT_DIRECTORY_GROUP_ACL", "rxncs")
+"""ACL allow permission bits for the group of fileset parent directories."""
+GPFS_PARENT_DIRECTORY_OTHER_ACL = ENV.str("GPFS_PARENT_DIRECTORY_OTHER_ACL", "rxncs")
+"""ACL allow permission bits for others of fileset parent directories."""
+GPFS_FILESET_OWNER_ACL = ENV.str("GPFS_FILESET_OWNER_ACL", "rwmxDaAnNcCos")
+"""ACL allow permission bits for the owner of the fileset."""
+GPFS_FILESET_GROUP_ACL = ENV.str("GPFS_FILESET_GROUP_ACL", "rwmxDanNc")
+"""ACL allow permission bits for the group of the fileset."""
+GPFS_FILESET_OTHER_ACL = ENV.str("GPFS_FILESET_OTHER_ACL", "ancs")
+"""ACL allow permission bits for others of the fileset."""
 
 GPFS_FILES_QUOTA = ENV.int("GPFS_FILES_QUOTA", default=1000)
 """Quota for the fileset."""

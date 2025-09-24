@@ -13,6 +13,7 @@ from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import ProjectCreationForm, RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
+from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
 
 
@@ -139,8 +140,8 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
 
         # set all of these so they are not empty
         settings.GPFS_FILESYSTEM_NAME = "fsname"
-        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
-        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
+        settings.GPFS_FILESYSTEM_MOUNT_PATH = Path("/mountpath")
+        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = Path("top/level")
 
         # get some metadata from the project level
         faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
@@ -241,18 +242,30 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         ldap_add_member_mock.assert_called_once_with(
             rdf_allocation_ldap_name, project.pi.username, allow_already_present=True
         )
+        fileset_path_info = FilesetPathInfo(
+            settings.GPFS_FILESYSTEM_MOUNT_PATH,
+            settings.GPFS_FILESYSTEM_NAME,
+            settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+            faculty,
+            department,
+            group_id,
+            rdf_allocation_shortname,
+        )
 
         gpfs_task_mock.assert_called_once_with(
-            filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+            fileset_path_info=fileset_path_info,
             owner_id="root",
-            group_id="root",
-            fileset_name=rdf_allocation_shortname,
-            parent_fileset_path=faculty_path,
-            relative_projects_path=relative_projects_path,
-            permissions=settings.GPFS_PERMISSIONS,
+            group_id=rdf_allocation_ldap_name,
+            fileset_posix_permissions=settings.GPFS_FILESET_POSIX_PERMISSIONS,
+            fileset_owner_acl=settings.GPFS_FILESET_OWNER_ACL,
+            fileset_group_acl=settings.GPFS_FILESET_GROUP_ACL,
+            fileset_other_acl=settings.GPFS_FILESET_OTHER_ACL,
+            parent_posix_permissions=settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
+            parent_owner_acl=settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
+            parent_group_acl=settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
+            parent_other_acl=settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
             block_quota=f"{size}T",
             files_quota=settings.GPFS_FILES_QUOTA,
-            parent_fileset=faculty,
         )
 
     class TestLoadDepartmentsView:
