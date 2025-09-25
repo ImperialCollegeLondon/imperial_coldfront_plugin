@@ -6,7 +6,7 @@ import pytest
 from imperial_coldfront_plugin.gpfs_client import (
     DirectoryExistsError,
     FilesetPathInfo,
-    _create_fileset_set_quota,
+    create_fileset_set_quota,
 )
 
 FILESYSTEM_MOUNT_PATH = Path("/")
@@ -80,7 +80,7 @@ def client_mock(mocker):
 
 def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
     """Test creating a fileset, setting ACLs and quotas."""
-    _create_fileset_set_quota(
+    create_fileset_set_quota(
         fileset_path_info,
         OWNER_ID,
         GROUP_ID,
@@ -150,7 +150,7 @@ def test_create_fileset_set_quota_existing_directory(
     """If an intermediate directory already exists we continue and don't set the ACL."""
     client_mock.create_fileset_directory.side_effect = [DirectoryExistsError, None]
 
-    _create_fileset_set_quota(
+    create_fileset_set_quota(
         fileset_path_info,
         OWNER_ID,
         GROUP_ID,

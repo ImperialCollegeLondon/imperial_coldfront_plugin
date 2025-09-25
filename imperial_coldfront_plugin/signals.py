@@ -5,10 +5,11 @@ from coldfront.core.project.models import ProjectAttribute
 from django.conf import settings
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
+from django_q.tasks import async_task
 
 from .ldap import (
-    ldap_add_member_to_group_in_background,
-    ldap_remove_member_from_group_in_background,
+    ldap_add_member_to_group,
+    ldap_remove_member_from_group,
 )
 
 
@@ -55,12 +56,18 @@ def sync_ldap_group_membership(sender, instance, **kwargs):
         return
 
     if instance.status.name == "Active":
-        ldap_add_member_to_group_in_background(
-            group_id, instance.user.username, allow_already_present=True
+        async_task(
+            ldap_add_member_to_group,
+            group_id,
+            instance.user.username,
+            allow_already_present=True,
         )
     else:
-        ldap_remove_member_from_group_in_background(
-            group_id, instance.user.username, allow_missing=True
+        async_task(
+            ldap_remove_member_from_group,
+            group_id,
+            instance.user.username,
+            allow_missing=True,
         )
 
 
@@ -77,6 +84,9 @@ def remove_ldap_group_membership(sender, instance, **kwargs):
     if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
         return
 
-    ldap_remove_member_from_group_in_background(
-        group_id, instance.user.username, allow_missing=True
+    async_task(
+        ldap_remove_member_from_group,
+        group_id,
+        instance.user.username,
+        allow_missing=True,
     )

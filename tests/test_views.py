@@ -1,5 +1,6 @@
 """Tests for the views of the plugin."""
 
+from datetime import datetime
 from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import patch
@@ -8,13 +9,10 @@ import pytest
 from django.conf import settings
 from django.shortcuts import render, reverse
 from django.utils import timezone
-from django_q.tasks import Chain
+from django_q.models import Task
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import ProjectCreationForm, RDFAllocationForm
-from imperial_coldfront_plugin.gid import get_new_gid
-from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
-from imperial_coldfront_plugin.ldap import LDAP_GROUP_TYPE, group_dn_from_name
 
 
 class LoginRequiredMixin:
@@ -83,6 +81,18 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         mock().user_profile.return_value = dict(username=None)
         return mock
 
+    mock_task_id = 1
+
+    @pytest.fixture(autouse=True)
+    def async_task_mock(self, mocker):
+        """Mock out async_task in favour of direct task execution."""
+
+        def f(func, *args, **kwargs):
+            func(*args, **kwargs)
+            return self.mock_task_id
+
+        return mocker.patch("imperial_coldfront_plugin.views.async_task", f)
+
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:add_rdf_storage_allocation")
 
@@ -98,66 +108,20 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], RDFAllocationForm)
 
-    @pytest.fixture
-    def post_ldap_conn_mock(self, mocker):
-        """Mock LDAP connection for test_post method.
-
-        Because we pass _ldap_create_group directly to the Django Q Chain
-        we can't mock the function as Django Q encounters an error pickling the mock.
-        Instead for this function we mock out the ldap connection and check the raw
-        arguments passed to it.
-        """
-        ldap_conn_mock = mocker.patch("imperial_coldfront_plugin.ldap.Connection")
-        ldap_conn_mock().add.return_value = True, [[]], None, None
-
-        return ldap_conn_mock
-
-    @patch("imperial_coldfront_plugin.views.Chain")
-    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group_in_background")
-    @patch("imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota")
+    @patch("imperial_coldfront_plugin.views.create_rdf_allocation")
     def test_post(
         self,
-        gpfs_task_mock,
-        ldap_add_member_mock,
-        chain_mock,
-        post_ldap_conn_mock,
-        project,
+        create_rdf_allocation_mock,
         superuser_client,
-        rdf_allocation_dependencies,
+        project,
         rdf_allocation_shortname,
-        rdf_allocation_ldap_name,
-        settings,
     ):
         """Test successful project creation."""
         # mock the chain to inject the group value to check the redirect later
-        chain_group = "chain_group"
-        chain_mock.return_value = Chain(cached=True, group=chain_group)
         end_date = timezone.datetime.max.date()
         start_date = timezone.now().date()
         size = 10
         description = "A longer description text."
-        gid = get_new_gid()
-
-        # set all of these so they are not empty
-        settings.GPFS_FILESYSTEM_NAME = "fsname"
-        settings.GPFS_FILESYSTEM_MOUNT_PATH = Path("/mountpath")
-        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = Path("top/level")
-
-        # get some metadata from the project level
-        faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
-        department = project.projectattribute_set.get(
-            proj_attr_type__name="Department"
-        ).value
-        group_id = project.projectattribute_set.get(
-            proj_attr_type__name="Group ID"
-        ).value
-        faculty_path = Path(
-            settings.GPFS_FILESYSTEM_MOUNT_PATH,
-            settings.GPFS_FILESYSTEM_NAME,
-            settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-            faculty,
-        )
-        relative_projects_path = Path(department, group_id)
 
         response = superuser_client.post(
             self._get_url(),
@@ -166,107 +130,27 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 start_date=start_date,
                 end_date=end_date,
                 size=size,
-                gid=gid,
                 allocation_shortname=rdf_allocation_shortname,
                 description=description,
             ),
         )
-        from coldfront.core.allocation.models import (
-            Allocation,
-            AllocationAttribute,
-            AllocationAttributeUsage,
-            AllocationUser,
-        )
-
-        allocation = Allocation.objects.get(
-            project=project,
-            status__name="Active",
-            quantity=1,
-            start_date=start_date,
-            end_date=end_date,
-            justification=description,
-        )
         assertRedirects(
             response,
             reverse(
-                "imperial_coldfront_plugin:list_tasks",
-                args=[chain_group, allocation.pk],
+                "imperial_coldfront_plugin:allocation_task_result",
+                args=[self.mock_task_id, rdf_allocation_shortname],
             ),
             fetch_redirect_response=False,
         )
-
-        storage_attribute = AllocationAttribute.objects.get(
-            allocation_attribute_type__name="Storage Quota (TB)",
-            allocation=allocation,
-            value=size,
-        )
-        AllocationAttributeUsage.objects.get(
-            allocation_attribute=storage_attribute, value=0
-        )
-        files_attribute = AllocationAttribute.objects.get(
-            allocation_attribute_type__name="Files Quota",
-            allocation=allocation,
-            value=settings.GPFS_FILES_QUOTA,
-        )
-        AllocationAttributeUsage.objects.get(
-            allocation_attribute=files_attribute, value=0
-        )
-        AllocationAttribute.objects.get(
-            allocation_attribute_type__name="Shortname",
-            allocation=allocation,
-            value=rdf_allocation_shortname,
-        )
-        AllocationAttribute.objects.get(
-            allocation_attribute_type__name="Filesystem location",
-            allocation=allocation,
-            value=str(faculty_path / relative_projects_path / rdf_allocation_shortname),
-        )
-        # AllocationAttribute.objects.get(
-        #     allocation_attribute_type__name="DART ID",
-        #     allocation=allocation,
-        #     value=dart_id,
-        # )
-        AllocationUser.objects.get(
-            allocation=allocation, user=project.pi, status__name="Active"
-        )
-        post_ldap_conn_mock().add.assert_called_once_with(
-            group_dn_from_name(rdf_allocation_ldap_name),
-            object_class=["top", "group"],
-            attributes=dict(
-                cn=rdf_allocation_ldap_name,
-                groupType=LDAP_GROUP_TYPE,
-                sAMAccountName=rdf_allocation_ldap_name,
-                gidNumber=min(settings.GID_RANGES[0]),
-            ),
-        )
-        ldap_add_member_mock.assert_called_once_with(
-            rdf_allocation_ldap_name, project.pi.username, allow_already_present=True
-        )
-        fileset_path_info = FilesetPathInfo(
-            settings.GPFS_FILESYSTEM_MOUNT_PATH,
-            settings.GPFS_FILESYSTEM_NAME,
-            settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-            faculty,
-            department,
-            group_id,
-            rdf_allocation_shortname,
-        )
-
-        gpfs_task_mock.assert_called_once_with(
-            fileset_path_info=fileset_path_info,
-            owner_id="root",
-            group_id=rdf_allocation_ldap_name,
-            fileset_posix_permissions=settings.GPFS_FILESET_POSIX_PERMISSIONS,
-            fileset_owner_acl=settings.GPFS_FILESET_OWNER_ACL,
-            fileset_group_acl=settings.GPFS_FILESET_GROUP_ACL,
-            fileset_other_acl=settings.GPFS_FILESET_OTHER_ACL,
-            parent_posix_permissions=settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
-            parent_owner_acl=settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
-            parent_group_acl=settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
-            parent_other_acl=settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
-            block_quota=f"{size}T",
-            files_quota=settings.GPFS_FILES_QUOTA,
-        )
+        create_rdf_allocation_mock.assert_called_once()
+        called_args, called_kwargs = create_rdf_allocation_mock.call_args
+        form_data = called_args[0]
+        assert form_data["project"] == project
+        assert form_data["start_date"] == start_date
+        assert form_data["end_date"] == end_date
+        assert form_data["size"] == size
+        assert form_data["allocation_shortname"] == rdf_allocation_shortname
+        assert form_data["description"] == description
 
     class TestLoadDepartmentsView:
         """Tests for the load_departments view."""
@@ -295,48 +179,57 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             mock_get_department_choices.assert_called_once_with(faculty)
 
 
-class TestTaskListView(LoginRequiredMixin):
-    """Tests for the task_stat_view."""
+class TestAllocationTaskResult(LoginRequiredMixin):
+    """Tests for the allocation_task_result view."""
 
-    def _get_url(self, group: str = "None", allocation_pk=1):
+    TASK_ID = "a" * 32  # 32 chars to match the Task model id field
+
+    def _get_url(self, task_id: str = "None", shortname: str = "shorty"):
         return reverse(
-            "imperial_coldfront_plugin:list_tasks",
-            kwargs={"group": group, "allocation_pk": allocation_pk},
+            "imperial_coldfront_plugin:allocation_task_result",
+            kwargs={"task_id": task_id, "shortname": shortname},
         )
 
-    def test_no_tasks_returned(self, superuser_client):
-        """Test that the tasks returned are none."""
+    def test_no_task_returned(self, superuser_client):
+        """Test when no is task returned."""
         response = superuser_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
-        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
-        assert len(response.context["queued"]) == 0
-        assert len(response.context["completed"]) == 0
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/allocation_task_result.html"
+        )
 
-    def test_the_right_tasks_returned(self, superuser_client):
-        """Test that the tasks returned are the right ones.
-
-        Note that this currently only checks for completed tasks as building test data
-        for queued tasks is prohibitively complex.
-        """
-        from datetime import datetime
-        from uuid import uuid4
-
-        from django_q.models import Task
-
-        for g in ["test", "test", "test", "other"]:
-            Task.objects.create(
-                id=uuid4(),
-                func="time.sleep",
-                args=[16],
-                started=datetime.now(),
-                stopped=datetime.now(),
-                group=g,
-            )
-
-        response = superuser_client.get(self._get_url("test"))
+    def test_task_success(self, superuser_client, rdf_allocation_shortname):
+        """Test view when the task completed successfully."""
+        pk = 1
+        Task.objects.create(
+            id=self.TASK_ID,
+            success=True,
+            result=pk,
+            started=datetime.min,
+            stopped=datetime.now(),
+        )
+        response = superuser_client.get(
+            self._get_url(self.TASK_ID, rdf_allocation_shortname)
+        )
         assert response.status_code == HTTPStatus.OK
-        assertTemplateUsed(response, "imperial_coldfront_plugin/task_list.html")
-        assert len(response.context["completed"]) == 3
+        allocation_url = reverse("allocation-detail", kwargs=dict(allocation_pk=pk))
+        assert bytes(allocation_url, "utf-8") in response.content
+
+    def test_task_failure(self, superuser_client, rdf_allocation_shortname):
+        """Test view when the task failed."""
+        result = "Something went wrong"
+        Task.objects.create(
+            id=self.TASK_ID,
+            success=False,
+            result=result,
+            started=datetime.min,
+            stopped=datetime.now(),
+        )
+        response = superuser_client.get(
+            self._get_url(self.TASK_ID, rdf_allocation_shortname)
+        )
+        assert response.status_code == HTTPStatus.OK
+        assert bytes(result, "utf-8") in response.content
 
 
 def test_get_or_create_project(user):

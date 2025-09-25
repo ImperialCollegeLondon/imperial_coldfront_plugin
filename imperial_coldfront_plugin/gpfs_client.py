@@ -1,5 +1,6 @@
 """Interface for interacting with the GPFS API."""
 
+import logging
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,8 +12,6 @@ from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
 from uplink.retry.when import RetryPredicate, status_5xx
-
-from .tasks import run_in_background
 
 
 class ErrorWhenProcessingJob(Exception):
@@ -102,7 +101,21 @@ def check_job_status(
 
 
 class GPFSClient(Consumer):
-    """Client for interacting with the GPFS API."""
+    """Client for interacting with the GPFS API.
+
+    This class follows some general design patterns:
+    - Methods that make requests to the GPFS API are split into public and private
+      methods. The private methods are prefixed with an underscore and are decorated
+      with the appropriate uplink decorators to define the HTTP method, endpoint,
+      and any response handling. The public methods handle any additional logic,
+      error handling, and return the final response to create an easy to use interface.
+    - Asynchronous operations (e.g. creating a fileset) are handled by making the
+      initial request in a private method, then polling the job status using a retry
+      mechanism until the job completes or fails. Polling uses exponential backoff
+      and a maximum timeout (defined by settings.GPFS_API_TIMEOUT).
+    - Error handling is implemented to raise custom exceptions for each api call and
+      to provide opportunities for flow control based on specific error conditions.
+    """
 
     def __init__(self) -> None:
         """Initialise the client with the base URL and authentication."""
@@ -153,21 +166,28 @@ class GPFSClient(Consumer):
             group_id: ID of the group (rdf project id).
             path: Absolute path where the fileset will be created.
             permissions: Permissions.
-            parent_fileset: Name of the fileset the new fileset will belong to.
+            parent_fileset: Name of the fileset the new fileset will beloong to.
 
         Returns:
             The response after successfully creating the fileset.
         """
-        return self._create_fileset(
-            filesystemName=filesystem_name,
-            filesetName=fileset_name,
-            owner=f"{owner_id}:{group_id}",
-            path=str(path),
-            permissions=permissions,
-            inodeSpace=parent_fileset,
-            permissionChangeMode="chmodAndSetAcl",
-            iamMode="advisory",
-        )
+        try:
+            response = self._create_fileset(
+                filesystemName=filesystem_name,
+                filesetName=fileset_name,
+                owner=f"{owner_id}:{group_id}",
+                path=str(path),
+                permissions=permissions,
+                inodeSpace=parent_fileset,
+                permissionChangeMode="chmodAndSetAcl",
+                iamMode="advisory",
+            )
+            response.raise_for_status()
+            return response
+        except (ErrorWhenProcessingJob, requests.HTTPError) as e:
+            raise FilesetCreationError(
+                f"Error creating fileset '{fileset_name}'"
+            ) from e
 
     @check_job_status
     @json
@@ -199,18 +219,25 @@ class GPFSClient(Consumer):
         Returns:
             The response after successfully setting the quota.
         """
-        return self._set_quota(
-            filesystemName=filesystem_name,
-            objectName=fileset_name,
-            operationType="setQuota",
-            quotaType="FILESET",
-            blockSoftLimit=block_quota,
-            blockHardLimit=block_quota,
-            filesSoftLimit=files_quota,
-            filesHardLimit=files_quota,
-            filesGracePeriod="null",
-            blockGracePeriod="null",
-        )
+        try:
+            response = self._set_quota(
+                filesystemName=filesystem_name,
+                objectName=fileset_name,
+                operationType="setQuota",
+                quotaType="FILESET",
+                blockSoftLimit=block_quota,
+                blockHardLimit=block_quota,
+                filesSoftLimit=files_quota,
+                filesHardLimit=files_quota,
+                filesGracePeriod="null",
+                blockGracePeriod="null",
+            )
+            response.raise_for_status()
+            return response
+        except (ErrorWhenProcessingJob, requests.HTTPError) as e:
+            raise FilesetQuotaError(
+                f"Error whilst setting fileset quota for '{fileset_name}'"
+            ) from e
 
     @check_job_status
     @json
@@ -260,7 +287,13 @@ class GPFSClient(Consumer):
                 raise DirectoryExistsError(
                     f"Directory {path} already exists in fileset {fileset_name}."
                 )
-            raise
+            raise DirectoryCreationError(
+                f"Error creating directory {path} in fileset {fileset_name}."
+            )
+        except requests.HTTPError as e:
+            raise DirectiorCreationError(
+                f"Error creating directory {path} in fileset {fileset_name}."
+            ) from e
 
     @json
     @get("filesystems/{filesystemName}/filesets/{filesetName}/quotas")
@@ -392,11 +425,24 @@ class GPFSClient(Consumer):
                     flags="",
                 )
             )
-        return self._set_directory_acl(filesystem_name, str(path), entries=entries)
+        try:
+            response = self._set_directory_acl(
+                filesystem_name, str(path), entries=entries
+            )
+            response.raise_for_status()
+            return response
+        except (ErrorWhenProcessingJob, requests.HTTPError) as e:
+            raise UnableToSetACLError(
+                f"Error setting ACL on {path} in filesystem {filesystem_name}"
+            ) from e
 
 
 class FilesetCreationError(Exception):
     """Raised when a problem is encountered when creating a fileset."""
+
+
+class DirectiorCreationError(Exception):
+    """Raised when a problem is encountered when creating a directory."""
 
 
 class FilesetQuotaError(Exception):
@@ -405,6 +451,14 @@ class FilesetQuotaError(Exception):
 
 class DirectoryExistsError(Exception):
     """Raised when a directory already exists and allow_existing is False."""
+
+
+class DirectoryCreationError(Exception):
+    """Raised when a problem is encountered when creating a directory."""
+
+
+class UnableToSetACLError(Exception):
+    """Raised when a problem is encountered when setting ACLs on a directory."""
 
 
 @dataclass
@@ -480,7 +534,7 @@ class FilesetPathInfo:
         )
 
 
-def _create_fileset_set_quota(
+def create_fileset_set_quota(
     fileset_path_info: FilesetPathInfo,
     owner_id: str,
     group_id: str,
@@ -494,12 +548,49 @@ def _create_fileset_set_quota(
     parent_other_acl: str,
     block_quota: str,
     files_quota: str,
+    logger: logging.Logger | None = None,
 ):
-    """Create a fileset and set a quota in the requested filesystem."""
+    """Create a fileset and set a quota in the requested filesystem.
+
+    This function carries out the following steps:
+    - Create any intermediate directories in the path to the fileset
+      (e.g. department and group_id directories).
+    - Set the ACLs on any intermediate directories created.
+    - Create the fileset.
+    - Set the ACLs on the fileset.
+    - Set the files and block quota on the fileset.
+
+    Args:
+        fileset_path_info: path information for the fileset to create.
+        owner_id: ID of the owner (pi username).
+        group_id: ID of the group (AD group name).
+        fileset_posix_permissions: POSIX permissions to set on the fileset.
+        fileset_owner_acl: ACL permissions string for the owner entry on the fileset.
+        fileset_group_acl: ACL permissions string for the group entry on the fileset.
+        fileset_other_acl: ACL permissions string for the other entry on the fileset.
+        parent_posix_permissions: POSIX permissions to set on any intermediate
+            directories created.
+        parent_owner_acl: ACL permissions string for the owner entry on any
+            intermediate directories created.
+        parent_group_acl: ACL permissions string for the group entry on any
+            intermediate directories created.
+        parent_other_acl: ACL permissions string for the other entry on any
+            intermediate directories created.
+        block_quota: Value that specifies the block soft limit and hard limit.
+            The number can be specified using the suffix K, M, G, or T.
+        files_quota: Value that specifies the inode soft limit and hard limit.
+        logger: Logger to use, defaults to the 'django' logger.
+    """
+    logger = logger or logging.getLogger("django")
+
     client = GPFSClient()
 
     for dir_path in fileset_path_info.iter_intermediate_relative_directory_paths():
         try:
+            logger.info(
+                f"Creating directory '{dir_path}' in fileset "
+                f"'{fileset_path_info.faculty}'."
+            )
             client.create_fileset_directory(
                 fileset_path_info.filesystem_name,
                 fileset_path_info.faculty,
@@ -508,9 +599,14 @@ def _create_fileset_set_quota(
                 permissions=parent_posix_permissions,
             )
         except DirectoryExistsError:
+            logger.info("Directory already exists, not creating.")
             continue
         else:
             # only set ACL if we created the directory
+            logger.info(
+                f"Setting ACL on directory '{dir_path}' in fileset "
+                f"'{fileset_path_info.faculty}'."
+            )
             client.set_directory_acl(
                 fileset_path_info.filesystem_name,
                 fileset_path_info.parent_fileset_path_relative_to_filesystem / dir_path,
@@ -519,22 +615,21 @@ def _create_fileset_set_quota(
                 other_allow_permissions=parent_other_acl,
             )
 
-    try:
-        client.create_fileset(
-            fileset_path_info.filesystem_name,
-            fileset_path_info.fileset_name,
-            owner_id,
-            f"IC\\{group_id}",
-            fileset_path_info.fileset_absolute_path,
-            fileset_posix_permissions,
-            fileset_path_info.faculty,
-        ).raise_for_status()
-    except requests.HTTPError as e:
-        raise FilesetCreationError(
-            "Error when creating fileset "
-            f"'{fileset_path_info.fileset_name}' - {e.response.content}"
-        ) from e
+    logger.info(
+        f"Creating fileset '{fileset_path_info.fileset_name}' at "
+        f"'{fileset_path_info.fileset_absolute_path}'."
+    )
+    client.create_fileset(
+        fileset_path_info.filesystem_name,
+        fileset_path_info.fileset_name,
+        owner_id,
+        f"{settings.AD_DOMAIN}\\{group_id}",
+        fileset_path_info.fileset_absolute_path,
+        fileset_posix_permissions,
+        fileset_path_info.faculty,
+    )
 
+    logger.info(f"Setting acl for fileset {fileset_path_info.fileset_name}")
     client.set_directory_acl(
         fileset_path_info.filesystem_name,
         fileset_path_info.fileset_path_relative_to_filesystem,
@@ -543,26 +638,21 @@ def _create_fileset_set_quota(
         other_allow_permissions=fileset_other_acl,
     )
 
-    try:
-        client.set_quota(
-            fileset_path_info.filesystem_name,
-            fileset_path_info.fileset_name,
-            block_quota,
-            files_quota,
-        ).raise_for_status()
-    except requests.HTTPError as e:
-        raise FilesetQuotaError(
-            "Error when setting fileset "
-            f"'{fileset_path_info.fileset_name}' quota  - {e.response.content}"
-        ) from e
-
-
-create_fileset_set_quota_in_background = run_in_background(_create_fileset_set_quota)
+    logger.info("Setting quota for fileset {fileset_path_info.fileset_name}")
+    client.set_quota(
+        fileset_path_info.filesystem_name,
+        fileset_path_info.fileset_name,
+        block_quota,
+        files_quota,
+    )
 
 
 def _update_quota_usages_task():
     """Update the usages of all quota related allocation attributes."""
     from coldfront.core.allocation.models import Allocation
+
+    if not settings.GPFS_ENABLED:
+        return
 
     client = GPFSClient()
     usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)

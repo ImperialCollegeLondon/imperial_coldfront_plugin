@@ -394,3 +394,13 @@ def patch_request_session(mocker):
         raise RuntimeError("Un-mocked HTTP request.")
 
     return mocker.patch("requests.Session.send", side_effect=f)
+
+
+@pytest.fixture(autouse=True)
+def signals_async_task_mock(mocker):
+    """Mock the async_task function used in signals to run tasks synchronously."""
+
+    def f(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    return mocker.patch("imperial_coldfront_plugin.signals.async_task", f)

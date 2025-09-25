@@ -1,0 +1,33 @@
+{% extends "common/base.html" %}
+{% block content %}
+  <div class="mb-3">
+    {% if task %}
+      {% if task.success %}
+        <h2 class="text-justify">Allocation Creation Succeeded</h2>
+        <p>
+          <a class="btn btn-primary"
+             href="{% url 'allocation-detail' task.result %}">View allocation</a>
+        </p>
+      {% else %}
+        <h2 class="text-justify">Allocation Creation Failed</h2>
+        <p>
+          In the event of failure the creation process will attempt to clean up any partially created or configured resources to keep Coldfront, Active Directory and GPFS in sync. However these systems should be manually checked to ensure this is the case.
+        </p>
+        <p>
+          The following steps are recommended:
+          <ul>
+            <li>Ensure that the AD group 'rdf-{{ shortname }}' does not exist.</li>
+            <li>Ensure that the GPFS fileset '{{ shortname }}' does not exist.</li>
+            <li>Resolve the underlying issue (see the backtrace of the failure below and check worker process logs).</li>
+            <li>Attempt creation of the allocation again.</li>
+          </ul>
+        </p>
+        <p>Failure backtrace:</p>
+        <p style="white-space: pre-wrap;">{{ task.result }}</p>
+      {% endif %}
+    {% else %}
+      <h2 class="text-justify">Allocation Creation In Progress</h2>
+      <p>Refresh the page for updates.</p>
+    {% endif %}
+  </div>
+{% endblock content %}

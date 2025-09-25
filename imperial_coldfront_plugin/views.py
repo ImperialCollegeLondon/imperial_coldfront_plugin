@@ -3,14 +3,7 @@
 import re
 from pathlib import Path
 
-from coldfront.core.allocation.models import (
-    Allocation,
-    AllocationAttribute,
-    AllocationAttributeType,
-    AllocationAttributeUsage,
-    AllocationStatusChoice,
-    AllocationUserStatusChoice,
-)
+from coldfront.core.allocation.models import Allocation
 from coldfront.core.project.forms import ProjectAddUserForm
 from coldfront.core.project.models import (
     Project,
@@ -20,16 +13,14 @@ from coldfront.core.project.models import (
     ProjectUserStatusChoice,
 )
 from coldfront.core.project.views import ProjectAddUsersSearchResultsView
-from coldfront.core.resource.models import Resource
 from coldfront.core.user.utils import CombinedUserSearch, UserSearch
 from django.conf import settings
-from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.forms import formset_factory
 from django.http import HttpRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render, reverse
-from django_q.tasks import Chain, Task
+from django_q.tasks import async_task, fetch
 
 from .dart import create_dart_id_attribute
 from .forms import (
@@ -39,10 +30,9 @@ from .forms import (
     RDFAllocationForm,
     get_department_choices,
 )
-from .gid import get_new_gid
-from .gpfs_client import FilesetPathInfo
 from .microsoft_graph_client import get_graph_api_client
 from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
+from .tasks import create_rdf_allocation
 
 User = get_user_model()
 
@@ -87,139 +77,11 @@ def add_rdf_storage_allocation(request):
     if request.method == "POST":
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
-            storage_size_tb = form.cleaned_data["size"]
-            # dart_id = form.cleaned_data["dart_id"]
-            project = form.cleaned_data["project"]
-            shortname = form.cleaned_data["allocation_shortname"]
-            ldap_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-
-            shortname_attribute_type = AllocationAttributeType.objects.get(
-                name="Shortname"
-            )
-            location_attribute_type = AllocationAttributeType.objects.get(
-                name="Filesystem location"
-            )
-            rdf_resource = Resource.objects.get(name="RDF Active")
-
-            allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-            rdf_allocation = Allocation.objects.create(
-                project=project,
-                status=allocation_active_status,
-                start_date=form.cleaned_data["start_date"],
-                end_date=form.cleaned_data["end_date"],
-                is_changeable=True,
-                justification=form.cleaned_data["description"],
-            )
-            rdf_allocation.resources.add(rdf_resource)
-
-            storage_quota_attribute_type = AllocationAttributeType.objects.get(
-                name="Storage Quota (TB)"
-            )
-            quota_attribute = AllocationAttribute.objects.create(
-                allocation_attribute_type=storage_quota_attribute_type,
-                allocation=rdf_allocation,
-                value=storage_size_tb,
-            )
-            AllocationAttributeUsage.objects.create(
-                allocation_attribute=quota_attribute, value=0
-            )
-
-            files_quota_attribute_type = AllocationAttributeType.objects.get(
-                name="Files Quota"
-            )
-            files_attribute = AllocationAttribute.objects.create(
-                allocation_attribute_type=files_quota_attribute_type,
-                allocation=rdf_allocation,
-                value=settings.GPFS_FILES_QUOTA,
-            )
-            AllocationAttributeUsage.objects.create(
-                allocation_attribute=files_attribute, value=0
-            )
-
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=shortname_attribute_type,
-                allocation=rdf_allocation,
-                value=shortname,
-            )
-
-            # create_dart_id_attribute(dart_id, rdf_allocation)
-
-            gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
-            gid = get_new_gid()
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=gid_attribute_type,
-                allocation=rdf_allocation,
-                value=gid,
-            )
-
-            chain = Chain()
-            if settings.LDAP_ENABLED:
-                chain.append(
-                    "imperial_coldfront_plugin.ldap._ldap_create_group",
-                    ldap_name,
-                    gid,
-                )
-
-            allocation_user_active_status = AllocationUserStatusChoice.objects.get(
-                name="Active"
-            )
-
-            chain.append(
-                "coldfront.core.allocation.models.AllocationUser.objects.create",
-                allocation=rdf_allocation,
-                user=project.pi,
-                status=allocation_user_active_status,
-            )
-
-            faculty = project.projectattribute_set.get(
-                proj_attr_type__name="Faculty"
-            ).value
-            department = project.projectattribute_set.get(
-                proj_attr_type__name="Department"
-            ).value
-            group_id = project.projectattribute_set.get(
-                proj_attr_type__name="Group ID"
-            ).value
-
-            fileset_path_info = FilesetPathInfo(
-                filesystem_mount_path=settings.GPFS_FILESYSTEM_MOUNT_PATH,
-                filesystem_name=settings.GPFS_FILESYSTEM_NAME,
-                top_level_directories=settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-                faculty=faculty,
-                department=department,
-                group_id=group_id,
-                fileset_name=shortname,
-            )
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=location_attribute_type,
-                allocation=rdf_allocation,
-                value=fileset_path_info.fileset_absolute_path,
-            )
-
-            if settings.GPFS_ENABLED:
-                chain.append(
-                    "imperial_coldfront_plugin.gpfs_client._create_fileset_set_quota",
-                    fileset_path_info=fileset_path_info,
-                    owner_id="root",
-                    group_id=ldap_name,
-                    fileset_posix_permissions=settings.GPFS_FILESET_POSIX_PERMISSIONS,
-                    fileset_owner_acl=settings.GPFS_FILESET_OWNER_ACL,
-                    fileset_group_acl=settings.GPFS_FILESET_GROUP_ACL,
-                    fileset_other_acl=settings.GPFS_FILESET_OTHER_ACL,
-                    parent_posix_permissions=settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
-                    parent_owner_acl=settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
-                    parent_group_acl=settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
-                    parent_other_acl=settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
-                    block_quota=f"{storage_size_tb}T",
-                    files_quota=settings.GPFS_FILES_QUOTA,
-                )
-
-            group = chain.run()
-            messages.success(request, "RDF allocation created successfully.")
+            task_id = async_task(create_rdf_allocation, form.cleaned_data)
             return redirect(
-                "imperial_coldfront_plugin:list_tasks",
-                group=group,
-                allocation_pk=rdf_allocation.pk,
+                "imperial_coldfront_plugin:allocation_task_result",
+                task_id=task_id,
+                shortname=form.cleaned_data["allocation_shortname"],
             )
     else:
         form = RDFAllocationForm()
@@ -240,24 +102,15 @@ def load_departments(request):
 
 
 @login_required
-def task_stat_view(request, group: str, allocation_pk: int):
-    """Displays a list of tasks and their status."""
-    from django_q.models import OrmQ
-
+def allocation_task_result(request, task_id: str, shortname: str):
+    """Display information about an rdf allocation creation task."""
     if not request.user.is_superuser:
         return HttpResponseForbidden()
-
-    queued = [qt.task() for qt in OrmQ.objects.all() if qt.task()["group"] == group]
-    completed = Task.objects.filter(group=group).order_by("started").reverse()
-
+    task = fetch(task_id)
     return render(
         request,
-        "imperial_coldfront_plugin/task_list.html",
-        context={
-            "completed": completed,
-            "queued": queued,
-            "allocation_pk": allocation_pk,
-        },
+        "imperial_coldfront_plugin/allocation_task_result.html",
+        context={"task": task, "shortname": shortname},
     )
 
 

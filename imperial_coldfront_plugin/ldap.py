@@ -8,11 +8,11 @@ from django.conf import settings
 from ldap3 import Connection, Server
 
 from .emails import _send_discrepancy_notification
-from .tasks import run_in_background
 
 LDAP_GROUP_TYPE = -2147483646  # magic number
 AD_WILL_NOT_PERFORM_ERROR_CODE = 53
 AD_ENTITY_ALREADY_EXISTS_ERROR_CODE = 68
+AD_NO_SUCH_OBJECT_ERROR_CODE = 32
 
 
 def _get_ldap_connection():
@@ -48,11 +48,15 @@ class LDAPGroupCreationError(Exception):
     """Dedicated exception for errors encountered when creating an LDAP group."""
 
 
+class LDAPGroupDeletionError(Exception):
+    """Dedicated exception for errors encountered when deleting an LDAP group."""
+
+
 class LDAPGroupModifyError(Exception):
     """Dedicated exception for errors encountered when creating an LDAP group."""
 
 
-def _ldap_create_group(group_name: str, gid: int, conn: Connection | None = None):
+def ldap_create_group(group_name: str, gid: int, conn: Connection | None = None):
     """Create an LDAP group."""
     if conn is None:
         conn = _get_ldap_connection()
@@ -73,12 +77,27 @@ def _ldap_create_group(group_name: str, gid: int, conn: Connection | None = None
         )
 
 
+def ldap_delete_group(
+    group_name: str, allow_missing=False, conn: Connection | None = None
+):
+    """Delete an LDAP group."""
+    if conn is None:
+        conn = _get_ldap_connection()
+
+    status, result, _, _ = conn.delete(group_dn_from_name(group_name))
+    if not status:
+        if not (allow_missing and result["result"] == AD_NO_SUCH_OBJECT_ERROR_CODE):
+            raise LDAPGroupDeletionError(
+                f"Failed to delete LDAP group '{group_name}' - {result}"
+            )
+
+
 def group_dn_from_name(group_name):
     """Create a full group distinguished name from a common name."""
     return f"cn={group_name},{settings.LDAP_GROUP_OU}"
 
 
-def _ldap_add_member_to_group(
+def ldap_add_member_to_group(
     group_name: str,
     member_username: str,
     allow_already_present=False,
@@ -108,12 +127,13 @@ def _ldap_add_member_to_group(
             )
 
 
-def _ldap_remove_member_from_group(
+def ldap_remove_member_from_group(
     group_name: str,
     member_username: str,
     allow_missing=False,
     conn: Connection | None = None,
 ):
+    """Remove a member from an existing ldap group."""
     if conn is None:
         conn = _get_ldap_connection()
 
@@ -187,9 +207,9 @@ def check_ldap_consistency():
     return discrepancies
 
 
-check_ldap_consistency_in_background = run_in_background(check_ldap_consistency)
-ldap_create_group_in_background = run_in_background(_ldap_create_group)
-ldap_add_member_to_group_in_background = run_in_background(_ldap_add_member_to_group)
-ldap_remove_member_from_group_in_background = run_in_background(
-    _ldap_remove_member_from_group
-)
+# check_ldap_consistency_in_background = run_in_background(check_ldap_consistency)
+# ldap_create_group_in_background = run_in_background(_ldap_create_group)
+# ldap_add_member_to_group_in_background = run_in_background(_ldap_add_member_to_group)
+# ldap_remove_member_from_group_in_background = run_in_background(
+#     _ldap_remove_member_from_group
+# )

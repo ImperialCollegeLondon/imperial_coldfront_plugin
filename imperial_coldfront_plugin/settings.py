@@ -87,8 +87,11 @@ LDAP_GROUP_OU = ENV.str(
 LDAP_SHORTNAME_PREFIX = "rdf-"
 """Prefix added to allocation shortname for corresponding Active Directory group."""
 
-LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
+AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
+"""The Active Directory domain."""
 
+LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
+"""Computed value of whether LDAP integration is enabled."""
 GID_RANGES = [
     range(1031386, 1031435),
 ]

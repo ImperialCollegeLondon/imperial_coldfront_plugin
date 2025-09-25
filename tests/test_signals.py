@@ -5,16 +5,15 @@ from coldfront.core.allocation.models import AllocationUser, AllocationUserStatu
 @pytest.fixture
 def ldap_add_member_mock(mocker):
     """Mock ldap_add_member_to_group_in_background in signals.py."""
-    return mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_add_member_to_group_in_background"
-    )
+    return mocker.patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
 
 
 @pytest.fixture
 def ldap_remove_member_mock(mocker):
     """Mock ldap_remove_member_from_group_in_background in signals.py."""
     return mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_remove_member_from_group_in_background"
+        "imperial_coldfront_plugin.signals.ldap_remove_member_from_group",
+        # RemoveMemberMock(),
     )
 
 
@@ -81,8 +80,8 @@ def test_remove_ldap_group_membership(
 
     allocation_user.delete()
 
-    ldap_remove_member_mock(
-        f"rdf-{rdf_allocation_shortname}", user.username, allowing_missing=True
+    ldap_remove_member_mock.assert_called_once_with(
+        f"rdf-{rdf_allocation_shortname}", user.username, allow_missing=True
     )
 
 

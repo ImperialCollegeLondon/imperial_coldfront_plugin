@@ -18,9 +18,9 @@ urlpatterns = [
         name="load_departments",
     ),
     path(
-        "list_tasks/<str:group>/<int:allocation_pk>/",
-        views.task_stat_view,
-        name="list_tasks",
+        "allocation_task_result/<str:task_id>/<str:shortname>",
+        views.allocation_task_result,
+        name="allocation_task_result",
     ),
     path(
         "add_dart_id/<int:allocation_pk>/",

@@ -16,6 +16,8 @@ def dummy_view(request, **kwargs):
 urlpatterns = [
     path("", portal_views.home, name="home"),
     path("icl/", include("imperial_coldfront_plugin.urls")),
-    path("<int:allocation_pk>/", dummy_view, name="allocation-detail"),
+    path(
+        "/allocation_detail/<int:allocation_pk>/", dummy_view, name="allocation-detail"
+    ),
     path("<int:pk>/", dummy_view, name="project-detail"),
 ]
