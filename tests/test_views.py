@@ -143,7 +143,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             fetch_redirect_response=False,
         )
         create_rdf_allocation_mock.assert_called_once()
-        called_args, called_kwargs = create_rdf_allocation_mock.call_args
+        called_args, _ = create_rdf_allocation_mock.call_args
         form_data = called_args[0]
         assert form_data["project"] == project
         assert form_data["start_date"] == start_date

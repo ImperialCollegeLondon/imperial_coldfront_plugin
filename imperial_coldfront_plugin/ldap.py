@@ -176,7 +176,7 @@ def check_ldap_consistency():
         )
         expected_usernames = [au.user.username for au in active_users]
 
-        success, _, group_search, _ = conn.search(
+        _, _, group_search, _ = conn.search(
             settings.LDAP_GROUP_OU, f"(cn={group_name})", attributes=["member"]
         )
 
