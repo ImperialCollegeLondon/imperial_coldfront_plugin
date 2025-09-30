@@ -101,3 +101,6 @@ ignore = "H021"
 
 [tool.django-stubs]
 django_settings_module = "imperial_coldfront_plugin" # a lie but seems to satisfy
+
+[project.entry-points."djangoq.errorreporters"]
+email = "imperial_coldfront_plugin.email_reporter:EmailReporter"
