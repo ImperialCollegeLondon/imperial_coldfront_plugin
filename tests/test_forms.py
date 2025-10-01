@@ -2,11 +2,9 @@ from datetime import datetime, timedelta
 from random import choices
 
 import pytest
+from django.conf import settings
 
 from imperial_coldfront_plugin.forms import (
-    DEPARTMENTS,
-    DEPARTMENTS_IN_FACULTY,
-    FACULTIES,
     ProjectCreationForm,
     RDFAllocationForm,
     get_department_choices,
@@ -17,7 +15,7 @@ from imperial_coldfront_plugin.forms import (
 
 def test_get_faculty_choices():
     """Test that get_faculty_choices returns the correct choices."""
-    expected_choices = [("", "--------"), *FACULTIES.items()]
+    expected_choices = [("", "--------"), *settings.FACULTIES.items()]
     assert get_faculty_choices() == expected_choices
 
 
@@ -27,7 +25,10 @@ def test_get_faculty_choices():
         (
             "foe",
             [("", "--------")]
-            + [(id_, DEPARTMENTS[id_]) for id_ in DEPARTMENTS_IN_FACULTY["foe"]],
+            + [
+                (id_, settings.DEPARTMENTS[id_])
+                for id_ in settings.DEPARTMENTS_IN_FACULTY["foe"]
+            ],
         ),
         ("invalid_id", [("", "--------")]),
         ("", [("", "--------")]),
@@ -40,7 +41,7 @@ def test_get_department_choices(faculty_id, expected_choices):
 
 def test_get_initial_department_choices():
     """Test that get_initial_department_choices returns the correct choices."""
-    expected_choices = [("", "--------"), *DEPARTMENTS.items()]
+    expected_choices = [("", "--------"), *settings.DEPARTMENTS.items()]
     assert get_initial_department_choices() == expected_choices
 
 
@@ -48,7 +49,7 @@ def test_get_initial_department_choices():
 def rdf_form_data(project):
     """Fixture to provide RDFAllocationForm data."""
     faculty_id = "foe"
-    department_id = DEPARTMENTS_IN_FACULTY[faculty_id][0]
+    department_id = settings.DEPARTMENTS_IN_FACULTY[faculty_id][0]
     return dict(
         project=project.pk,
         faculty=faculty_id,
@@ -167,7 +168,7 @@ def project_form_data(user):
     )
 
     faculty_id = "foe"
-    department_id = DEPARTMENTS_IN_FACULTY[faculty_id][0]
+    department_id = settings.DEPARTMENTS_IN_FACULTY[faculty_id][0]
 
     return dict(
         title="project title",
@@ -188,7 +189,7 @@ def test_project_form_clean_valid_combination(project_form_data):
 def test_project_form_clean_invalid_combination(project_form_data):
     """Test that RDFAllocationForm.clean() raises a ValidationError."""
     # choose department from a different faculty
-    project_form_data["department"] = DEPARTMENTS_IN_FACULTY["fons"][0]
+    project_form_data["department"] = settings.DEPARTMENTS_IN_FACULTY["fons"][0]
     form = ProjectCreationForm(data=project_form_data)
     assert not form.is_valid()
     assert form.errors == dict(__all__=["Invalid faculty and department combination."])

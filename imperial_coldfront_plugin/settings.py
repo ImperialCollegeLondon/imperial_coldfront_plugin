@@ -106,3 +106,25 @@ ALLOCATION_SHORTNAME_MAX_LENGTH = 12
 """Maximum length of an allocation shortname."""
 ALLOCATION_DEFAULT_PERIOD_DAYS = 365
 """Days from current date for the initial form default end date for an allocation."""
+
+
+# Mappings for faculty and department names and shortnames for development purposes.
+# These should be overridden in prod via prod_settings.py.
+DEPARTMENTS = {
+    "physics": "Physics",
+    "dsde": "Dyson School of Design Engineering",
+    "chemistry": "Chemistry",
+    "aero": "Aeronautics",
+}
+FACULTIES = {
+    "buss": "Business School",
+    "facility": "Facility",
+    "foe": "Faculty of Engineering",
+    "fom": "Faculty of Medicine",
+    "fons": "Faculty of Natural Sciences",
+    "ict": "ICT",
+}
+DEPARTMENTS_IN_FACULTY = {
+    "foe": ["dsde", "aero"],
+    "fons": ["physics", "chemistry"],
+}

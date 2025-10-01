@@ -9,7 +9,7 @@ from coldfront.core.allocation.models import (
     AllocationUser,
 )
 
-from imperial_coldfront_plugin.forms import DEPARTMENTS_IN_FACULTY, RDFAllocationForm
+from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.tasks import (
@@ -43,10 +43,10 @@ def ldap_delete_group_mock(mocker):
 
 
 @pytest.fixture
-def rdf_form_data(project):
+def rdf_form_data(project, settings):
     """Fixture to provide RDFAllocationForm data."""
     faculty_id = "foe"
-    department_id = DEPARTMENTS_IN_FACULTY[faculty_id][0]
+    department_id = settings.DEPARTMENTS_IN_FACULTY[faculty_id][0]
     return dict(
         project=project.pk,
         faculty=faculty_id,

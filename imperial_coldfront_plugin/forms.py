@@ -28,45 +28,25 @@ if TYPE_CHECKING:
 
 User = get_user_model()
 
-DEPARTMENTS = {
-    "physics": "Physics",
-    "dsde": "Dyson School of Design Engineering",
-    "chemistry": "Chemistry",
-    "aero": "Aeronautics",
-}
-
-FACULTIES = {
-    "buss": "Business School",
-    "facility": "Facility",
-    "foe": "Faculty of Engineering",
-    "fom": "Faculty of Medicine",
-    "fons": "Faculty of Natural Sciences",
-    "ict": "ICT",
-}
-
-DEPARTMENTS_IN_FACULTY = {
-    "foe": ["dsde", "aero"],
-    "fons": ["physics", "chemistry"],
-}
-
 
 def get_faculty_choices() -> Iterable[tuple[str, str]]:
     """Get the available faculties."""
-    return [("", "--------"), *FACULTIES.items()]
+    return [("", "--------"), *settings.FACULTIES.items()]
 
 
 def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
     """Get the available departments for the chosen faculty."""
-    if not faculty_id or faculty_id not in DEPARTMENTS_IN_FACULTY:
+    if not faculty_id or faculty_id not in settings.DEPARTMENTS_IN_FACULTY:
         return [("", "--------")]
     return [("", "--------")] + [
-        (id_, DEPARTMENTS[id_]) for id_ in DEPARTMENTS_IN_FACULTY[faculty_id]
+        (id_, settings.DEPARTMENTS[id_])
+        for id_ in settings.DEPARTMENTS_IN_FACULTY[faculty_id]
     ]
 
 
 def get_initial_department_choices() -> Iterable[tuple[str, str]]:
     """Get all the initial departments in tuple form."""
-    return [("", "--------"), *DEPARTMENTS.items()]
+    return [("", "--------"), *settings.DEPARTMENTS.items()]
 
 
 class UnknownUsernameError(Exception):
@@ -296,7 +276,7 @@ class ProjectCreationForm(forms.ModelForm[Project]):
         if cleaned_data:
             faculty_id = cleaned_data["faculty"]
             department_id = cleaned_data.get("department")
-            if department_id not in DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
+            if department_id not in settings.DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
                 raise ValidationError("Invalid faculty and department combination.")
         return cleaned_data
 
