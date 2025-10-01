@@ -4,6 +4,14 @@ Needless to say you should not import this module at runtime or use it for any o
 purpose.
 """
 
+import os
+
+# These shenanigans are necessary because the Coldfront OIDC plugin settings require
+# these env vars to be set. This won't always be the case (particularly in CI)
+# environments so we just set them to empty strings here
+os.environ["OIDC_RP_CLIENT_ID"] = ""
+os.environ["OIDC_RP_CLIENT_SECRET"] = ""
+
 from coldfront.config.settings import *  # noqa: F403
 
 from .settings import *  # noqa: F403
