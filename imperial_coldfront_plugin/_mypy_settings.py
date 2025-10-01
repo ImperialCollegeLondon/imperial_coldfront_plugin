@@ -6,11 +6,8 @@ purpose.
 
 import os
 
-# These shenanigans are necessary because the Coldfront OIDC plugin settings require
-# these env vars to be set. This won't always be the case (particularly in CI)
-# environments so we just set them to empty strings here
-os.environ["OIDC_RP_CLIENT_ID"] = ""
-os.environ["OIDC_RP_CLIENT_SECRET"] = ""
+# Disable oidc plugin to avoid needing to set OIDC env vars
+os.environ["PLUGIN_AUTH_OIDC"] = "False"
 
 from coldfront.config.settings import *  # noqa: F403
 
@@ -20,3 +17,5 @@ from .settings import *  # noqa: F403
 # so we need to declare them here for type checking purposes
 EMAIL_SENDER = ""
 EMAIL_ADMIN_LIST = ""
+OIDC_RP_CLIENT_ID = ""
+OIDC_RP_CLIENT_SECRET = ""
