@@ -68,8 +68,8 @@ def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
     assert gid == 1000
 
 
-def test_multiple_gid_ranges(settings, allocation_attribute_factory):
-    """Test when multiple GID ranges are configured."""
+def test_multiple_gid_ranges_overflow(settings, allocation_attribute_factory):
+    """Test that gid selection moves to the next range if at the end of previous one."""
     # Override the GID_RANGES setting using the fixture
     settings.GID_RANGES = [range(1000, 1100), range(2000, 2100)]
 
@@ -81,3 +81,18 @@ def test_multiple_gid_ranges(settings, allocation_attribute_factory):
 
     # Assert that the returned GID is the start of the next range
     assert gid == 2000
+
+
+def test_multiple_gid_ranges(settings, allocation_attribute_factory):
+    """Test when multiple GID ranges are configured."""
+    # Override the GID_RANGES setting using the fixture
+    settings.GID_RANGES = [range(1000, 1100), range(2000, 2100)]
+
+    # Create an existing GID in the second range
+    allocation_attribute_factory(name="GID", value=2005)
+
+    # Call the get_new_gid function
+    gid = get_new_gid()
+
+    # Assert that the returned GID is next in the second range
+    assert gid == 2006

@@ -202,9 +202,10 @@ def test_project_form_group_id_blank(project_form_data):
 
 
 @pytest.mark.parametrize("group_id,passes", PATH_COMPONENT_COMBINATIONS)
-def test_project_form_group_id_characters(group_id, passes, db):
+def test_project_form_group_id_characters(group_id, passes, db, project_form_data):
     """Test that valid characters are being checked for group_id field."""
-    form = ProjectCreationForm(data=dict(group_id=group_id))
+    project_form_data["group_id"] = group_id
+    form = ProjectCreationForm(data=project_form_data)
     form.is_valid()
     if passes:
         assert not form.errors.get("group_id")
@@ -214,20 +215,24 @@ def test_project_form_group_id_characters(group_id, passes, db):
         ]
 
 
-def test_project_form_group_id_min_length(settings):
+def test_project_form_group_id_min_length(settings, project_form_data):
     """Test that min length is being checked for allocation_shortname field."""
-    group_id = "".join(choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=2))
-    form = ProjectCreationForm(data=dict(group_id=group_id))
+    project_form_data["group_id"] = "".join(
+        choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=2)
+    )
+    form = ProjectCreationForm(data=project_form_data)
     form.is_valid()
     assert form.errors["group_id"] == [
         "Ensure this value has at least 3 characters (it has 2)."
     ]
 
 
-def test_project_form_group_id_max_length(settings):
+def test_project_form_group_id_max_length(settings, project_form_data):
     """Test that max length is being checked for allocation_shortname field."""
-    group_id = "".join(choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=13))
-    form = ProjectCreationForm(data=dict(group_id=group_id))
+    project_form_data["group_id"] = "".join(
+        choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=13)
+    )
+    form = ProjectCreationForm(data=project_form_data)
     form.is_valid()
     assert form.errors["group_id"] == [
         "Ensure this value has at most 12 characters (it has 13)."
@@ -264,9 +269,10 @@ def test_project_form_group_id_from_username_validation_length(
     form.errors["group_id"] == ["Must be between 3 and 12 characters."]
 
 
-def test_project_form_group_id_unique(project):
+def test_project_form_group_id_unique(project, project_form_data):
     """Test that uniqueness is being checked for group_id field."""
-    form = ProjectCreationForm(data=dict(group_id=project.pi.username))
+    project_form_data["group_id"] = project.pi.username
+    form = ProjectCreationForm(data=project_form_data)
     assert not form.is_valid()
     assert form.errors["group_id"] == ["Name already in use."]
 

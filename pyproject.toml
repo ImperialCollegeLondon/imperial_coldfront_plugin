@@ -29,6 +29,8 @@ dev = [
     "pytest-mock",
     "pytest-django",
     "django-stubs",
+    "types-requests",
+    "types-ldap3",
 ]
 doc = [
     "mkdocs",
@@ -55,7 +57,7 @@ disallow_any_generics = true
 warn_unreachable = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
-exclude = [".venv/", "docs/"]
+exclude = [".venv/", "docs/", "migrations/", "site/"]
 plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
@@ -63,15 +65,32 @@ module = "tests.*"
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["mozilla_django_oidc.*"]
+module = [
+  "mozilla_django_oidc.*",
+  "coldfront.*",
+  "django_q.*",
+  "uplink.*",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["imperial_coldfront_plugin.oidc"]
+module = ["imperial_coldfront_plugin.forms"]
 disallow_any_explicit = false
 
 [tool.pytest.ini_options]
-addopts = "-v -p no:warnings --cov=imperial_coldfront_plugin --cov-report=html --doctest-modules --ignore=docs --ignore=makemigrations.py"
+addopts = [
+    "-v",
+    "-p",
+    "no:warnings",
+    "--cov=imperial_coldfront_plugin",
+    "--cov-report=html",
+    "--doctest-modules",
+    "--ignore=docs",
+    "--ignore=site",
+    "--ignore=makemigrations.py",
+    "--ignore=imperial_coldfront_plugin/migrations",
+    "--mypy",
+]
 
 [tool.ruff]
 exclude = ["*/migrations"]
@@ -100,7 +119,10 @@ indent = 2
 ignore = "H021"
 
 [tool.django-stubs]
-django_settings_module = "imperial_coldfront_plugin" # a lie but seems to satisfy
+# use a dummy settings module that ensures we get all of the coldfront and plugin
+# settings together
+django_settings_module = "imperial_coldfront_plugin._mypy_settings"
+
 
 [project.entry-points."djangoq.errorreporters"]
 email = "imperial_coldfront_plugin.email_reporter:EmailReporter"

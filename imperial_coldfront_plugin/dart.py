@@ -11,7 +11,7 @@ class DartIDValidationError(Exception):
     """Error when a Dart ID does not meet validation criteria."""
 
 
-def validate_dart_id(dart_id: str, allocation: Allocation):
+def validate_dart_id(dart_id: str, allocation: Allocation) -> None:
     """Validate range and availability of Dart ID value.
 
     Args:
@@ -33,7 +33,7 @@ def validate_dart_id(dart_id: str, allocation: Allocation):
         raise DartIDValidationError("Dart ID already assigned to this allocation")
 
 
-def create_dart_id_attribute(dart_id: str, allocation: Allocation):
+def create_dart_id_attribute(dart_id: str, allocation: Allocation) -> Allocation:
     """Create an AllocationAttribute for a Dart ID."""
     validate_dart_id(dart_id, allocation)
     dart_id_attribute_type = AllocationAttributeType.objects.get(

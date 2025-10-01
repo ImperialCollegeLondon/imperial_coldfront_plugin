@@ -1,9 +1,15 @@
 """Policy functionality governing the eligibility of users access RCS systems."""
 
+from typing import TYPE_CHECKING
+
+from coldfront.core.allocation.models import Project
 from django.core.exceptions import PermissionDenied
 
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User
 
-def user_eligible_for_hpc_access(user_profile):
+
+def user_eligible_for_hpc_access(user_profile: dict[str, str]) -> bool:
     """Assess the eligibility of a user to join a ResearchGroup.
 
     Imperial identity systems contain entries for non-human entities such as rooms and
@@ -118,7 +124,7 @@ HPC_ACCESS_ALLOWED_ENTITY_TYPE = [
 ]
 
 
-def user_eligible_to_be_pi(user_profile):
+def user_eligible_to_be_pi(user_profile: dict[str, str]) -> bool:
     """Assess eligibilty of a user be a Principal Investigator."""
     job_title = user_profile["job_title"]
     if any(
@@ -140,7 +146,7 @@ def user_eligible_to_be_pi(user_profile):
     return True
 
 
-def check_project_pi_or_superuser(project, user):
+def check_project_pi_or_superuser(project: Project, user: "User") -> None:
     """Check if the user is the owner of the project or a superuser."""
     if not (user.is_superuser or user == project.pi):
         raise PermissionDenied

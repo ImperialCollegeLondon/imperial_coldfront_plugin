@@ -7,7 +7,8 @@ from unittest.mock import patch
 
 import pytest
 from django.conf import settings
-from django.shortcuts import render, reverse
+from django.shortcuts import render
+from django.urls import reverse
 from django.utils import timezone
 from django_q.models import Task
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
@@ -414,7 +415,7 @@ class TestProjectCreation(LoginRequiredMixin):
         """Test project creation is blocked if there is already a group with that id."""
         response = superuser_client.post(
             self._get_url(),
-            data=dict(username=user.username),
+            data=dict(username=user.username, faculty="fons"),
         )
         assert response.status_code == 200
         form = response.context["form"]
@@ -434,6 +435,7 @@ class TestProjectCreation(LoginRequiredMixin):
                 description="a description",
                 username="whatever",
                 field_of_science=FieldOfScience.DEFAULT_PK,
+                faculty="fons",
             ),
         )
         assert response.status_code == 200

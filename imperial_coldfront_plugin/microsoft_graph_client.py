@@ -1,11 +1,13 @@
 """Interface for interacting with the Microsoft Graph API."""
 
+from typing import Any
+
 import requests
 from django.conf import settings
 from uplink import Consumer, get, headers, response_handler
 
 
-def _get_app_access_token():
+def _get_app_access_token() -> str:
     """Get an access token for the application to use the Microsoft Graph API.
 
     Fetches an access token that is enabled for app-only access i.e. not on behalf of a
@@ -24,7 +26,9 @@ def _get_app_access_token():
     return response.json()["access_token"]
 
 
-def _transform_profile_data(data):
+def _transform_profile_data(  # type: ignore[misc]
+    data: dict[str, Any],
+) -> dict[str, str | None]:
     extension_attributes = data.get("onPremisesExtensionAttributes", {})
     return {
         "job_title": data.get("jobTitle"),
@@ -42,19 +46,19 @@ def _transform_profile_data(data):
     }
 
 
-def parse_profile_data(response):
+def parse_profile_data(response: requests.Response) -> dict[str, str | None]:
     """Parse the user profile data from the API response into a useful format."""
     return _transform_profile_data(response.json())
 
 
-def get_uid_from_response(response):
+def get_uid_from_response(response: requests.Response) -> int | None:
     """Extract the Unix uid from the API response."""
     data = response.json()
     uid = data.get("onPremisesExtensionAttributes", {}).get("extensionAttribute12")
     return uid if uid is None else int(uid)
 
 
-def parse_profile_data_list(response):
+def parse_profile_data_list(response: requests.Response) -> list[dict[str, str | None]]:
     """Parse a list of user profile data from the API response into a useful format."""
     data = response.json()["value"]
     return [_transform_profile_data(item) for item in data]
@@ -97,19 +101,23 @@ class MicrosoftGraphClient(Consumer):
 
     @response_handler(parse_profile_data)
     @get("users/{username}@ic.ac.uk?$select=" + PROFILE_ATTRIBUTES)
-    def user_profile(self, username: str):
+    def user_profile(  # type: ignore[empty-body]
+        self, username: str
+    ) -> requests.Response:
         """Get the profile data for a user."""
         pass
 
     @response_handler(parse_profile_data_list)
     @headers(dict(ConsistencyLevel="eventual"))
     @get("users?$search={query}&$select=" + PROFILE_ATTRIBUTES)
-    def user_search(self, query: str):
+    def user_search(  # type: ignore[empty-body]
+        self, query: str
+    ) -> requests.Response:
         """Search for a user by their display name or user principal name."""
 
     def user_search_by(
         self, user_search_string: str | None = None, search_by: str = "all_fields"
-    ) -> list[str]:
+    ) -> list[dict[str, str]]:
         """Search within a specific field.
 
         Args:
@@ -123,7 +131,7 @@ class MicrosoftGraphClient(Consumer):
         return self.user_search(query)
 
 
-def get_graph_api_client(access_token=None):
+def get_graph_api_client(access_token: str | None = None) -> MicrosoftGraphClient:
     """Get a client for interacting with the Microsoft Graph API."""
     if access_token is None:
         access_token = _get_app_access_token()

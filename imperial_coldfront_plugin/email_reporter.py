@@ -10,7 +10,7 @@ from django.core.mail import send_mail
 class EmailReporter:
     """Simple email reporter for Coldfront system monitor."""
 
-    def report(self):
+    def report(self) -> None:
         """Send an email report."""
         _, _, tb = sys.exc_info()
 

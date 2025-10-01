@@ -4,7 +4,8 @@ This module contains form classes used for research group management.
 """
 
 from collections.abc import Iterable
-from datetime import timedelta
+from datetime import date, timedelta
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
@@ -21,6 +22,9 @@ from django.utils import timezone
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
 from .utils import get_allocation_shortname
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User as UserType
 
 User = get_user_model()
 
@@ -69,13 +73,13 @@ class UnknownUsernameError(Exception):
     """Unable to locate a user in the local database or College directory."""
 
 
-def filesystem_path_component_validator(value: str) -> str:
+def filesystem_path_component_validator(value: str) -> None:
     """Ensure filesystem path components only contain valid chars."""
     if not settings.PATH_COMPONENT_VALID_CHARACTERS.issuperset(value):
         raise ValidationError("Name must contain only lowercase letters or numbers")
 
 
-def get_or_create_user(username: str) -> User:
+def get_or_create_user(username: str) -> "UserType":
     """Get user from the database or creates one using data from Graph.
 
     Args:
@@ -104,24 +108,36 @@ def get_or_create_user(username: str) -> User:
     )
 
 
-def _todays_date():
+def _todays_date() -> date:
     """Get today's date."""
     return timezone.now().date()
 
 
-def _initial_end_date():
+def _initial_end_date() -> date:
     return _todays_date() + timedelta(days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS)
 
 
-def _js_select_widget():
+def _js_select_widget() -> forms.Select:
     """Get a select widget with the class for select2."""
     return forms.Select(attrs={"class": "js-example-basic-single"})
+
+
+class AllocationFormData(TypedDict):
+    """Structure for holding cleaned RDF allocation form data with types."""
+
+    project: Project
+    description: str
+    start_date: date
+    end_date: date
+    size: int
+    dart_id: str
+    allocation_shortname: str
 
 
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project = forms.ModelChoiceField(
+    project: forms.ModelChoiceField[Project] = forms.ModelChoiceField(
         queryset=Project.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
@@ -170,7 +186,7 @@ class RDFAllocationForm(forms.Form):
 
     def clean_allocation_shortname(self) -> str:
         """Validate allocation shortname contains only valid characters."""
-        shortname = self.cleaned_data.get("allocation_shortname")
+        shortname = self.cleaned_data["allocation_shortname"]
         if AllocationAttribute.objects.filter(
             allocation_attribute_type__name="Shortname", value=shortname
         ):
@@ -195,7 +211,7 @@ class DartIDForm(forms.Form):
         return dart_id
 
 
-class ProjectCreationForm(forms.ModelForm):
+class ProjectCreationForm(forms.ModelForm[Project]):
     """Form for creating a new research group (project)."""
 
     class Meta:
@@ -228,7 +244,7 @@ class ProjectCreationForm(forms.ModelForm):
         label="ASK Ticket Reference",
     )
 
-    def __init__(self, data: QueryDict | None = None, **kwargs):
+    def __init__(self, data: QueryDict | None = None, **kwargs: Any):
         """Initialise new form instance.
 
         Performs some manipulation of the input data such that if group_id is not
@@ -270,17 +286,19 @@ class ProjectCreationForm(forms.ModelForm):
             raise ValidationError("Name already in use.")
         return group_id
 
-    def clean(self) -> bool:
+    def clean(self) -> dict[str, Any] | None:
         """Check if the faculty and department combination is valid.
 
         Raises:
             ValidationError: If the combination is invalid.
         """
         cleaned_data = super().clean()
-        faculty_id = cleaned_data.get("faculty")
-        department_id = cleaned_data.get("department")
-        if department_id not in DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
-            raise ValidationError("Invalid faculty and department combination.")
+        if cleaned_data:
+            faculty_id = cleaned_data["faculty"]
+            department_id = cleaned_data.get("department")
+            if department_id not in DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
+                raise ValidationError("Invalid faculty and department combination.")
+        return cleaned_data
 
 
 class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
@@ -290,7 +308,9 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
     of the allocation choices to include the shortname attribute.
     """
 
-    def __init__(self, request_user, project_pk, *args, **kwargs):
+    def __init__(
+        self, request_user: "UserType", project_pk: int, *args: Any, **kwargs: Any
+    ) -> None:
         """Initialize the form."""
         super().__init__(request_user, project_pk, *args, **kwargs)
         project_obj = get_object_or_404(Project, pk=project_pk)

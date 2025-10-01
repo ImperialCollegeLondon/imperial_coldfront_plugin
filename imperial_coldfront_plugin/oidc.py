@@ -1,12 +1,10 @@
 """Customisations for the OIDC authentication backend."""
 
-from typing import Any
-
 from django.contrib.auth.models import User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
 
-def _update_user(user: User, claims: dict[str, Any]) -> None:
+def _update_user(user: User, claims: dict[str, str]) -> None:
     user.username = claims["preferred_username"]
     user.email = claims["email"]
     user.first_name = claims["given_name"]
@@ -17,7 +15,7 @@ def _update_user(user: User, claims: dict[str, Any]) -> None:
 class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
     """Extension of the OIDC authentication backend for ICL auth."""
 
-    def create_user(self, claims: dict[str, Any]) -> User:
+    def create_user(self, claims: dict[str, str]) -> User:
         """Create a new user from the available claims.
 
         Args:
@@ -27,7 +25,7 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         _update_user(user, claims)
         return user
 
-    def update_user(self, user: User, claims: dict[str, Any]) -> User:
+    def update_user(self, user: User, claims: dict[str, str]) -> User:
         """Update user data from claims.
 
         Args:
@@ -38,8 +36,8 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         return user
 
     def get_userinfo(
-        self, access_token: str, id_token: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+        self, access_token: str, id_token: str, payload: dict[str, str]
+    ) -> dict[str, str]:
         """Get concise claims data later used for user creation/update.
 
         We extend the superclass implementation of this method which provides data from

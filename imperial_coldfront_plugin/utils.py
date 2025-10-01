@@ -1,9 +1,9 @@
 """Utility functions for the Imperial Coldfront plugin."""
 
-from coldfront.core.allocation.models import AllocationAttribute
+from coldfront.core.allocation.models import Allocation, AllocationAttribute
 
 
-def get_allocation_shortname(allocation):
+def get_allocation_shortname(allocation: Allocation) -> str:
     """Get the shortname attribute for an allocation."""
     try:
         return allocation.allocationattribute_set.get(

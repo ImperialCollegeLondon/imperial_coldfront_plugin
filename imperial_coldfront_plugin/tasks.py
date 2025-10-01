@@ -1,7 +1,6 @@
 """Plugin tasks."""
 
 import logging
-from functools import wraps
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -15,28 +14,14 @@ from coldfront.core.allocation.models import (
 from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
-from django_q.tasks import async_task
 
+from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group
 
 
-def run_in_background(func):
-    """Wrapper to run a function.
-
-    Note that Django q's architecture means this can't be used as a straight decorator
-    and it's output must be stored as a different name from the wrapped function.
-    """
-
-    @wraps(func)
-    def wrapped(*args, **kwargs):
-        return async_task(func, *args, **kwargs)
-
-    return wrapped
-
-
-def create_rdf_allocation(form_data: dict) -> int:
+def create_rdf_allocation(form_data: AllocationFormData) -> int:
     """Create an RDF allocation from a validated RDFAllocationForm.
 
     Note that this function interacts with external systems.

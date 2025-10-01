@@ -7,7 +7,7 @@ from coldfront.core.allocation.models import Allocation, AllocationUser
 from django.conf import settings
 from ldap3 import Connection, Server
 
-from .emails import _send_discrepancy_notification
+from .emails import Discrepancy, _send_discrepancy_notification
 
 LDAP_GROUP_TYPE = -2147483646  # magic number
 AD_WILL_NOT_PERFORM_ERROR_CODE = 53
@@ -15,7 +15,7 @@ AD_ENTITY_ALREADY_EXISTS_ERROR_CODE = 68
 AD_NO_SUCH_OBJECT_ERROR_CODE = 32
 
 
-def _get_ldap_connection():
+def _get_ldap_connection() -> Connection:
     server = Server(settings.LDAP_URI, mode="IP_V4_ONLY")
     conn = Connection(
         server,
@@ -32,7 +32,7 @@ class LDAPUserSearchError(Exception):
     """Dedicated exception when unable to retrieve a unique DN from a username."""
 
 
-def ldap_get_user_dn(username: str, conn: Connection | None = None):
+def ldap_get_user_dn(username: str, conn: Connection | None = None) -> str:
     """Get the full ldap dn for a user."""
     if conn is None:
         conn = _get_ldap_connection()
@@ -56,7 +56,9 @@ class LDAPGroupModifyError(Exception):
     """Dedicated exception for errors encountered when creating an LDAP group."""
 
 
-def ldap_create_group(group_name: str, gid: int, conn: Connection | None = None):
+def ldap_create_group(
+    group_name: str, gid: int, conn: Connection | None = None
+) -> None:
     """Create an LDAP group."""
     if conn is None:
         conn = _get_ldap_connection()
@@ -78,8 +80,8 @@ def ldap_create_group(group_name: str, gid: int, conn: Connection | None = None)
 
 
 def ldap_delete_group(
-    group_name: str, allow_missing=False, conn: Connection | None = None
-):
+    group_name: str, allow_missing: bool = False, conn: Connection | None = None
+) -> None:
     """Delete an LDAP group."""
     if conn is None:
         conn = _get_ldap_connection()
@@ -92,7 +94,7 @@ def ldap_delete_group(
             )
 
 
-def group_dn_from_name(group_name):
+def group_dn_from_name(group_name: str) -> str:
     """Create a full group distinguished name from a common name."""
     return f"cn={group_name},{settings.LDAP_GROUP_OU}"
 
@@ -100,9 +102,9 @@ def group_dn_from_name(group_name):
 def ldap_add_member_to_group(
     group_name: str,
     member_username: str,
-    allow_already_present=False,
+    allow_already_present: bool = False,
     conn: Connection | None = None,
-):
+) -> None:
     """Add a member to an existing ldap group."""
     if conn is None:
         conn = _get_ldap_connection()
@@ -130,9 +132,9 @@ def ldap_add_member_to_group(
 def ldap_remove_member_from_group(
     group_name: str,
     member_username: str,
-    allow_missing=False,
+    allow_missing: bool = False,
     conn: Connection | None = None,
-):
+) -> None:
     """Remove a member from an existing ldap group."""
     if conn is None:
         conn = _get_ldap_connection()
@@ -155,9 +157,9 @@ def ldap_remove_member_from_group(
             )
 
 
-def check_ldap_consistency():
+def check_ldap_consistency() -> list[Discrepancy]:
     """Check the consistency of LDAP groups with the database."""
-    discrepancies = []
+    discrepancies: list[Discrepancy] = []
     allocations = Allocation.objects.filter(
         resources__name="RDF Active",
         status__name="Active",
@@ -205,11 +207,3 @@ def check_ldap_consistency():
         _send_discrepancy_notification(discrepancies)
 
     return discrepancies
-
-
-# check_ldap_consistency_in_background = run_in_background(check_ldap_consistency)
-# ldap_create_group_in_background = run_in_background(_ldap_create_group)
-# ldap_add_member_to_group_in_background = run_in_background(_ldap_add_member_to_group)
-# ldap_remove_member_from_group_in_background = run_in_background(
-#     _ldap_remove_member_from_group
-# )

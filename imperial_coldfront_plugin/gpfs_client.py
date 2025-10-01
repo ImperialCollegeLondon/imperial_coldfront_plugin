@@ -4,6 +4,7 @@ import logging
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypedDict
 
 import requests
 from django.conf import settings
@@ -20,6 +21,14 @@ class ErrorWhenProcessingJob(Exception):
 
 class JobTimeout(Exception):
     """Raises an exception when a job times out."""
+
+
+class JobResponseData(TypedDict):
+    """TypedDict for the result of a job."""
+
+    status: str
+    jobId: str
+    result: dict[str, str]
 
 
 class JobRunning(RetryPredicate):
@@ -40,7 +49,7 @@ class JobRunning(RetryPredicate):
         if not 200 <= response.status_code < 300:
             return False
 
-        job_data: dict = response.json()["jobs"][0]
+        job_data: JobResponseData = response.json()["jobs"][0]
         if job_data["status"] == "FAILED":
             job_data["result"]["jobId"] = job_data["jobId"]
             raise ErrorWhenProcessingJob(job_data["result"])
@@ -53,7 +62,7 @@ class JobRunning(RetryPredicate):
 class TimeoutWithException(after_delay):
     """Stops the retry with a custom exception when there is too much delay."""
 
-    def __call__(self) -> Generator[bool, float, None]:
+    def __call__(self) -> Generator[bool | float, float, None]:
         """Checks if delay is beyond maximum timeout.
 
         Raises:
@@ -130,17 +139,19 @@ class GPFSClient(Consumer):
         stop=TimeoutWithException(settings.GPFS_API_TIMEOUT),
     )
     @get("jobs/{jobId}")
-    def _get_job_status(self, jobId: int) -> requests.Response:
+    def _get_job_status(  # type: ignore[empty-body]
+        self, jobId: int
+    ) -> requests.Response:
         """Query the status of a job."""
 
     @get("filesystems")
-    def filesystems(self) -> requests.Response:
+    def filesystems(self) -> requests.Response:  # type: ignore[empty-body]
         """Return the information on the filesystems available."""
 
     @check_job_status
     @json
     @post("filesystems/{filesystemName}/filesets")
-    def _create_fileset(
+    def _create_fileset(  # type: ignore[empty-body]
         self,
         filesystemName: str,
         **data: Body,
@@ -192,7 +203,7 @@ class GPFSClient(Consumer):
     @check_job_status
     @json
     @post("filesystems/{filesystemName}/quotas")
-    def _set_quota(
+    def _set_quota(  # type: ignore[empty-body]
         self,
         filesystemName: str,
         **data: Body,
@@ -242,7 +253,7 @@ class GPFSClient(Consumer):
     @check_job_status
     @json
     @post("filesystems/{filesystemName}/filesets/{filesetName}/directory/{path}")
-    def _create_fileset_directory(
+    def _create_fileset_directory(  # type: ignore[empty-body]
         self,
         filesystemName: str,
         filesetName: str,
@@ -258,7 +269,7 @@ class GPFSClient(Consumer):
         path: str | Path,
         permissions: str,
         allow_existing: bool = False,
-    ):
+    ) -> requests.Response:
         """Create a new directory within a fileset.
 
         Args:
@@ -297,7 +308,7 @@ class GPFSClient(Consumer):
 
     @json
     @get("filesystems/{filesystemName}/filesets/{filesetName}/quotas")
-    def _retrieve_quota_usage(
+    def _retrieve_quota_usage(  # type: ignore[empty-body]
         self,
         filesystemName: str,
         filesetName: str,
@@ -309,7 +320,7 @@ class GPFSClient(Consumer):
         self,
         filesystem_name: str,
         fileset_name: str,
-    ) -> requests.Response:
+    ) -> dict[str, float]:
         """Method (public) to retrieve the quota usage of a fileset.
 
         Args:
@@ -341,13 +352,15 @@ class GPFSClient(Consumer):
 
     @json
     @get("filesystems/{filesystemName}/quotas")
-    def _retrieve_all_fileset_quotas(
+    def _retrieve_all_fileset_quotas(  # type: ignore[empty-body]
         self,
         filesystemName: str,
     ) -> requests.Response:
         """Method (private) to retrieve the quotas of a filesystem."""
 
-    def retrieve_all_fileset_usages(self, filesystem_name: str):
+    def retrieve_all_fileset_usages(
+        self, filesystem_name: str
+    ) -> dict[str, dict[str, float]]:
         """Get the quotas for all filesets.
 
         Arguments:
@@ -365,13 +378,17 @@ class GPFSClient(Consumer):
 
     @json
     @get("filesystems/{filesystem_name}/acl/{path}")
-    def get_directory_acl(self, filesystem_name: str, path: str):
+    def get_directory_acl(  # type: ignore[empty-body]
+        self, filesystem_name: str, path: str
+    ) -> requests.Response:
         """Get the ACL of a directory within a filesystem."""
 
     @check_job_status
     @json
     @put("filesystems/{filesystem_name}/acl/{path}")
-    def _set_directory_acl(self, filesystem_name: str, path: str, **data: Body):
+    def _set_directory_acl(  # type: ignore[empty-body]
+        self, filesystem_name: str, path: str, **data: Body
+    ) -> requests.Response:
         pass
 
     def set_directory_acl(
@@ -381,7 +398,7 @@ class GPFSClient(Consumer):
         owner_allow_permissions: str = "",
         group_allow_permissions: str = "",
         other_allow_permissions: str = "",
-    ):
+    ) -> requests.Response:
         """Set the ACL of a directory within a filesystem.
 
         These ACL's can be applied to both filesets and any directory within the
@@ -549,7 +566,7 @@ def create_fileset_set_quota(
     block_quota: str,
     files_quota: str,
     logger: logging.Logger | None = None,
-):
+) -> None:
     """Create a fileset and set a quota in the requested filesystem.
 
     This function carries out the following steps:
@@ -647,7 +664,7 @@ def create_fileset_set_quota(
     )
 
 
-def _update_quota_usages_task():
+def _update_quota_usages_task() -> None:
     """Update the usages of all quota related allocation attributes."""
     from coldfront.core.allocation.models import Allocation
 

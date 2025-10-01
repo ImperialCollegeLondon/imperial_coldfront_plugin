@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from coldfront.core.allocation.models import Allocation
 from coldfront.core.project.forms import ProjectAddUserForm
@@ -18,8 +19,9 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.forms import formset_factory
-from django.http import HttpRequest, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect, render, reverse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django_q.tasks import async_task, fetch
 
 from .dart import create_dart_id_attribute
@@ -34,6 +36,15 @@ from .microsoft_graph_client import get_graph_api_client
 from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
 from .tasks import create_rdf_allocation
 
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User as UserType
+
+    class AuthenticatedHttpRequest(HttpRequest):
+        """An HttpRequest class with a logged in user."""
+
+        user: UserType
+
+
 User = get_user_model()
 
 
@@ -44,7 +55,7 @@ class GraphAPISearch(UserSearch):
 
     def search_a_user(
         self, user_search_string: str | None = None, search_by: str = "all_fields"
-    ) -> list[str]:
+    ) -> list[dict[str, str]]:
         """Searchers for a single user.
 
         Args:
@@ -56,20 +67,15 @@ class GraphAPISearch(UserSearch):
         found = graph_client.user_search_by(user_search_string, search_by)
         for user in found:
             user["source"] = self.search_source
-        return list(filter(user_eligible_for_hpc_access, found))
+        return [user for user in found if user_eligible_for_hpc_access(user)]
 
 
 PROJECT_ID_PREFIX = "rdf-"
 PROJECT_ID_REGEX = re.compile(PROJECT_ID_PREFIX + r"(?P<number>\d{6})")
 
 
-def format_project_number_to_id(num):
-    """Format an rdf project number into a full id string."""
-    return f"{PROJECT_ID_PREFIX}{num:06d}"
-
-
 @login_required
-def add_rdf_storage_allocation(request):
+def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
     """Create a new RDF project allocation."""
     if not request.user.is_superuser:
         return HttpResponseForbidden()
@@ -90,9 +96,9 @@ def add_rdf_storage_allocation(request):
     )
 
 
-def load_departments(request):
+def load_departments(request: HttpRequest) -> HttpResponse:
     """Loads the available departments for a given faculty."""
-    faculty = request.GET.get("faculty")
+    faculty = request.GET["faculty"]
     departments = get_department_choices(faculty)
     return render(
         request,
@@ -102,7 +108,9 @@ def load_departments(request):
 
 
 @login_required
-def allocation_task_result(request, task_id: str, shortname: str):
+def allocation_task_result(
+    request: HttpRequest, task_id: str, shortname: str
+) -> HttpResponse:
     """Display information about an rdf allocation creation task."""
     if not request.user.is_superuser:
         return HttpResponseForbidden()
@@ -114,7 +122,7 @@ def allocation_task_result(request, task_id: str, shortname: str):
     )
 
 
-def get_or_create_project(user: User) -> Project:
+def get_or_create_project(user: "UserType") -> Project:
     """Get project from the database or creates one.
 
     Args:
@@ -141,7 +149,9 @@ def get_or_create_project(user: User) -> Project:
 
 
 @login_required
-def add_dart_id_to_allocation(request: HttpRequest, allocation_pk: int):
+def add_dart_id_to_allocation(
+    request: "AuthenticatedHttpRequest", allocation_pk: int
+) -> HttpResponse:
     """Dedicated view function to add dart ids to an allocation."""
     allocation = get_object_or_404(Allocation, pk=allocation_pk)
     check_project_pi_or_superuser(allocation.project, request.user)
@@ -219,7 +229,7 @@ def create_new_project(form: ProjectCreationForm) -> Project:
 
 
 @login_required
-def project_creation(request: HttpRequest):
+def project_creation(request: HttpRequest) -> HttpResponse:
     """View to create a new project for any user."""
     if not request.user.is_superuser:
         return HttpResponseForbidden()
@@ -248,7 +258,9 @@ class ProjectAddUsersSearchResultsShortnameView(ProjectAddUsersSearchResultsView
 
     template_name = "imperial_coldfront_plugin/project_add_user_search_results.html"
 
-    def post(self, request, *args, **kwargs):
+    # As mentioned in doc string this is copy pasted code so we ignore the type checking
+    # errors so we don't have to change it and risk breaking something.
+    def post(self, request, *args, **kwargs):  # type: ignore[no-untyped-def]
         """Handle POST requests: process the search form and display results."""
         user_search_string = request.POST.get("q")
         search_by = request.POST.get("search_by")
