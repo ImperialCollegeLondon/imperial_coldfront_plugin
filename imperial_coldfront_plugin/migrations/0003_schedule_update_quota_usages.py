@@ -6,7 +6,7 @@ def schedule_update_quota_usages_task(apps, schema_editor):
     Schedule = apps.get_model("django_q", "Schedule")
     Schedule.objects.update_or_create(
         name="Update quota usages",
-        func="imperial_coldfront_plugin.gpfs_client._update_quota_usages_task",
+        func="imperial_coldfront_plugin.tasks.update_quota_usages_task",
         schedule_type="H",
     )
 

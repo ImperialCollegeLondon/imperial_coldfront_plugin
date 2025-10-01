@@ -20,7 +20,7 @@ from django.db import transaction
 from .emails import Discrepancy, send_discrepancy_notification
 from .forms import AllocationFormData
 from .gid import get_new_gid
-from .gpfs_client import FilesetPathInfo, create_fileset_set_quota
+from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
 
 
@@ -192,6 +192,9 @@ def _create_rdf_allocation(form_data: AllocationFormData) -> int:
 
 def _check_ldap_consistency() -> list[Discrepancy]:
     """Check the consistency of LDAP groups with the database."""
+    if not settings.LDAP_ENABLED:
+        return []
+
     discrepancies: list[Discrepancy] = []
     allocations = Allocation.objects.filter(
         resources__name="RDF Active",
@@ -233,7 +236,36 @@ def _check_ldap_consistency() -> list[Discrepancy]:
     return discrepancies
 
 
+def _update_quota_usages_task() -> None:
+    """Update the usages of all quota related allocation attributes."""
+    client = GPFSClient()
+    usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)
+
+    # use prefetch_related to reduce number of database operations
+    allocations = Allocation.objects.filter(
+        resources__name="RDF Active"
+    ).prefetch_related("allocationattribute_set")
+    # below could use some more error handling but is a reasonable first pass
+    for allocation in allocations:
+        rdf_id = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+        storage_attribute_usage = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Storage Quota (TB)"
+        ).allocationattributeusage
+        storage_attribute_usage.value = usages[rdf_id]["block_usage_tb"]
+        storage_attribute_usage.save()
+        files_attribute_usage = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Files Quota"
+        ).allocationattributeusage
+        files_attribute_usage.value = usages[rdf_id]["files_usage"]
+        files_attribute_usage.save()
+
+
 # note that we can't use log_task_exceptions_to_django_logger as a decorator
 # here as django-q needs to be able to serialize the function for use as a task
 create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocation)
 check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consistency)
+update_quota_usages_task = log_task_exceptions_to_django_logger(
+    _update_quota_usages_task
+)
