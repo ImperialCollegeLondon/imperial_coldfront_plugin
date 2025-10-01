@@ -16,7 +16,7 @@ class Discrepancy(TypedDict):
     extra_members: list[str]
 
 
-def _send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
+def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
     """Send email notification for discrepancies found during the consistency check."""
     if not settings.ADMINS:
         return

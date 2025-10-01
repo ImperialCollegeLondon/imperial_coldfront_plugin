@@ -17,10 +17,11 @@ from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
 
+from .emails import Discrepancy, send_discrepancy_notification
 from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, create_fileset_set_quota
-from .ldap import ldap_create_group, ldap_delete_group
+from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
 
 
 class log_task_exceptions_to_django_logger:
@@ -189,4 +190,50 @@ def _create_rdf_allocation(form_data: AllocationFormData) -> int:
     return rdf_allocation.pk
 
 
+def _check_ldap_consistency() -> list[Discrepancy]:
+    """Check the consistency of LDAP groups with the database."""
+    discrepancies: list[Discrepancy] = []
+    allocations = Allocation.objects.filter(
+        resources__name="RDF Active",
+        status__name="Active",
+        allocationattribute__allocation_attribute_type__name="Shortname",
+    ).distinct()
+
+    ldap_groups = ldap_group_member_search(f"{settings.LDAP_SHORTNAME_PREFIX}*")
+
+    for allocation in allocations:
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+        group_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
+
+        active_users = AllocationUser.objects.filter(
+            allocation=allocation, status__name="Active"
+        )
+        expected_usernames = [au.user.username for au in active_users]
+
+        actual_members = ldap_groups.get(group_name, [])
+        missing_members = set(expected_usernames) - set(actual_members)
+        extra_members = set(actual_members) - set(expected_usernames)
+
+        if missing_members or extra_members:
+            discrepancies.append(
+                {
+                    "allocation_id": allocation.id,
+                    "group_name": group_name,
+                    "project_name": allocation.project.title,
+                    "missing_members": list(missing_members),
+                    "extra_members": list(extra_members),
+                }
+            )
+
+    if discrepancies:
+        send_discrepancy_notification(discrepancies)
+
+    return discrepancies
+
+
+# note that we can't use log_task_exceptions_to_django_logger as a decorator
+# here as django-q needs to be able to serialize the function for use as a task
 create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocation)
+check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consistency)

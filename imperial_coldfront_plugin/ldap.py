@@ -1,13 +1,8 @@
 """Module for performing operations in Active Directory via LDAP."""
 
-import re
-
 import ldap3
-from coldfront.core.allocation.models import Allocation, AllocationUser
 from django.conf import settings
 from ldap3 import Connection, Server
-
-from .emails import Discrepancy, _send_discrepancy_notification
 
 LDAP_GROUP_TYPE = -2147483646  # magic number
 AD_WILL_NOT_PERFORM_ERROR_CODE = 53
@@ -157,53 +152,28 @@ def ldap_remove_member_from_group(
             )
 
 
-def check_ldap_consistency() -> list[Discrepancy]:
-    """Check the consistency of LDAP groups with the database."""
-    discrepancies: list[Discrepancy] = []
-    allocations = Allocation.objects.filter(
-        resources__name="RDF Active",
-        status__name="Active",
-        allocationattribute__allocation_attribute_type__name="Shortname",
-    ).distinct()
+def get_username_from_dn(dn: str) -> str:
+    """Extract the username from a distinguished name."""
+    parts = dn.split(",")
+    for part in parts:
+        if part.lower().startswith("cn="):
+            return part[3:]
+    return dn
 
-    conn = _get_ldap_connection()
-    for allocation in allocations:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        group_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
 
-        active_users = AllocationUser.objects.filter(
-            allocation=allocation, status__name="Active"
-        )
-        expected_usernames = [au.user.username for au in active_users]
-
-        _, _, group_search, _ = conn.search(
-            settings.LDAP_GROUP_OU, f"(cn={group_name})", attributes=["member"]
-        )
-
-        actual_members = []
-        for member_dn in group_search[0]["attributes"].get("member", []):
-            match = re.search(r"cn=([^,]+)", member_dn, re.IGNORECASE)
-            if match:
-                username = match.group(1)
-                actual_members.append(username)
-
-        missing_members = set(expected_usernames) - set(actual_members)
-        extra_members = set(actual_members) - set(expected_usernames)
-
-        if missing_members or extra_members:
-            discrepancies.append(
-                {
-                    "allocation_id": allocation.id,
-                    "group_name": group_name,
-                    "project_name": allocation.project.title,
-                    "missing_members": list(missing_members),
-                    "extra_members": list(extra_members),
-                }
-            )
-
-    if discrepancies:
-        _send_discrepancy_notification(discrepancies)
-
-    return discrepancies
+def ldap_group_member_search(
+    search_filter: str, conn: Connection | None = None
+) -> dict[str, list[str]]:
+    """Search for LDAP groups and return their members as a dictionary."""
+    if conn is None:
+        conn = _get_ldap_connection()
+    _, _, response, _ = conn.search(
+        settings.LDAP_GROUP_OU, f"(cn={search_filter})", attributes=["cn", "member"]
+    )
+    return {
+        entry["attributes"]["cn"]: [
+            get_username_from_dn(member_dn)
+            for member_dn in entry["attributes"].get("member", [])
+        ]
+        for entry in response
+    }
