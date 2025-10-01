@@ -1,6 +1,8 @@
 """Plugin tasks."""
 
+import functools
 import logging
+from collections.abc import Callable
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -21,7 +23,30 @@ from .gpfs_client import FilesetPathInfo, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group
 
 
-def create_rdf_allocation(form_data: AllocationFormData) -> int:
+class log_task_exceptions_to_django_logger:
+    """Decorator to log exceptions raised in a background task to the django logger.
+
+    This is useful when using django-q as the task runner, as exceptions raised in tasks
+    will not trigger email notifications to admins. In production, the django logger
+    will send emails on errors. This decorator ensures this happens on task failures.
+    """
+
+    def __init__(self, func: Callable[..., object]) -> None:  # type: ignore[misc]
+        """Initialize the decorator with the function to wrap."""
+        self.func = func
+        self.logger = logging.getLogger("django")
+        functools.update_wrapper(self, func)
+
+    def __call__(self, *args: object, **kwargs: object) -> object:
+        """Call the wrapped function, logging any exceptions raised."""
+        try:
+            return self.func(*args, **kwargs)
+        except Exception:
+            self.logger.exception("Error during background task")
+            raise
+
+
+def _create_rdf_allocation(form_data: AllocationFormData) -> int:
     """Create an RDF allocation from a validated RDFAllocationForm.
 
     Note that this function interacts with external systems.
@@ -162,3 +187,6 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
                 ldap_delete_group(ldap_name, allow_missing=True)
                 raise
     return rdf_allocation.pk
+
+
+create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocation)

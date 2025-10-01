@@ -122,7 +122,3 @@ ignore = "H021"
 # use a dummy settings module that ensures we get all of the coldfront and plugin
 # settings together
 django_settings_module = "imperial_coldfront_plugin._mypy_settings"
-
-
-[project.entry-points."djangoq.errorreporters"]
-email = "imperial_coldfront_plugin.email_reporter:EmailReporter"
