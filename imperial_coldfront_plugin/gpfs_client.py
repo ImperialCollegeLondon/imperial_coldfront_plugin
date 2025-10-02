@@ -195,9 +195,13 @@ class GPFSClient(Consumer):
             )
             response.raise_for_status()
             return response
-        except (ErrorWhenProcessingJob, requests.HTTPError) as e:
+        except requests.HTTPError as e:
             raise FilesetCreationError(
-                f"Error creating fileset '{fileset_name}'"
+                f"Error creating fileset '{fileset_name}' - {e.response.json()}"
+            ) from e
+        except ErrorWhenProcessingJob as e:
+            raise FilesetCreationError(
+                f"Error creating fileset '{fileset_name}' - {e.args[0]}"
             ) from e
 
     @check_job_status
@@ -245,9 +249,14 @@ class GPFSClient(Consumer):
             )
             response.raise_for_status()
             return response
-        except (ErrorWhenProcessingJob, requests.HTTPError) as e:
+        except requests.HTTPError as e:
             raise FilesetQuotaError(
-                f"Error whilst setting fileset quota for '{fileset_name}'"
+                f"Error whilst setting fileset quota for '{fileset_name}' - "
+                f"{e.response.json()}"
+            ) from e
+        except ErrorWhenProcessingJob as e:
+            raise FilesetQuotaError(
+                f"Error whilst setting fileset quota for '{fileset_name}' - {e.args[0]}"
             ) from e
 
     @check_job_status
@@ -299,11 +308,13 @@ class GPFSClient(Consumer):
                     f"Directory {path} already exists in fileset {fileset_name}."
                 )
             raise DirectoryCreationError(
-                f"Error creating directory {path} in fileset {fileset_name}."
+                f"Error creating directory {path} in fileset {fileset_name} - "
+                f"{task_data}"
             )
         except requests.HTTPError as e:
             raise DirectiorCreationError(
-                f"Error creating directory {path} in fileset {fileset_name}."
+                f"Error creating directory {path} in fileset {fileset_name} - "
+                f"{e.response.json()}"
             ) from e
 
     @json
@@ -448,9 +459,15 @@ class GPFSClient(Consumer):
             )
             response.raise_for_status()
             return response
-        except (ErrorWhenProcessingJob, requests.HTTPError) as e:
+        except requests.HTTPError as e:
             raise UnableToSetACLError(
-                f"Error setting ACL on {path} in filesystem {filesystem_name}"
+                f"Error setting ACL on {path} in filesystem {filesystem_name} - "
+                f"{e.response.json()}"
+            ) from e
+        except ErrorWhenProcessingJob as e:
+            raise UnableToSetACLError(
+                f"Error setting ACL on {path} in filesystem {filesystem_name} - "
+                f"{e.args[0]}"
             ) from e
 
 
