@@ -101,9 +101,13 @@ AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
 
 LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
 """Computed value of whether LDAP integration is enabled."""
+
+_GID_RANGES = ENV.str("GID_RANGE", default="1031386-1031435,1-2")
 GID_RANGES = [
-    range(1031386, 1031435),
+    range(int(start), int(end) + 1)
+    for start, end in [gid_range.split("-") for gid_range in _GID_RANGES.split(",")]
 ]
+"""List of ranges of GIDs available for allocation to groups."""
 
 LOGOUT_REDIRECT_URL = "/"
 
