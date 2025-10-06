@@ -14,6 +14,8 @@ from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
 from uplink.retry.when import RetryPredicate, status_5xx
 
+from .acl import ACL
+
 
 class ErrorWhenProcessingJob(Exception):
     """Handles errors in asynchronous jobs."""
@@ -406,9 +408,7 @@ class GPFSClient(Consumer):
         self,
         filesystem_name: str,
         path: str | Path,
-        owner_allow_permissions: str = "",
-        group_allow_permissions: str = "",
-        other_allow_permissions: str = "",
+        acl: ACL,
     ) -> requests.Response:
         """Set the ACL of a directory within a filesystem.
 
@@ -421,41 +421,11 @@ class GPFSClient(Consumer):
         Args:
             filesystem_name: Name of the filesystem containing the directory.
             path: Relative path of the directory within the filesystem.
-            owner_allow_permissions: Permissions string for the owner entry.
-            group_allow_permissions: Permissions string for the group entry.
-            other_allow_permissions: Permissions string for the other entry.
+            acl: The ACL entries to set.
         """
-        entries = []
-        if owner_allow_permissions:
-            entries.append(
-                dict(
-                    type="allow",
-                    who="special:owner@",
-                    permissions=owner_allow_permissions,
-                    flags="",
-                )
-            )
-        if group_allow_permissions:
-            entries.append(
-                dict(
-                    type="allow",
-                    who="special:group@",
-                    permissions=group_allow_permissions,
-                    flags="",
-                )
-            )
-        if other_allow_permissions:
-            entries.append(
-                dict(
-                    type="allow",
-                    who="special:everyone@",
-                    permissions=other_allow_permissions,
-                    flags="",
-                )
-            )
         try:
             response = self._set_directory_acl(
-                filesystem_name, str(path), entries=entries
+                filesystem_name, str(path), entries=list(acl.iter_as_dicts())
             )
             response.raise_for_status()
             return response
@@ -573,13 +543,9 @@ def create_fileset_set_quota(
     owner_id: str,
     group_id: str,
     fileset_posix_permissions: str,
-    fileset_owner_acl: str,
-    fileset_group_acl: str,
-    fileset_other_acl: str,
+    fileset_acl: ACL,
     parent_posix_permissions: str,
-    parent_owner_acl: str,
-    parent_group_acl: str,
-    parent_other_acl: str,
+    parent_acl: ACL,
     block_quota: str,
     files_quota: str,
     logger: logging.Logger | None = None,
@@ -599,17 +565,10 @@ def create_fileset_set_quota(
         owner_id: ID of the owner (pi username).
         group_id: ID of the group (AD group name).
         fileset_posix_permissions: POSIX permissions to set on the fileset.
-        fileset_owner_acl: ACL permissions string for the owner entry on the fileset.
-        fileset_group_acl: ACL permissions string for the group entry on the fileset.
-        fileset_other_acl: ACL permissions string for the other entry on the fileset.
+        fileset_acl: ACL for the fileset.
         parent_posix_permissions: POSIX permissions to set on any intermediate
             directories created.
-        parent_owner_acl: ACL permissions string for the owner entry on any
-            intermediate directories created.
-        parent_group_acl: ACL permissions string for the group entry on any
-            intermediate directories created.
-        parent_other_acl: ACL permissions string for the other entry on any
-            intermediate directories created.
+        parent_acl: ACL for any intermediate directories created.
         block_quota: Value that specifies the block soft limit and hard limit.
             The number can be specified using the suffix K, M, G, or T.
         files_quota: Value that specifies the inode soft limit and hard limit.
@@ -644,9 +603,7 @@ def create_fileset_set_quota(
             client.set_directory_acl(
                 fileset_path_info.filesystem_name,
                 fileset_path_info.parent_fileset_path_relative_to_filesystem / dir_path,
-                owner_allow_permissions=parent_owner_acl,
-                group_allow_permissions=parent_group_acl,
-                other_allow_permissions=parent_other_acl,
+                acl=parent_acl,
             )
 
     logger.info(
@@ -667,9 +624,7 @@ def create_fileset_set_quota(
     client.set_directory_acl(
         fileset_path_info.filesystem_name,
         fileset_path_info.fileset_path_relative_to_filesystem,
-        owner_allow_permissions=fileset_owner_acl,
-        group_allow_permissions=fileset_group_acl,
-        other_allow_permissions=fileset_other_acl,
+        acl=fileset_acl,
     )
 
     logger.info("Setting quota for fileset {fileset_path_info.fileset_name}")

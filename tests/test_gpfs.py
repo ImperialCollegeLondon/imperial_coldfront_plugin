@@ -85,13 +85,9 @@ def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
         OWNER_ID,
         GROUP_ID,
         settings.GPFS_FILESET_POSIX_PERMISSIONS,
-        settings.GPFS_FILESET_OWNER_ACL,
-        settings.GPFS_FILESET_GROUP_ACL,
-        settings.GPFS_FILESET_OTHER_ACL,
+        settings.GPFS_FILESET_ACL,
         settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
-        settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
-        settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
-        settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
+        settings.GPFS_PARENT_DIRECTORY_ACL,
         BLOCK_QUOTA,
         FILES_QUOTA,
     )
@@ -111,9 +107,7 @@ def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
         call(
             FILESYSTEM_NAME,
             TOP_LEVEL_DIRECTORIES / FACULTY / path,
-            owner_allow_permissions=settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
-            group_allow_permissions=settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
-            other_allow_permissions=settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
+            acl=settings.GPFS_PARENT_DIRECTORY_ACL,
         )
         for path in intermediate_relative_paths
     ]
@@ -138,9 +132,7 @@ def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
     client_mock.set_directory_acl.assert_called_with(
         FILESYSTEM_NAME,
         TOP_LEVEL_DIRECTORIES / FACULTY / DEPARTMENT / GROUP_NAME / FILESET_NAME,
-        owner_allow_permissions=settings.GPFS_FILESET_OWNER_ACL,
-        group_allow_permissions=settings.GPFS_FILESET_GROUP_ACL,
-        other_allow_permissions=settings.GPFS_FILESET_OTHER_ACL,
+        acl=settings.GPFS_FILESET_ACL,
     )
 
 
@@ -155,13 +147,9 @@ def test_create_fileset_set_quota_existing_directory(
         OWNER_ID,
         GROUP_ID,
         settings.GPFS_FILESET_POSIX_PERMISSIONS,
-        settings.GPFS_FILESET_OWNER_ACL,
-        settings.GPFS_FILESET_GROUP_ACL,
-        settings.GPFS_FILESET_OTHER_ACL,
+        settings.GPFS_FILESET_ACL,
         settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
-        settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
-        settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
-        settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
+        settings.GPFS_PARENT_DIRECTORY_ACL,
         BLOCK_QUOTA,
         FILES_QUOTA,
     )
@@ -183,16 +171,12 @@ def test_create_fileset_set_quota_existing_directory(
     assert client_mock.set_directory_acl.call_args_list[0] == call(
         FILESYSTEM_NAME,
         TOP_LEVEL_DIRECTORIES / FACULTY / DEPARTMENT / GROUP_NAME,
-        owner_allow_permissions=settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
-        group_allow_permissions=settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
-        other_allow_permissions=settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
+        acl=settings.GPFS_PARENT_DIRECTORY_ACL,
     )
     assert (
         call(
             FILESYSTEM_NAME,
-            owner_allow_permissions=settings.GPFS_PARENT_DIRECTORY_OWNER_ACL,
-            group_allow_permissions=settings.GPFS_PARENT_DIRECTORY_GROUP_ACL,
-            other_allow_permissions=settings.GPFS_PARENT_DIRECTORY_OTHER_ACL,
+            acl=settings.GPFS_PARENT_DIRECTORY_ACL,
         )
         not in client_mock.set_directory_acl.call_args_list
     )

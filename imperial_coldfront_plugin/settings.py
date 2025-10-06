@@ -9,6 +9,8 @@ from string import ascii_lowercase, digits
 
 from coldfront.config.env import ENV
 
+from .acl import ACL, ACLEntry
+
 INVITATION_TOKEN_TIMEOUT = timedelta(days=7).total_seconds()
 MICROSOFT_TENANT_ID = ENV.str("MICROSOFT_TENANT_ID", default="")
 ADDITIONAL_USER_SEARCH_CLASSES = ["imperial_coldfront_plugin.views.GraphAPISearch"]
@@ -47,20 +49,27 @@ GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS = ENV.str(
 )
 """Posix permissions for fileset parent directories."""
 
-GPFS_PARENT_DIRECTORY_OWNER_ACL = ENV.str(
-    "GPFS_PARENT_DIRECTORY_OWNER_ACL", "rwmxDaAnNcCos"
+GPFS_PARENT_DIRECTORY_ACL = ACL(
+    owner=[ACLEntry("", "rwmxDaAnNcCos")],
+    group=[ACLEntry("", "rxancs")],
+    other=[ACLEntry("", "rxancs")],
 )
-"""ACL allow permission bits for the owner of fileset parent directories."""
-GPFS_PARENT_DIRECTORY_GROUP_ACL = ENV.str("GPFS_PARENT_DIRECTORY_GROUP_ACL", "rxncs")
-"""ACL allow permission bits for the group of fileset parent directories."""
-GPFS_PARENT_DIRECTORY_OTHER_ACL = ENV.str("GPFS_PARENT_DIRECTORY_OTHER_ACL", "rxncs")
-"""ACL allow permission bits for others of fileset parent directories."""
-GPFS_FILESET_OWNER_ACL = ENV.str("GPFS_FILESET_OWNER_ACL", "rwmxDaAnNcCos")
-"""ACL allow permission bits for the owner of the fileset."""
-GPFS_FILESET_GROUP_ACL = ENV.str("GPFS_FILESET_GROUP_ACL", "rwmxDanNc")
-"""ACL allow permission bits for the group of the fileset."""
-GPFS_FILESET_OTHER_ACL = ENV.str("GPFS_FILESET_OTHER_ACL", "ancs")
-"""ACL allow permission bits for others of the fileset."""
+"""ACL data for fileset parent directories."""
+
+GPFS_FILESET_ACL = ACL(
+    owner=[
+        ACLEntry("", "rwmxDaAnNcCos"),
+        ACLEntry("f", "rwmxDaAnNcCos"),
+        ACLEntry("d", "rwmxDaAnNcCos"),
+    ],
+    group=[
+        ACLEntry("", "rwmxDanNc"),
+        ACLEntry("f", "rwmxdDaAnNcs"),
+        ACLEntry("d", "rwmxdDaAnNcs"),
+    ],
+    other=[ACLEntry("", "ancs")],
+)
+"""ACL data for filesets."""
 
 GPFS_FILES_QUOTA = ENV.int("GPFS_FILES_QUOTA", default=1000)
 """Quota for the fileset."""
