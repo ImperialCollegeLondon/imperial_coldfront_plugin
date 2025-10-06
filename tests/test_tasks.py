@@ -42,6 +42,15 @@ def ldap_delete_group_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.tasks.ldap_delete_group")
 
 
+@pytest.fixture(autouse=True)
+def ldap_gid_in_use_mock(mocker):
+    """Mock ldap_gid_in_use in tasks.py."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_gid_in_use",
+        return_value=False,
+    )
+
+
 @pytest.fixture
 def rdf_form_data(project, settings):
     """Fixture to provide RDFAllocationForm data."""
@@ -69,6 +78,7 @@ def test_create_rdf_allocation(
     rdf_allocation_ldap_name,
     settings,
     rdf_form_data,
+    enable_ldap,
 ):
     """Test create_rdf_allocation task."""
     # set all of these so they are not empty
@@ -166,6 +176,7 @@ def test_create_rdf_allocation_ldap_rollback(
     rdf_allocation_ldap_name,
     settings,
     rdf_form_data,
+    enable_ldap,
 ):
     """Test create_rdf_allocation task rolls back on LDAP error."""
     # first ldap call now raises an error
@@ -191,6 +202,7 @@ def test_create_rdf_allocation_gpfs_rollback(
     rdf_allocation_ldap_name,
     settings,
     rdf_form_data,
+    enable_ldap,
 ):
     """Test create_rdf_allocation task rolls back on GPFS error."""
     # first gpfs call now raises an error
@@ -246,6 +258,7 @@ def test_check_ldap_consistency_missing_members(
     ldap_group_search_mock,
     notify_mock,
     rdf_allocation_ldap_name,
+    enable_ldap,
 ):
     """Test when a user is missing from AD group."""
     username = allocation_user.user.username
@@ -270,6 +283,7 @@ def test_check_ldap_consistency_extra_members(
     ldap_group_search_mock,
     notify_mock,
     rdf_allocation_ldap_name,
+    enable_ldap,
 ):
     """Test when there are extra users in AD group."""
     username = allocation_user.user.username

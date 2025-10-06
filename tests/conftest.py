@@ -78,7 +78,10 @@ def pytest_configure():
             if key.isupper()
         }
         | dict(
-            LDAP_ENABLED=True,
+            LDAP_ENABLED=False,
+            LDAP_USERNAME="",
+            LDAP_PASSWORD="",
+            LDAP_URI="",
             GPFS_FILESET_PATH="/path/",
             GPFS_FILESYSTEM_NAME="testfs",
             GPFS_ENABLED=True,
@@ -230,21 +233,6 @@ def user_or_superuser(request):
     return _get_user_fixture(request)
 
 
-@pytest.fixture(autouse=True)
-def ldap_connection_mock(mocker):
-    """Block connections to LDAP server and return simple dummy data."""
-    mock = mocker.patch("imperial_coldfront_plugin.ldap.Connection")
-    mock().add.return_value = [True, None, None, None]
-
-    def search_side_effect(ou, search_term):
-        return None, None, [dict(dn=search_term[4:-1])], None
-
-    mock().search.side_effect = search_side_effect
-
-    mock().modify.return_value = [True, None, None, None]
-    return mock
-
-
 @pytest.fixture
 def project(user):
     """Provides a Coldfront project owned by a user."""
@@ -311,7 +299,15 @@ def rdf_allocation_ldap_name(settings, rdf_allocation_shortname):
 
 
 @pytest.fixture
-def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_shortname):
+def rdf_allocation_gid(settings):
+    """GID applied to rdf_allocation fixture."""
+    return 55
+
+
+@pytest.fixture
+def rdf_allocation(
+    project, rdf_allocation_dependencies, rdf_allocation_shortname, rdf_allocation_gid
+):
     """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.allocation.models import (
         Allocation,
@@ -323,6 +319,7 @@ def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_shortnam
 
     rdf_resource = Resource.objects.get(name="RDF Active")
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
+    gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
     allocation = Allocation.objects.create(
@@ -334,6 +331,11 @@ def rdf_allocation(project, rdf_allocation_dependencies, rdf_allocation_shortnam
         allocation_attribute_type=shortname_attribute_type,
         allocation=allocation,
         value=rdf_allocation_shortname,
+    )
+    AllocationAttribute.objects.create(
+        allocation_attribute_type=gid_attribute_type,
+        allocation=allocation,
+        value=rdf_allocation_gid,
     )
     return allocation
 
@@ -404,3 +406,9 @@ def signals_async_task_mock(mocker):
         return func(*args, **kwargs)
 
     return mocker.patch("imperial_coldfront_plugin.signals.async_task", f)
+
+
+@pytest.fixture
+def enable_ldap(settings):
+    """Fixture to enable LDAP in settings."""
+    settings.LDAP_ENABLED = True

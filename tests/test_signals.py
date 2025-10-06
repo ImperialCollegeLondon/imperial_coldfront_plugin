@@ -1,5 +1,10 @@
 import pytest
-from coldfront.core.allocation.models import AllocationUser, AllocationUserStatusChoice
+from coldfront.core.allocation.models import (
+    AllocationAttribute,
+    AllocationAttributeType,
+    AllocationUser,
+    AllocationUserStatusChoice,
+)
 
 
 @pytest.fixture
@@ -13,7 +18,15 @@ def ldap_remove_member_mock(mocker):
     """Mock ldap_remove_member_from_group_in_background in signals.py."""
     return mocker.patch(
         "imperial_coldfront_plugin.signals.ldap_remove_member_from_group",
-        # RemoveMemberMock(),
+    )
+
+
+@pytest.fixture
+def ldap_gid_in_use_mock(mocker):
+    """Mock ldap_gid_in_use in signals.py."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_gid_in_use",
+        return_value=False,
     )
 
 
@@ -23,11 +36,10 @@ def test_sync_ldap_group_membership(
     user,
     rdf_allocation_ldap_name,
     allocation_user,
+    enable_ldap,
 ):
     """Test sync_ldap_group_membership signal."""
-    ldap_add_member_mock.assert_called_once_with(
-        rdf_allocation_ldap_name, user.username, allow_already_present=True
-    )
+    ldap_add_member_mock.assert_not_called()
     ldap_remove_member_mock.assert_not_called()
 
     allocation_user_inactive_status = AllocationUserStatusChoice.objects.create(
@@ -36,7 +48,7 @@ def test_sync_ldap_group_membership(
     allocation_user.status = allocation_user_inactive_status
     allocation_user.save()
 
-    ldap_add_member_mock.assert_called_once()
+    ldap_add_member_mock.assert_not_called()
     ldap_remove_member_mock.assert_called_once_with(
         rdf_allocation_ldap_name, user.username, allow_missing=True
     )
@@ -74,6 +86,7 @@ def test_remove_ldap_group_membership(
     rdf_allocation_shortname,
     allocation_user,
     user,
+    enable_ldap,
 ):
     """Test remove_ldap_group_membership signal."""
     ldap_remove_member_mock.assert_not_called()
@@ -136,3 +149,30 @@ def test_ensure_unique_group_id(project):
         proj_attr_type=group_id_attribute_type,
         value=project.pi.username,
     )
+
+
+def test_ensure_no_existing_gid_database(rdf_allocation, rdf_allocation_gid):
+    """Test creating a project with an existing GID in the database raises an error."""
+    gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
+    with pytest.raises(ValueError):
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=gid_attribute_type,
+            allocation=rdf_allocation,
+            value=rdf_allocation_gid,
+        )
+
+
+def test_ensure_no_existing_gid_ldap(
+    rdf_allocation,
+    rdf_allocation_gid,
+    ldap_gid_in_use_mock,
+):
+    """Test creating a project with an existing GID in LDAP raises an error."""
+    ldap_gid_in_use_mock.return_value = True
+    gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
+    with pytest.raises(ValueError):
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=gid_attribute_type,
+            allocation=rdf_allocation,
+            value=rdf_allocation_gid,
+        )

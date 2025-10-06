@@ -124,6 +124,8 @@ def _create_rdf_allocation(form_data: AllocationFormData) -> int:
         )
 
         gid = get_new_gid()
+        # create the gid attribute now so it is reserved in the database
+        # uniqueness is enforced in both database and Active Directory
         AllocationAttribute.objects.create(
             allocation_attribute_type=gid_attribute_type,
             allocation=rdf_allocation,

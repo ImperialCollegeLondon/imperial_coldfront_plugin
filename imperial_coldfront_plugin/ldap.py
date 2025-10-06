@@ -177,3 +177,13 @@ def ldap_group_member_search(
         ]
         for entry in response
     }
+
+
+def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:
+    """Check if a GID is already in use by any LDAP group."""
+    if conn is None:
+        conn = _get_ldap_connection()
+    _, _, response, _ = conn.search(
+        settings.LDAP_GROUP_OU, f"(gidNumber={gid})", attributes=["cn"]
+    )
+    return len(response) > 0

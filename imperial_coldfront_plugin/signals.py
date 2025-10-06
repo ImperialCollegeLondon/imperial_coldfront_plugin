@@ -13,6 +13,7 @@ from django_q.tasks import async_task
 
 from .ldap import (
     ldap_add_member_to_group,
+    ldap_gid_in_use,
     ldap_remove_member_from_group,
 )
 
@@ -27,6 +28,23 @@ def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
         raise ValueError(f"Multiple shortnames found for allocation - {allocation}")
     except AllocationAttribute.DoesNotExist:
         return None
+
+
+@receiver(pre_save, sender=AllocationAttribute)
+def ensure_no_existing_gid(
+    sender: object, instance: AllocationAttribute, **kwargs: object
+) -> None:
+    """Prevent saving of GID attribute if it is already in use."""
+    if instance.allocation_attribute_type.name != "GID":
+        return
+    if AllocationAttribute.objects.filter(
+        allocation_attribute_type__name="GID", value=instance.value
+    ):
+        raise ValueError(
+            f"GID {instance.value} is already assigned to another allocation."
+        )
+    if settings.LDAP_ENABLED and ldap_gid_in_use(instance.value):
+        raise ValueError(f"GID {instance.value} is already in use in LDAP.")
 
 
 @receiver(pre_save, sender=AllocationAttribute)
