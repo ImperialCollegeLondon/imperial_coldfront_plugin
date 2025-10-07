@@ -1,5 +1,13 @@
-<h1 class="display-4">Welcome to Coldfront</h1>
+{% load projects %}
+<h1 class="display-4">Welcome to the Imperial Research Computing Access Portal</h1>
 <p>
   This system is used to manage the resources provided by the Research Computing
   Service including High Performance Computing (HPC) and the Research Data Facility.
 </p>
+{% get_user_projects user as groups %}
+{% if groups %}
+  <p>
+    See the Group Spaces you own or are a member of on the
+    <a href="{% url 'project-list' %}">Groups</a> page.
+  </p>
+{% endif %}
