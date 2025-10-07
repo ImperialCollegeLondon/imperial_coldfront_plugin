@@ -3,7 +3,6 @@
 These are imported into the project level settings by the Coldfront plugin mechanism.
 """
 
-from datetime import timedelta
 from pathlib import Path
 from string import ascii_lowercase, digits
 
@@ -11,7 +10,6 @@ from coldfront.config.env import ENV
 
 from .acl import ACL, ACLEntry
 
-INVITATION_TOKEN_TIMEOUT = timedelta(days=7).total_seconds()
 MICROSOFT_TENANT_ID = ENV.str("MICROSOFT_TENANT_ID", default="")
 ADDITIONAL_USER_SEARCH_CLASSES = ["imperial_coldfront_plugin.views.GraphAPISearch"]
 GPFS_API_URL = ENV.str("GPFS_API_URL", default="")
@@ -75,8 +73,7 @@ GPFS_FILES_QUOTA = ENV.int("GPFS_FILES_QUOTA", default=1000)
 """Quota for the fileset."""
 
 GPFS_ENABLED = bool(GPFS_API_URL and GPFS_API_USERNAME and GPFS_API_PASSWORD)
-
-EXPIRATION_NOTIFICATION_DAYS = [1, 5, 30]
+"""Computed value of whether GPFS integration is enabled."""
 
 LDAP_USERNAME = ENV.str("LDAP_USERNAME", default="")
 """Active Directory user account name."""
