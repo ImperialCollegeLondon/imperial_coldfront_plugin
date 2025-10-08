@@ -1,4 +1,10 @@
-"""Module for performing operations in Active Directory via LDAP."""
+"""Module for performing operations in Active Directory via LDAP.
+
+This module provides a simplified interface for common LDAP operations such as
+creating and deleting groups, adding and removing members from groups etc. It hides the
+complexity of dealing with LDAP connections and error handling by trading off some
+generalisation for simplicity.
+"""
 
 import ldap3
 from django.conf import settings
@@ -28,7 +34,19 @@ class LDAPUserSearchError(Exception):
 
 
 def ldap_get_user_dn(username: str, conn: Connection | None = None) -> str:
-    """Get the full ldap dn for a user."""
+    """Get the full ldap dn for a user.
+
+    Args:
+      username: The username to look up.
+      conn: Connection to ldap server. If not provided, a new connection will be
+        created.
+
+    Returns:
+        The full distinguished name of the user.
+
+    Raises:
+        LDAPUserSearchError: If unable to retrieve a unique dn for the username.
+    """
     if conn is None:
         conn = _get_ldap_connection()
     _, _, response, _ = conn.search(settings.LDAP_USER_OU, f"(cn={username})")
@@ -54,7 +72,17 @@ class LDAPGroupModifyError(Exception):
 def ldap_create_group(
     group_name: str, gid: int, conn: Connection | None = None
 ) -> None:
-    """Create an LDAP group."""
+    """Create an LDAP group.
+
+    Args:
+      group_name: The name of the group to create.
+      gid: The gidNumber to assign to the group.
+      conn: Connection to ldap server. If not provided, a new connection will be
+        created.
+
+    Raises:
+        LDAPGroupCreationError: If unable to create the group.
+    """
     if conn is None:
         conn = _get_ldap_connection()
 
@@ -77,7 +105,17 @@ def ldap_create_group(
 def ldap_delete_group(
     group_name: str, allow_missing: bool = False, conn: Connection | None = None
 ) -> None:
-    """Delete an LDAP group."""
+    """Delete an LDAP group.
+
+    Args:
+      group_name: The name of the group to delete.
+      allow_missing: If True, do not raise an error if the group does not exist.
+      conn: Connection to ldap server. If not provided, a new connection will be
+        created.
+
+    Raises:
+        LDAPGroupDeletionError: If unable to delete the group.
+    """
     if conn is None:
         conn = _get_ldap_connection()
 
@@ -90,7 +128,14 @@ def ldap_delete_group(
 
 
 def group_dn_from_name(group_name: str) -> str:
-    """Create a full group distinguished name from a common name."""
+    """Create a full group distinguished name from a common name.
+
+    Args:
+        group_name: The common name of the group.
+
+    Returns:
+        The full distinguished name of the group.
+    """
     return f"cn={group_name},{settings.LDAP_GROUP_OU}"
 
 
@@ -100,7 +145,16 @@ def ldap_add_member_to_group(
     allow_already_present: bool = False,
     conn: Connection | None = None,
 ) -> None:
-    """Add a member to an existing ldap group."""
+    """Add a member to an existing ldap group.
+
+    Args:
+      group_name: The name of the group to add the member to.
+      member_username: The username of the member to add.
+      allow_already_present: If True, do not raise an error if the member is already in
+            the group.
+      conn: Connection to ldap server. If not provided, a new connection will be
+        created.
+    """
     if conn is None:
         conn = _get_ldap_connection()
 
@@ -130,7 +184,15 @@ def ldap_remove_member_from_group(
     allow_missing: bool = False,
     conn: Connection | None = None,
 ) -> None:
-    """Remove a member from an existing ldap group."""
+    """Remove a member from an existing ldap group.
+
+    Args:
+      group_name: The name of the group to remove the member from.
+      member_username: The username of the member to remove.
+      allow_missing: If True, do not raise an error if the member is not in the group.
+      conn: Connection to ldap server. If not provided, a new connection will be
+            created.
+    """
     if conn is None:
         conn = _get_ldap_connection()
 
@@ -153,7 +215,14 @@ def ldap_remove_member_from_group(
 
 
 def get_username_from_dn(dn: str) -> str:
-    """Extract the username from a distinguished name."""
+    """Extract the username from a distinguished name.
+
+    Args:
+        dn: The distinguished name to extract the username from.
+
+    Returns:
+        The extracted username, or the original dn if unable to extract.
+    """
     parts = dn.split(",")
     for part in parts:
         if part.lower().startswith("cn="):
@@ -164,7 +233,13 @@ def get_username_from_dn(dn: str) -> str:
 def ldap_group_member_search(
     search_filter: str, conn: Connection | None = None
 ) -> dict[str, list[str]]:
-    """Search for LDAP groups and return their members as a dictionary."""
+    """Search for LDAP groups and return their members as a dictionary.
+
+    Args:
+      search_filter: The search filter to use (e.g. group name) - supports wildcards.
+      conn: Connection to ldap server. If not provided, a new connection will be
+        created.
+    """
     if conn is None:
         conn = _get_ldap_connection()
     _, _, response, _ = conn.search(
@@ -180,7 +255,16 @@ def ldap_group_member_search(
 
 
 def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:
-    """Check if a GID is already in use by any LDAP group."""
+    """Check if a GID is already in use by any LDAP group.
+
+    Args:
+        gid: The gidNumber to check.
+        conn: Connection to ldap server. If not provided, a new connection will be
+            created.
+
+    Returns:
+        True if the gidNumber is in use, False otherwise.
+    """
     if conn is None:
         conn = _get_ldap_connection()
     _, _, response, _ = conn.search(

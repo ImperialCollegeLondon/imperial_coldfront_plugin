@@ -1,4 +1,9 @@
-"""Django signals."""
+"""Django signals.
+
+Signals are a rather blunt instrument but are useful for hooking into models
+defined by Coldfront. Here we use them to enforce some constraints on
+attributes and to manage LDAP group membership.
+"""
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -34,7 +39,20 @@ def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
 def ensure_no_existing_gid(
     sender: object, instance: AllocationAttribute, **kwargs: object
 ) -> None:
-    """Prevent saving of GID attribute if it is already in use."""
+    """Prevent saving of GID attribute if it is already in use.
+
+    This checks both existing allocation attributes and LDAP (if enabled).
+
+    Note that this makes all operations that create or modify GID attributes
+    potentially slow as they involve a network call to the LDAP server. GID attributes
+    should ideally be created in background tasks rather than in the request/response
+    cycle.
+
+    Args:
+        sender: The model class.
+        instance: The instance being saved.
+        **kwargs: Additional keyword arguments.
+    """
     if instance.allocation_attribute_type.name != "GID":
         return
     if AllocationAttribute.objects.filter(
@@ -51,7 +69,13 @@ def ensure_no_existing_gid(
 def ensure_unique_shortname(
     sender: object, instance: AllocationAttribute, **kwargs: object
 ) -> None:
-    """Prevent saving of shortname attribute if it is not unique."""
+    """Prevent saving of shortname attribute if it is not unique.
+
+    Args:
+      sender: The model class.
+      instance: The instance being saved.
+      **kwargs: Additional keyword arguments.
+    """
     if (
         instance.allocation_attribute_type.name == "Shortname"
         and AllocationAttribute.objects.filter(
@@ -65,7 +89,13 @@ def ensure_unique_shortname(
 def ensure_unique_group_id(
     sender: object, instance: ProjectAttribute, **kwargs: object
 ) -> None:
-    """Prevent saving of project group name if it is not unique."""
+    """Prevent saving of project group name if it is not unique.
+
+    Args:
+        sender: The model class.
+        instance: The instance being saved.
+        **kwargs: Additional keyword arguments.
+    """
     if instance.proj_attr_type.name == "Group ID" and ProjectAttribute.objects.filter(
         proj_attr_type__name="Group ID", value=instance.value
     ):
@@ -76,7 +106,17 @@ def ensure_unique_group_id(
 def sync_ldap_group_membership(
     sender: object, instance: AllocationUser, **kwargs: object
 ) -> None:
-    """Add or remove members from an ldap group based on AllocationUser.status."""
+    """Add or remove members from an ldap group based on AllocationUser.status.
+
+    Note this signal invokes a background task to do the actual LDAP operation. This
+    leaves the potential for the database and LDAP to get out of sync if the task
+    fails, but avoids making the request/response cycle slow.
+
+    Args:
+        sender: The model class.
+        instance: The instance being saved.
+        **kwargs: Additional keyword arguments.
+    """
     if not settings.LDAP_ENABLED:
         return
 
@@ -106,7 +146,16 @@ def remove_ldap_group_membership(
     """Remove an ldap group member if the associated AllocationUser is deleted.
 
     This isn't expected to come up in the usual course of things as removing a user via
-    the UI does not delete the AllocationUser object. Just cover it for completeness.
+    the UI does not delete the AllocationUser object. Just covering it for completeness.
+
+    Note this signal invokes a background task to do the actual LDAP operation. This
+    leaves the potential for the database and LDAP to get out of sync if the task
+    fails, but avoids making the request/response cycle slow.
+
+    Args:
+        sender: The model class.
+        instance: The instance being deleted.
+        **kwargs: Additional keyword arguments.
     """
     if not settings.LDAP_ENABLED:
         return

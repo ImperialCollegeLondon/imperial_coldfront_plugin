@@ -148,7 +148,11 @@ class GPFSClient(Consumer):
 
     @get("filesystems")
     def filesystems(self) -> requests.Response:  # type: ignore[empty-body]
-        """Return the information on the filesystems available."""
+        """Return the information on the filesystems available.
+
+        Returns:
+            The response from the GPFS API.
+        """
 
     @check_job_status
     @json
@@ -182,7 +186,7 @@ class GPFSClient(Consumer):
             parent_fileset: Name of the fileset the new fileset will beloong to.
 
         Returns:
-            The response after successfully creating the fileset.
+            The response from the GPFS API.
         """
         try:
             response = self._create_fileset(
@@ -234,7 +238,7 @@ class GPFSClient(Consumer):
                     limit. The number can be specified using the suffix K, M, or G.
 
         Returns:
-            The response after successfully setting the quota.
+            The response from the GPFS API.
         """
         try:
             response = self._set_quota(
@@ -290,6 +294,9 @@ class GPFSClient(Consumer):
             will create new directories recursively as required.
           permissions: POSIX permissions to set on the new directory.
           allow_existing: if True do not raise an error if the directory already exists.
+
+        Returns:
+          The response from the GPFS API.
         """
         try:
             return self._create_fileset_directory(
@@ -334,7 +341,7 @@ class GPFSClient(Consumer):
         filesystem_name: str,
         fileset_name: str,
     ) -> dict[str, float]:
-        """Method (public) to retrieve the quota usage of a fileset.
+        """Retrieve the quota usage of a fileset.
 
         Args:
             filesystem_name: Name of the filesystem to retrieve the quota usage from.
@@ -378,6 +385,9 @@ class GPFSClient(Consumer):
 
         Arguments:
             filesystem_name: Name of the filesystem to retrieve the quota usage from.
+
+        Returns:
+            Mapping of fileset names to their file and block usage statistics.
         """
         data = self._retrieve_all_fileset_quotas(filesystem_name).json()
         return {
@@ -394,7 +404,15 @@ class GPFSClient(Consumer):
     def get_directory_acl(  # type: ignore[empty-body]
         self, filesystem_name: str, path: str
     ) -> requests.Response:
-        """Get the ACL of a directory within a filesystem."""
+        """Get the ACL of a directory within a filesystem.
+
+        Args:
+            filesystem_name: Name of the filesystem containing the directory.
+            path: Relative path of the directory within the filesystem.
+
+        Returns;
+            The response from the GPFS API.
+        """
 
     @check_job_status
     @json
@@ -422,6 +440,9 @@ class GPFSClient(Consumer):
             filesystem_name: Name of the filesystem containing the directory.
             path: Relative path of the directory within the filesystem.
             acl: The ACL entries to set.
+
+        Returns:
+            The response from the GPFS API.
         """
         try:
             response = self._set_directory_acl(
@@ -474,6 +495,19 @@ class FilesetPathInfo:
     The absolute path of the fileset follows the structure:
         <filesystem_mount_path>/<filesystem_name>/<top_level_directories>/
         <faculty>/<department>/<group_id>/<fileset_name>
+
+    Args:
+        filesystem_mount_path: The mount path of the filesystem, e.g. /
+        filesystem_name: The name of the filesystem
+        top_level_directories: The top level directories under the filesystem root
+            that contain the faculty directories, e.g. "home/projects"
+        faculty: The faculty name, must match an existing faculty level fileset
+            in the filesystem
+        department: The department name, used to create a directory under the faculty
+            level fileset
+        group_id: The group ID, used to create a directory under the department
+            directory
+        fileset_name: The name of the fileset to create, typically the RDF project ID
     """
 
     filesystem_mount_path: Path
@@ -553,12 +587,12 @@ def create_fileset_set_quota(
     """Create a fileset and set a quota in the requested filesystem.
 
     This function carries out the following steps:
-    - Create any intermediate directories in the path to the fileset
-      (e.g. department and group_id directories).
-    - Set the ACLs on any intermediate directories created.
-    - Create the fileset.
-    - Set the ACLs on the fileset.
-    - Set the files and block quota on the fileset.
+      - Create any intermediate directories in the path to the fileset
+        (e.g. department and group_id directories).
+      - Set the ACLs on any intermediate directories created.
+      - Create the fileset.
+      - Set the ACLs on the fileset.
+      - Set the files and block quota on the fileset.
 
     Args:
         fileset_path_info: path information for the fileset to create.

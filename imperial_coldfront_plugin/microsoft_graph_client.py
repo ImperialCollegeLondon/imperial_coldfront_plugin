@@ -1,4 +1,10 @@
-"""Interface for interacting with the Microsoft Graph API."""
+"""Interface for interacting with the Microsoft Graph API.
+
+Provides a simplified interface for making requests to the Microsoft Graph API
+and parsing the responses into useful data structures. It hides the details of
+interacting with the API and provides a high-level interface for operations relevant
+to our use case.
+"""
 
 from typing import Any
 
@@ -47,19 +53,25 @@ def _transform_profile_data(  # type: ignore[misc]
 
 
 def parse_profile_data(response: requests.Response) -> dict[str, str | None]:
-    """Parse the user profile data from the API response into a useful format."""
+    """Parse the user profile data from the API response into a useful format.
+
+    Args:
+        response: The response from the Microsoft Graph API.
+
+    Returns: The user's profile data flattened into a convenient form.
+    """
     return _transform_profile_data(response.json())
 
 
-def get_uid_from_response(response: requests.Response) -> int | None:
-    """Extract the Unix uid from the API response."""
-    data = response.json()
-    uid = data.get("onPremisesExtensionAttributes", {}).get("extensionAttribute12")
-    return uid if uid is None else int(uid)
-
-
 def parse_profile_data_list(response: requests.Response) -> list[dict[str, str | None]]:
-    """Parse a list of user profile data from the API response into a useful format."""
+    """Parse a list of user profile data from the API response into a useful format.
+
+    Args:
+        response: The response from the Microsoft Graph API.
+
+    Returns:
+        A list of users' profile data flattened into a convenient form.
+    """
     data = response.json()["value"]
     return [_transform_profile_data(item) for item in data]
 
@@ -103,8 +115,15 @@ class MicrosoftGraphClient(Consumer):
     @get("users/{username}@ic.ac.uk?$select=" + PROFILE_ATTRIBUTES)
     def user_profile(  # type: ignore[empty-body]
         self, username: str
-    ) -> requests.Response:
-        """Get the profile data for a user."""
+    ) -> dict[str, str | None]:
+        """Get the profile data for a user.
+
+        Args:
+            username: The user's username (without the @ic.ac.uk).
+
+        Returns:
+            The user's profile data.
+        """
         pass
 
     @response_handler(parse_profile_data_list)
@@ -112,8 +131,15 @@ class MicrosoftGraphClient(Consumer):
     @get("users?$search={query}&$select=" + PROFILE_ATTRIBUTES)
     def user_search(  # type: ignore[empty-body]
         self, query: str
-    ) -> requests.Response:
-        """Search for a user by their display name or user principal name."""
+    ) -> list[requests.Response]:
+        """Search for a user by their display name or user principal name.
+
+        Args:
+            query: The search query string.
+
+        Returns:
+          List of user profiles matching the query.
+        """
 
     def user_search_by(
         self, user_search_string: str | None = None, search_by: str = "all_fields"
@@ -132,7 +158,15 @@ class MicrosoftGraphClient(Consumer):
 
 
 def get_graph_api_client(access_token: str | None = None) -> MicrosoftGraphClient:
-    """Get a client for interacting with the Microsoft Graph API."""
+    """Get a client for interacting with the Microsoft Graph API.
+
+    Args:
+        access_token: An optional access token to use for authentication. If not
+            provided, an app-only access token will be fetched.
+
+    Returns:
+        A configured MicrosoftGraphClient instance.
+    """
     if access_token is None:
         access_token = _get_app_access_token()
 

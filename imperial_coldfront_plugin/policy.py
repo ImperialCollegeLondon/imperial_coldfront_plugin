@@ -12,6 +12,9 @@ if TYPE_CHECKING:
 def user_eligible_for_hpc_access(user_profile: dict[str, str]) -> bool:
     """Assess the eligibility of a user to join a ResearchGroup.
 
+    This function determines which users are displayed in search results when adding a
+    user to a Project.
+
     Imperial identity systems contain entries for non-human entities such as rooms and
     shared mailboxes that should be removed from consideration.
     """
@@ -125,7 +128,14 @@ HPC_ACCESS_ALLOWED_ENTITY_TYPE = [
 
 
 def user_eligible_to_be_pi(user_profile: dict[str, str]) -> bool:
-    """Assess eligibilty of a user be a Principal Investigator."""
+    """Assess eligibilty of a user be a Principal Investigator.
+
+    Args:
+        user_profile: User profile information
+
+    Returns:
+      True if the user is eligible to be a PI, False otherwise.
+    """
     job_title = user_profile["job_title"]
     if any(
         (
@@ -147,6 +157,14 @@ def user_eligible_to_be_pi(user_profile: dict[str, str]) -> bool:
 
 
 def check_project_pi_or_superuser(project: Project, user: "User") -> None:
-    """Check if the user is the owner of the project or a superuser."""
+    """Check if the user is the owner of the project or a superuser.
+
+    Args:
+      project: The project to check against.
+      user: The user to check.
+
+    Raises:
+      PermissionDenied: If the user is neither the project owner nor a superuser.
+    """
     if not (user.is_superuser or user == project.pi):
         raise PermissionDenied

@@ -33,7 +33,11 @@ class log_task_exceptions_to_django_logger:
     """
 
     def __init__(self, func: Callable[..., object]) -> None:  # type: ignore[misc]
-        """Initialize the decorator with the function to wrap."""
+        """Initialize the decorator with the function to wrap.
+
+        Args:
+            func: The function to wrap.
+        """
         self.func = func
         self.logger = logging.getLogger("django")
         functools.update_wrapper(self, func)

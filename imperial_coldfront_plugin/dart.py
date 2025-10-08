@@ -1,4 +1,8 @@
-"""Module for creation and validation of Dart ID AllocationAttribute's."""
+"""Module for creation and validation of Dart ID AllocationAttribute's.
+
+Note that this module is not currently used by the plugin, but is provided
+for anticipated future integration with DART.
+"""
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -34,7 +38,12 @@ def validate_dart_id(dart_id: str, allocation: Allocation) -> None:
 
 
 def create_dart_id_attribute(dart_id: str, allocation: Allocation) -> Allocation:
-    """Create an AllocationAttribute for a Dart ID."""
+    """Create an AllocationAttribute for a Dart ID.
+
+    Args:
+        dart_id: Dart ID to assign.
+        allocation: Allocation to assign the Dart ID to.
+    """
     validate_dart_id(dart_id, allocation)
     dart_id_attribute_type = AllocationAttributeType.objects.get(
         name="DART ID", is_changeable=False

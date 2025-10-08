@@ -62,6 +62,9 @@ class GraphAPISearch(UserSearch):
             user_search_string: The user string to look for.
             search_by: (Unused) Fields to look into. This backend always looks into the
                 user's name or username.
+
+        Returns:
+            A list of user profiles matching the search criteria.
         """
         graph_client = get_graph_api_client()
         found = graph_client.user_search_by(user_search_string, search_by)
@@ -76,7 +79,14 @@ PROJECT_ID_REGEX = re.compile(PROJECT_ID_PREFIX + r"(?P<number>\d{6})")
 
 @login_required
 def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
-    """Create a new RDF project allocation."""
+    """Create a new RDF project allocation.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the allocation creation form or redirects to the task result page.
+    """
     if not request.user.is_superuser:
         return HttpResponseForbidden()
 
@@ -97,7 +107,14 @@ def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
 
 
 def load_departments(request: HttpRequest) -> HttpResponse:
-    """Loads the available departments for a given faculty."""
+    """Loads the available departments for a given faculty.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The partial HTML to populate the departments dropdown.
+    """
     faculty = request.GET["faculty"]
     departments = get_department_choices(faculty)
     return render(
@@ -111,7 +128,16 @@ def load_departments(request: HttpRequest) -> HttpResponse:
 def allocation_task_result(
     request: HttpRequest, task_id: str, shortname: str
 ) -> HttpResponse:
-    """Display information about an rdf allocation creation task."""
+    """Display information about an rdf allocation creation task.
+
+    Args:
+      request: The HTTP request object.
+      task_id: The ID of the task to fetch.
+      shortname: The shortname of the allocation being created.
+
+    Returns:
+      The page displaying the task result.
+    """
     if not request.user.is_superuser:
         return HttpResponseForbidden()
     task = fetch(task_id)
@@ -152,7 +178,15 @@ def get_or_create_project(user: "UserType") -> Project:
 def add_dart_id_to_allocation(
     request: "AuthenticatedHttpRequest", allocation_pk: int
 ) -> HttpResponse:
-    """Dedicated view function to add dart ids to an allocation."""
+    """Dedicated view function to add dart ids to an allocation.
+
+    Args:
+      request: The HTTP request object.
+      allocation_pk: The primary key of the allocation to add the dart id to.
+
+    Returns:
+      The page for the dart id form or redirects to the allocation detail page.
+    """
     allocation = get_object_or_404(Allocation, pk=allocation_pk)
     check_project_pi_or_superuser(allocation.project, request.user)
 
@@ -169,7 +203,14 @@ def add_dart_id_to_allocation(
 
 
 def create_new_project(form: ProjectCreationForm) -> Project:
-    """Create a new project from the form data."""
+    """Create a new project from the form data.
+
+    Args:
+      form: The validated project creation form.
+
+    Returns:
+        The newly created project.
+    """
     from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
 
     project_obj = form.save(commit=False)
@@ -230,7 +271,14 @@ def create_new_project(form: ProjectCreationForm) -> Project:
 
 @login_required
 def project_creation(request: HttpRequest) -> HttpResponse:
-    """View to create a new project for any user."""
+    """View to create a new project for any user.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the project creation form or redirects to the new project page.
+    """
     if not request.user.is_superuser:
         return HttpResponseForbidden()
 

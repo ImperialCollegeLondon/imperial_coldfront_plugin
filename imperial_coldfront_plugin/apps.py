@@ -1,4 +1,7 @@
-"""Django app configuration."""
+"""Django app configuration.
+
+This is part of the boilerplate needed for a Django app.
+"""
 
 import django_stubs_ext
 from django.apps import AppConfig

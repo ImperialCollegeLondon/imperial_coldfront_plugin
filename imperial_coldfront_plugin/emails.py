@@ -17,7 +17,11 @@ class Discrepancy(TypedDict):
 
 
 def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
-    """Send email notification for discrepancies found during the consistency check."""
+    """Send email notification for discrepancies found during the consistency check.
+
+    Args:
+        discrepancies: List of discrepancies found.
+    """
     if not settings.ADMINS:
         return
 

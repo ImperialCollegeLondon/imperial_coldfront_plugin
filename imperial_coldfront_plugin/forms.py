@@ -35,7 +35,14 @@ def get_faculty_choices() -> Iterable[tuple[str, str]]:
 
 
 def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
-    """Get the available departments for the chosen faculty."""
+    """Get the available departments for the chosen faculty.
+
+    Args:
+        faculty_id: The faculty to get departments for.
+
+    Returns:
+        A list of tuples of department IDs and names.
+    """
     if not faculty_id or faculty_id not in settings.DEPARTMENTS_IN_FACULTY:
         return [("", "--------")]
     return [("", "--------")] + [
@@ -45,7 +52,11 @@ def get_department_choices(faculty_id: str) -> Iterable[tuple[str, str]]:
 
 
 def get_initial_department_choices() -> Iterable[tuple[str, str]]:
-    """Get all the initial departments in tuple form."""
+    """Get all the initial departments in tuple form.
+
+    Returns:
+        A list of tuples of department IDs and names.
+    """
     return [("", "--------"), *settings.DEPARTMENTS.items()]
 
 
@@ -54,7 +65,11 @@ class UnknownUsernameError(Exception):
 
 
 def filesystem_path_component_validator(value: str) -> None:
-    """Ensure filesystem path components only contain valid chars."""
+    """Ensure filesystem path components only contain valid chars.
+
+    Args:
+        value: The string to validate.
+    """
     if not settings.PATH_COMPONENT_VALID_CHARACTERS.issuperset(value):
         raise ValidationError("Name must contain only lowercase letters or numbers")
 
@@ -65,7 +80,7 @@ def get_or_create_user(username: str) -> "UserType":
     Args:
         username: The username of the user to be retrieved or created.
 
-    Return:
+    Returns:
         The user, already existing or newly created.
     """
     try:

@@ -13,13 +13,20 @@ def _update_user(user: User, claims: dict[str, str]) -> None:
 
 
 class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
-    """Extension of the OIDC authentication backend for ICL auth."""
+    """Extension of the OIDC authentication backend for ICL auth.
+
+    Handles extraction of username from preferred_username claim and
+    updates user profile on login.
+    """
 
     def create_user(self, claims: dict[str, str]) -> User:
         """Create a new user from the available claims.
 
         Args:
           claims: user info provided by self.get_user_info
+
+        Returns:
+          The created user
         """
         user = super().create_user(claims)
         _update_user(user, claims)
@@ -31,6 +38,9 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         Args:
           user: user to update
           claims: user info provided by self.get_user_info
+
+        Returns:
+            The updated user
         """
         _update_user(user, claims)
         return user
@@ -48,6 +58,9 @@ class ICLOIDCAuthenticationBackend(OIDCAuthenticationBackend):
           access_token: for use with the Microsoft Entra graph API.
           id_token: raw user information as a b64 encoded JWT.
           payload: decoded and verified claims from the id_token.
+
+        Returns:
+            User claims from the OIDC provider.
         """
         user_info = super().get_userinfo(access_token, id_token, payload)
         username = payload["preferred_username"].removesuffix("@ic.ac.uk")
