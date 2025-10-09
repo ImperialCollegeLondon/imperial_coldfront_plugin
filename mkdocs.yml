@@ -34,5 +34,6 @@ plugins:
 
 nav:
   - Imperial College London Coldfront Plugin documentation: index.md
+  - Application Overview: overview.md
   # defer to gen-files + literate-nav
   - Code Reference: reference/
