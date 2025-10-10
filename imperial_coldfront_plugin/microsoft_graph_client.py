@@ -125,7 +125,7 @@ class MicrosoftGraphClient(Consumer):
             username: The user's username (without the @ic.ac.uk).
 
         Returns:
-            The user's profile data.
+            (dict): The user's profile data.
         """
         pass
 
