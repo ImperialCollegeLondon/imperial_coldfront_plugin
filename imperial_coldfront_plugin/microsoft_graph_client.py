@@ -111,11 +111,14 @@ class MicrosoftGraphClient(Consumer):
     provides easy to use data structures for the responses.
     """
 
+    # uplink will attempt to transform the response data based on the return type hint
+    # of the method. This is not possible with the union type we'd want to use here so
+    # skip the annotation.
     @response_handler(parse_profile_data)
     @get("users/{username}@ic.ac.uk?$select=" + PROFILE_ATTRIBUTES)
-    def user_profile(  # type: ignore[empty-body]
+    def user_profile(  # type: ignore[no-untyped-def]
         self, username: str
-    ) -> dict[str, str | None]:
+    ):
         """Get the profile data for a user.
 
         Args:
