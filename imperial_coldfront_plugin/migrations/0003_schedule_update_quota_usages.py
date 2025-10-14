@@ -7,7 +7,8 @@ def schedule_update_quota_usages_task(apps, schema_editor):
     Schedule.objects.update_or_create(
         name="Update quota usages",
         func="imperial_coldfront_plugin.tasks.update_quota_usages_task",
-        schedule_type="H",
+        schedule_type="I",
+        minutes=5,
     )
 
 class Migration(migrations.Migration):
