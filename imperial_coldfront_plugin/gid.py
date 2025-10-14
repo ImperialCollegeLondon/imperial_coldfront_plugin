@@ -1,7 +1,15 @@
 """Functionality to get a new GID value."""
 
+from itertools import pairwise
+
 from coldfront.core.allocation.models import AllocationAttribute
 from django.conf import settings
+
+# these values are deliberately hardcoded according to the gid range we have been
+# assigned changing them is meant to be a pain and must only be carried out in
+# agreement with the identity management team.
+# Something more sophisticated will be needed if we ever have multiple ranges
+ALLOWED_GID_RANGES = [range(881436, 1031436)]
 
 
 class NoGIDAvailableError(Exception):
@@ -44,3 +52,30 @@ def get_new_gid() -> int:
                 ):  # if at the end of the range, get the next range
                     return settings.GID_RANGES[index + 1][0]
     raise NoGIDAvailableError("No available GID found in the configured ranges.")
+
+
+def validate_gid_ranges(ranges: list[range]) -> None:
+    """Validate the GID ranges.
+
+    This function checks that the provided GID ranges are valid, i.e., they do not
+     overlap and are in ascending order.
+
+    Args:
+        ranges: GID ranges to validate.
+
+    Raises:
+        ValueError: If the ranges are not valid.
+    """
+    for r in ranges:
+        if all(r.start not in allowed_range for allowed_range in ALLOWED_GID_RANGES):
+            raise ValueError(f"GID range start {r.start} is outside of allowed range.")
+        if all(r.stop - 1 not in allowed_range for allowed_range in ALLOWED_GID_RANGES):
+            raise ValueError(f"GID range stop {r.stop} is outside of allowed range.")
+        if r.stop < r.start:
+            raise ValueError(f"GID range stop {r.stop} is less than start {r.start}.")
+        if r.step != 1:
+            raise ValueError(f"GID range step must be 1, got {r.step}.")
+
+    for r1, r2 in pairwise(ranges):
+        if r1.stop > r2.start:
+            raise ValueError("GID ranges must not overlap and be in ascending order.")

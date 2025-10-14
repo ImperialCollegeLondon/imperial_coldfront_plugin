@@ -1,6 +1,11 @@
 import pytest
 
-from imperial_coldfront_plugin.gid import NoGIDAvailableError, get_new_gid
+from imperial_coldfront_plugin.gid import (
+    ALLOWED_GID_RANGES,
+    NoGIDAvailableError,
+    get_new_gid,
+    validate_gid_ranges,
+)
 
 
 def test_get_new_gid_no_existing_gids(db, settings):
@@ -96,3 +101,52 @@ def test_multiple_gid_ranges(settings, allocation_attribute_factory):
 
     # Assert that the returned GID is next in the second range
     assert gid == 2006
+
+
+TEST_GID_START = ALLOWED_GID_RANGES[0].start
+TEST_GID_STOP = ALLOWED_GID_RANGES[0].stop
+
+
+def test_gid_range_validation():
+    """Test that valid GID ranges pass validation."""
+    validate_gid_ranges(
+        [
+            range(TEST_GID_START, TEST_GID_START + 1000),
+            range(TEST_GID_STOP - 1000, TEST_GID_STOP),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_ranges,msg_contains",
+    [
+        (
+            [range(TEST_GID_START - 10, TEST_GID_STOP)],
+            "start",
+        ),  # start below allowed range
+        ([range(TEST_GID_START, TEST_GID_STOP + 5)], "stop"),  # Above allowed range
+        (
+            [
+                range(TEST_GID_START, TEST_GID_START + 1000),
+                range(TEST_GID_START + 500, TEST_GID_START + 1000),
+            ],
+            "overlap",
+        ),  # Overlapping ranges
+        (
+            [range(TEST_GID_STOP - 1, TEST_GID_START + 1)],
+            "less than start",
+        ),  # Invalid range (start >= stop)
+        (
+            [
+                range(TEST_GID_START + 1000, TEST_GID_STOP),
+                range(TEST_GID_START, TEST_GID_START + 300),
+            ],
+            "ascending",
+        ),  # Not in ascending order
+        ([range(TEST_GID_START, TEST_GID_STOP, 2)], "step"),  # Step not equal to 1,
+    ],
+)
+def test_invalid_gid_range_validation(invalid_ranges, msg_contains):
+    """Test that invalid GID ranges raise ValueError."""
+    with pytest.raises(ValueError, match=msg_contains):
+        validate_gid_ranges(invalid_ranges)
