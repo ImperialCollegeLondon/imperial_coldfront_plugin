@@ -124,7 +124,7 @@ def test_gid_range_validation():
             [range(TEST_GID_START - 10, TEST_GID_STOP)],
             "start",
         ),  # start below allowed range
-        ([range(TEST_GID_START, TEST_GID_STOP + 5)], "stop"),  # Above allowed range
+        ([range(TEST_GID_START, TEST_GID_STOP + 5)], "end"),  # Above allowed range
         (
             [
                 range(TEST_GID_START, TEST_GID_START + 1000),

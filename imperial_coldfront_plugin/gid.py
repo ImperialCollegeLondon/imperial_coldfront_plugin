@@ -70,9 +70,9 @@ def validate_gid_ranges(ranges: list[range]) -> None:
         if all(r.start not in allowed_range for allowed_range in ALLOWED_GID_RANGES):
             raise ValueError(f"GID range start {r.start} is outside of allowed range.")
         if all(r.stop - 1 not in allowed_range for allowed_range in ALLOWED_GID_RANGES):
-            raise ValueError(f"GID range stop {r.stop} is outside of allowed range.")
+            raise ValueError(f"GID range end {r.stop - 1} is outside of allowed range.")
         if r.stop < r.start:
-            raise ValueError(f"GID range stop {r.stop} is less than start {r.start}.")
+            raise ValueError(f"GID range end {r.stop} is less than start {r.start}.")
         if r.step != 1:
             raise ValueError(f"GID range step must be 1, got {r.step}.")
 
