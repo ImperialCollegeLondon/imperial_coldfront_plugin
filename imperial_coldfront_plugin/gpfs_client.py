@@ -371,7 +371,7 @@ class GPFSClient(Consumer):
         return retrieved_data
 
     @json
-    @get("filesystems/{filesystemName}/quotas")
+    @get("filesystems/{filesystemName}/quotas?filter=quotaType=FILESET")
     def _retrieve_all_fileset_quotas(  # type: ignore[empty-body]
         self,
         filesystemName: str,
@@ -396,7 +396,6 @@ class GPFSClient(Consumer):
                 "block_usage_tb": quota["blockUsage"] / 1024**3,
             }
             for quota in data["quotas"]
-            if quota["quotaType"] == "FILESET"
         }
 
     @json
