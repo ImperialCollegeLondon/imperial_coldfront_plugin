@@ -134,7 +134,7 @@ class MicrosoftGraphClient(Consumer):
     @get("users?$search={query}&$select=" + PROFILE_ATTRIBUTES)
     def user_search(  # type: ignore[empty-body]
         self, query: str
-    ) -> list[requests.Response]:
+    ) -> requests.Response:
         """Search for a user by their display name or user principal name.
 
         Args:
