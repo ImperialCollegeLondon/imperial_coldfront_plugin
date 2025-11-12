@@ -1,0 +1,45 @@
+{% load static %}
+{% load common_tags %}
+<div class="bg-light top-brand" id="brand">
+  <div class="container">
+    <!-- Logo and Title Row -->
+    <div class="row">
+      <div class="col-12 d-flex align-items-center">
+        <a href="/" class="me-3">
+          <img class="img-responsive banner-logo" src="{% static 'common/images/logo.png' %}" alt="Coldfront">
+        </a>
+        <h3 class="banner-name mb-0">{% settings_value 'CENTER_NAME' %}</h3>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <nav class="brand-nav mt-2">
+          <ul class="nav nav-pills nav-fill">
+            <li class="nav-item mega">
+              <a class="nav-link parent" href="https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/about/">About</a>
+            </li>
+            <li class="nav-item mega">
+              <a class="nav-link parent" href="https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/service-offering/hpc/">Computing</a>
+            </li>
+            <li class="nav-item mega">
+              <a class="nav-link parent" href="https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/service-offering/rds/">Data</a>
+            </li>
+            <li class="nav-item mega">
+              <a class="nav-link parent" href="https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/service-offering/research-software-engineering/">Software Engineering</a>
+            </li>
+            <li class="nav-item mega">
+              <a class="nav-link parent"  href="https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/get-support/training/">Training</a>
+            </li>
+            <li class="nav-item mega">
+              <a class="nav-link parent" href="https://icl-rcs-user-guide.readthedocs.io/">User Guides</a>
+            </li>
+            <li class="nav-item mega">
+              <a class="nav-link parent" href="https://www.imperial.ac.uk/admin-services/ict/self-service/research-support/rcs/get-support/">Get Support</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+</div>

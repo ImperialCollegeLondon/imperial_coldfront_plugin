@@ -38,4 +38,6 @@ repos:
     rev: v1.36.4
     hooks:
       - id: djlint-reformat-django
+        exclude: imperial_coldfront_plugin/templates/imperial_coldfront_plugin/overrides/.*.html
       - id: djlint-django
+        exclude: imperial_coldfront_plugin/templates/imperial_coldfront_plugin/overrides/.*.html

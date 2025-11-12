@@ -52,7 +52,9 @@ class TestHomeView:
 
     def test_get_standard_user(self, request_):
         """Test that the home view renders correctly for a standard user."""
-        response = render(request_, "imperial_coldfront_plugin/home.html")
+        response = render(
+            request_, "imperial_coldfront_plugin/overrides/authorized_home.html"
+        )
 
         assert response.status_code == 200
 

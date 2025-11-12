@@ -117,6 +117,7 @@ pydocstyle.convention = "google"
 profile = "django"
 indent = 2
 ignore = "H021"
+extend_exclude = "imperial_coldfront_plugin/templates/imperial_coldfront_plugin/overrides/*"
 
 [tool.django-stubs]
 # use a dummy settings module that ensures we get all of the coldfront and plugin

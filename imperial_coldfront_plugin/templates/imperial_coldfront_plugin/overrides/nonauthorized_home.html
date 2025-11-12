@@ -1,0 +1,9 @@
+<div class="row mt-4">
+  <div class="col mr-5">
+      {% if settings.DEBUG %}
+    <p><a class="btn btn-primary btn-block" href="{% url 'login' %}" role="button"><i class="fas fa-sign-in-alt" aria-hidden="true"></i> Log In</a></p>
+      {% else %}
+      <p><a class="btn btn-primary btn-block" href="{% url 'oidc_authentication_init' %}" role="button"><i class="fas fa-sign-in-alt" aria-hidden="true"></i> Log In</a></p>
+      {% endif %}
+  </div>
+</div>
