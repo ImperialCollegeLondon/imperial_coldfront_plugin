@@ -4,7 +4,7 @@ import pytest
 @pytest.fixture
 def project():
     """Create a test project."""
-    from coldfront.core.project.models import Project  # type: ignore
+    from coldfront.core.project.models import Project
 
     proj = Project()
     proj.name = "TestProject"
@@ -35,7 +35,7 @@ class TestCreditTransaction:
 
     def test_amount_field(self):
         """Test the amount field configuration."""
-        from django.db import models as dj_models  # type: ignore
+        from django.db import models as dj_models
 
         from imperial_coldfront_plugin import models
 
@@ -44,7 +44,7 @@ class TestCreditTransaction:
 
     def test_description_field(self):
         """Test the description field configuration."""
-        from django.db import models as dj_models  # type: ignore
+        from django.db import models as dj_models
 
         from imperial_coldfront_plugin import models
 
@@ -54,7 +54,7 @@ class TestCreditTransaction:
 
     def test_project_foreign_key(self):
         """Test the project foreign key configuration."""
-        from coldfront.core.project.models import Project  # type: ignore
+        from coldfront.core.project.models import Project
 
         from imperial_coldfront_plugin import models
 
