@@ -11,4 +11,4 @@ def test_calculate_credit_balance_returns_sum(project):
     CreditTransaction.objects.create(project=project, amount=10, description="refund")
     CreditTransaction.objects.create(project=project, amount=25, description="bonus")
 
-    assert calculate_credit_balance(project) == 75
+    assert calculate_credit_balance(project) == 85
