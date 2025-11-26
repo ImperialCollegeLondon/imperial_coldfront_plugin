@@ -1,16 +1,6 @@
 import pytest
 
 
-@pytest.fixture
-def project():
-    """Create a test project."""
-    from coldfront.core.project.models import Project
-
-    proj = Project()
-    proj.name = "TestProject"
-    return proj
-
-
 class TestCreditTransaction:
     """Tests for the CreditTransaction model."""
 
@@ -24,7 +14,7 @@ class TestCreditTransaction:
             amount=1000,
             description="Test transaction",
         )
-        assert str(transaction) == "CreditTransaction(id=123, project=TestProject)"
+        assert str(transaction) == f"CreditTransaction(id=123, project={project.title})"
 
     def test_timestamp_auto_now_add(self):
         """Test that timestamp is automatically set on creation."""

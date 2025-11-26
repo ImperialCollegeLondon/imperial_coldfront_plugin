@@ -14,4 +14,4 @@ class CreditTransaction(models.Model):
 
     def __str__(self) -> str:
         """String representation of the CreditTransaction."""
-        return f"CreditTransaction(id={self.id}, project={self.project.name})"
+        return f"CreditTransaction(id={self.id}, project={self.project.title})"
