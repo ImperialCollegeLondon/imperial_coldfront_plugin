@@ -1,10 +1,10 @@
 """Interface for interacting with the GPFS API."""
 
 import logging
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import requests
 from django.conf import settings
@@ -145,6 +145,46 @@ class GPFSClient(Consumer):
         self, jobId: int
     ) -> requests.Response:
         """Query the status of a job."""
+
+    def _paginate(  # type: ignore[misc]
+        self,
+        request_callable: Callable[..., requests.Response],
+        item_key: str,
+        start: int = 0,
+        limit: int = 1000,
+        **kwargs: str,
+    ) -> list[dict[str, Any]]:
+        """Helper method to paginate through GPFS API results.
+
+        Args:
+            request_callable: Bound method that accepts 'start' and 'limit'.
+            item_key: Key in response JSON where the list of items is found.
+            start: Starting index for pagination.
+            limit: Maximum number of items to retrieve per request.
+            **kwargs: Additional arguments to pass to the request callable.
+
+        Returns:
+            A list of all items retrieved across all pages.
+        """
+        all_items: list[dict[str, Any]] = []  # type: ignore[misc]
+
+        while True:
+            response = request_callable(start=start, limit=limit, **kwargs)
+            response.raise_for_status()
+            data = response.json()
+            items: list[dict[str, Any]] = data.get(item_key, [])  # type: ignore[misc]
+
+            if not items:
+                break
+
+            all_items.extend(items)
+
+            if len(items) < limit:
+                break
+
+            start += limit
+
+        return all_items
 
     @get("filesystems")
     def filesystems(self) -> requests.Response:  # type: ignore[empty-body]
@@ -389,13 +429,18 @@ class GPFSClient(Consumer):
         Returns:
             Mapping of fileset names to their file and block usage statistics.
         """
-        data = self._retrieve_all_fileset_quotas(filesystem_name).json()
+        quotas = self._paginate(
+            self._retrieve_all_fileset_quotas,
+            item_key="quotas",
+            filesystemName=filesystem_name,
+        )
+
         return {
             quota["objectName"]: {
                 "files_usage": quota["filesUsage"],
                 "block_usage_tb": quota["blockUsage"] / 1024**3,
             }
-            for quota in data["quotas"]
+            for quota in quotas
         }
 
     @json
