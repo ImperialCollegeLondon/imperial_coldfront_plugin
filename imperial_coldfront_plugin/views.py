@@ -26,6 +26,7 @@ from django_q.tasks import async_task, fetch
 
 from .dart import create_dart_id_attribute
 from .forms import (
+    CreditTransactionForm,
     DartIDForm,
     ProjectAddUsersToAllocationShortnameForm,
     ProjectCreationForm,
@@ -152,7 +153,7 @@ def get_or_create_project(user: "UserType") -> Project:
     """Get project from the database or creates one.
 
     Args:
-        user: The user object that will own a project.
+        user: The user object that will owner a project.
 
     Return:
         The project, already existing or newly created.
@@ -361,3 +362,30 @@ class ProjectAddUsersSearchResultsShortnameView(ProjectAddUsersSearchResultsView
         context["pk"] = pk
         context["allocation_form"] = allocation_form
         return render(request, self.template_name, context)
+
+
+@login_required
+def create_credit_transaction(request: HttpRequest) -> HttpResponse:
+    """Create a new credit transaction.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the credit transaction form or redirects to project detail.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = CreditTransactionForm(request.POST)
+        if form.is_valid():
+            transaction = form.save()
+            return redirect("project-detail", pk=transaction.project.pk)
+    else:
+        form = CreditTransactionForm()
+    return render(
+        request,
+        "imperial_coldfront_plugin/credit_transaction_form.html",
+        context=dict(form=form),
+    )

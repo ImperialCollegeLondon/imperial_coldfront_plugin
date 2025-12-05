@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
+from .models import CreditTransaction
 from .utils import get_allocation_shortname
 
 if TYPE_CHECKING:
@@ -343,3 +344,25 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
             ].help_text = "<br/>Select allocations to add selected users to."
         else:
             self.fields["allocation"].widget = forms.HiddenInput()
+
+
+class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
+    """Form for creating a new credit transaction."""
+
+    class Meta:
+        """Meta class for the form."""
+
+        model = CreditTransaction
+        fields = ("project", "amount", "description")
+
+    project: forms.ModelChoiceField[Project] = forms.ModelChoiceField(
+        queryset=Project.objects.filter(status__name="Active"),
+        widget=_js_select_widget(),
+    )
+    amount = forms.IntegerField(
+        help_text="Credit amount (positive for credit, negative for debit)"
+    )
+    description = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Description of the transaction",
+    )

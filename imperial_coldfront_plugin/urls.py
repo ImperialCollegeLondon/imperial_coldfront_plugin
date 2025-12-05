@@ -13,6 +13,11 @@ urlpatterns = [
         name="add_rdf_storage_allocation",
     ),
     path(
+        "create_credit_transaction/",
+        views.create_credit_transaction,
+        name="create_credit_transaction",
+    ),
+    path(
         "load_departments/",
         views.load_departments,
         name="load_departments",
