@@ -20,4 +20,5 @@ urlpatterns = [
         "/allocation_detail/<int:allocation_pk>/", dummy_view, name="allocation-detail"
     ),
     path("<int:pk>/", dummy_view, name="project-detail"),
+    path("project/", dummy_view, name="project-list"),
 ]
