@@ -6,6 +6,8 @@ from coldfront.core.project.models import Project, ProjectUser
 from django import template
 from django.db.models.query import QuerySet
 
+from imperial_coldfront_plugin.utils import calculate_credit_balance
+
 if TYPE_CHECKING:
     from django.contrib.auth.models import User
 
@@ -37,7 +39,5 @@ def get_project_credit_balance(project: Project) -> int:
     Returns:
         The total credit balance (sum of all transaction amounts).
     """
-    from imperial_coldfront_plugin.utils import calculate_credit_balance
-
     balance = calculate_credit_balance(project)
     return balance if balance is not None else 0
