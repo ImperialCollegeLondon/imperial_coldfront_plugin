@@ -541,3 +541,22 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
         form = response.context["form"]
         assert not form.is_valid()
         assert "description" in form.errors
+
+
+class TestProjectDetailView:
+    """Tests for the project detail view."""
+
+    @pytest.fixture
+    def request_(self, rf, superuser):
+        """A request object with a user."""
+        request = rf.get("/")
+        request.superuser = superuser
+        return request
+
+    def test_page_render(self, request_):
+        """Test that the project detail view renders correctly for a user."""
+        response = render(
+            request_, "imperial_coldfront_plugin/overrides/project_detail.html"
+        )
+
+        assert response.status_code == 200
