@@ -25,6 +25,7 @@
   <hr>
 </div>
 
+{% if SHOW_CREDIT_BALANCE %}
 <!-- Start Credit Balance Display -->
 <div class="card mb-3 bg-light border-primary">
   <div class="card-body">
@@ -37,20 +38,15 @@
       <div class="col-md-4 text-right">
         {% get_project_credit_balance project as credit_balance %}
         <h2 class="mb-0">
-          {% if credit_balance >= 0 %}
-            <span class="badge badge-success badge-lg" style="font-size: 1.5rem; padding: 0.5rem 1rem;">
-              {{ credit_balance|intcomma }} credits
-            </span>
-          {% else %}
-            <span class="badge badge-danger badge-lg" style="font-size: 1.5rem; padding: 0.5rem 1rem;">
-              {{ credit_balance|intcomma }} credits
-            </span>
-          {% endif %}
+        <span class="badge badge-lg" style="font-size: 1.5rem; padding: 0.5rem 1rem;">
+            {{ credit_balance|intcomma }} credits
+        </span>
         </h2>
       </div>
     </div>
   </div>
 </div>
+{% endif %}
 <!-- End Credit Balance Display -->
 
 <!-- {% if project.status.name != 'Archived' and is_allowed_to_update_project %}
