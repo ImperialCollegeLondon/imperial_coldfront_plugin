@@ -38,9 +38,7 @@ def get_project_credit_balance(project: Project) -> int:
     Returns:
         The total credit balance (sum of all transaction amounts).
     """
-    from imperial_coldfront_plugin.models import CreditTransaction
+    from imperial_coldfront_plugin.utils import calculate_credit_balance
 
-    balance = CreditTransaction.objects.filter(project=project).aggregate(
-        total=Sum("amount")
-    )["total"]
+    balance = calculate_credit_balance(project)
     return balance if balance is not None else 0
