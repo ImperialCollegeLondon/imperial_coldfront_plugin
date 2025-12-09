@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from coldfront.core.project.models import Project, ProjectUser
 from django import template
-from django.db.models import Sum
 from django.db.models.query import QuerySet
 
 if TYPE_CHECKING:
