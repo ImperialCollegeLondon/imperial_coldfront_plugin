@@ -54,6 +54,7 @@ def pytest_configure():
                         "django.template.context_processors.request",
                         "django.contrib.auth.context_processors.auth",
                         "django.contrib.messages.context_processors.messages",
+                        "django_settings_export.settings_export",
                     ]
                 },
             }
@@ -74,6 +75,7 @@ def pytest_configure():
         EMAIL_SIGNATURE="",
         CENTER_NAME="",
         CENTER_BASE_URL="",
+        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE"],
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
@@ -91,6 +93,7 @@ def pytest_configure():
             GPFS_API_USERNAME="",
             GPFS_API_PASSWORD="",
             GID_RANGES=[range(1031386, 1031435)],
+            # SHOW_CREDIT_BALANCE=True,
         ),  # override settings loaded by env var for tests
     )
 
