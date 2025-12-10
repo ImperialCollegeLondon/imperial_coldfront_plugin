@@ -553,13 +553,21 @@ class TestProjectDetailView:
         request.superuser = superuser
         return request
 
-    def test_page_render(self, request_):
-        """Test that the project detail view renders correctly for a user."""
+    def test_zero_credits_render(self, request_, project, settings):
+        """Test that the project detail view renders and shows a 0 balance."""
+        settings.SHOW_CREDIT_BALANCE = True
+
         response = render(
-            request_, "imperial_coldfront_plugin/overrides/project_detail.html"
+            request_,
+            "imperial_coldfront_plugin/overrides/project_detail.html",
+            context={"project": project, "settings": settings},
         )
 
         assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
+        assert "Credit Balance" in content
+        assert "0 credits" in content
 
     def test_credit_balance_display_when_enabled(self, request_, project, settings):
         """Test that credit balance is displayed when SHOW_CREDIT_BALANCE is True."""
