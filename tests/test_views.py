@@ -541,3 +541,78 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
         form = response.context["form"]
         assert not form.is_valid()
         assert "description" in form.errors
+
+
+class TestProjectDetailView:
+    """Tests for the project detail view."""
+
+    @pytest.fixture
+    def request_(self, rf, superuser):
+        """A request object with a user."""
+        request = rf.get("/")
+        request.superuser = superuser
+        return request
+
+    def test_zero_credits_render(self, request_, project, settings):
+        """Test that the project detail view renders and shows a 0 balance."""
+        settings.SHOW_CREDIT_BALANCE = True
+
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/project_detail.html",
+            context={"project": project, "settings": settings},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
+        assert "Credit Balance" in content
+        assert "0 credits" in content
+
+    def test_credit_balance_display_when_enabled(self, request_, project, settings):
+        """Test that credit balance is displayed when SHOW_CREDIT_BALANCE is True."""
+        settings.SHOW_CREDIT_BALANCE = True
+
+        CreditTransaction.objects.create(
+            project=project, amount=100, description="Initial credit"
+        )
+        CreditTransaction.objects.create(
+            project=project, amount=50, description="Additional credit"
+        )
+        CreditTransaction.objects.create(
+            project=project, amount=-30, description="Debit"
+        )
+
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/project_detail.html",
+            context={"project": project, "settings": settings},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
+        assert "Credit Balance" in content
+        assert "120 credits" in content
+        assert "fa-coins" in content
+        assert "border-primary" in content
+
+    def test_credit_balance_hidden_when_disabled(self, request_, project, settings):
+        """Test that credit balance is not displayed when SHOW_CREDIT_BALANCE is False."""  # noqa: E501
+        settings.SHOW_CREDIT_BALANCE = False
+
+        CreditTransaction.objects.create(
+            project=project, amount=100, description="Credit"
+        )
+
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/project_detail.html",
+            context={"project": project, "settings": settings},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
+        assert "Credit Balance" not in content
+        assert "fa-coins" not in content
