@@ -93,7 +93,6 @@ def pytest_configure():
             GPFS_API_USERNAME="",
             GPFS_API_PASSWORD="",
             GID_RANGES=[range(1031386, 1031435)],
-            # SHOW_CREDIT_BALANCE=True,
         ),  # override settings loaded by env var for tests
     )
 
