@@ -118,6 +118,8 @@ ALLOCATION_SHORTNAME_MAX_LENGTH = 12
 ALLOCATION_DEFAULT_PERIOD_DAYS = 365
 """Days from current date for the initial form default end date for an allocation."""
 
+SHOW_CREDIT_BALANCE = ENV.bool("SHOW_CREDIT_BALANCE", default=False)
+"""Whether to display the credit balance section on project detail pages."""
 
 # Mappings for faculty and department names and shortnames for development purposes.
 # These should be overridden in prod via prod_settings.py.

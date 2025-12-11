@@ -26,6 +26,7 @@ def pytest_configure():
             "django.contrib.sites",
             "django.contrib.admin",
             "django.contrib.sessions",
+            "django.contrib.humanize",
             "mozilla_django_oidc",
             "coldfront.core.user",
             "coldfront.core.field_of_science",
@@ -35,6 +36,7 @@ def pytest_configure():
             "coldfront.core.grant",
             "coldfront.core.publication",
             "coldfront.core.research_output",
+            "coldfront.core.utils",
             "imperial_coldfront_plugin",
             "django_q",
             "crispy_forms",
@@ -52,6 +54,7 @@ def pytest_configure():
                         "django.template.context_processors.request",
                         "django.contrib.auth.context_processors.auth",
                         "django.contrib.messages.context_processors.messages",
+                        "django_settings_export.settings_export",
                     ]
                 },
             }
@@ -72,6 +75,7 @@ def pytest_configure():
         EMAIL_SIGNATURE="",
         CENTER_NAME="",
         CENTER_BASE_URL="",
+        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE"],
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)

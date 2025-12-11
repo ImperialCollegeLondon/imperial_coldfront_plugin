@@ -14,6 +14,7 @@ from django_q.models import Task
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import ProjectCreationForm, RDFAllocationForm
+from imperial_coldfront_plugin.models import CreditTransaction
 
 
 class LoginRequiredMixin:
@@ -445,3 +446,173 @@ class TestProjectCreation(LoginRequiredMixin):
             response.context["form"].errors["username"][0]
             == "Username not found locally or in College directory."
         )
+
+
+class TestCreateCreditTransaction(LoginRequiredMixin):
+    """Tests for the create_credit_transaction view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:create_credit_transaction")
+
+    def test_non_admin_forbidden(self, user, auth_client_factory):
+        """Test non-admin users cannot access the page."""
+        client = auth_client_factory(user)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_get(self, superuser_client):
+        """Check form rendering."""
+        from imperial_coldfront_plugin.forms import CreditTransactionForm
+
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], CreditTransactionForm)
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/credit_transaction_form.html"
+        )
+
+    def test_post_valid(self, superuser_client, project):
+        """Test successful credit transaction creation."""
+        amount = 100
+        description = "Test credit transaction"
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                amount=amount,
+                description=description,
+            ),
+        )
+
+        assertRedirects(
+            response,
+            reverse("project-detail", args=[project.pk]),
+            fetch_redirect_response=False,
+        )
+
+        transaction = CreditTransaction.objects.get()
+        assert transaction.project == project
+        assert transaction.amount == amount
+        assert transaction.description == description
+        assert transaction.timestamp is not None
+
+    def test_post_missing_project(self, superuser_client):
+        """Test form validation failure when project is missing."""
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                amount=100,
+                description="Test transaction",
+            ),
+        )
+
+        assert response.status_code == HTTPStatus.OK
+        form = response.context["form"]
+        assert not form.is_valid()
+        assert "project" in form.errors
+
+    def test_post_missing_amount(self, superuser_client, project):
+        """Test form validation failure when amount is missing."""
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                description="Test transaction",
+            ),
+        )
+
+        assert response.status_code == HTTPStatus.OK
+        form = response.context["form"]
+        assert not form.is_valid()
+        assert "amount" in form.errors
+
+    def test_post_missing_description(self, superuser_client, project):
+        """Test form validation failure when description is missing."""
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                amount=100,
+            ),
+        )
+
+        assert response.status_code == HTTPStatus.OK
+        form = response.context["form"]
+        assert not form.is_valid()
+        assert "description" in form.errors
+
+
+class TestProjectDetailView:
+    """Tests for the project detail view."""
+
+    @pytest.fixture
+    def request_(self, rf, superuser):
+        """A request object with a user."""
+        request = rf.get("/")
+        request.superuser = superuser
+        return request
+
+    def test_zero_credits_render(self, request_, project, settings):
+        """Test that the project detail view renders and shows a 0 balance."""
+        settings.SHOW_CREDIT_BALANCE = True
+
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/project_detail.html",
+            context={"project": project, "settings": settings},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
+        assert "Credit Balance" in content
+        assert "0 credits" in content
+
+    def test_credit_balance_display_when_enabled(self, request_, project, settings):
+        """Test that credit balance is displayed when SHOW_CREDIT_BALANCE is True."""
+        settings.SHOW_CREDIT_BALANCE = True
+
+        CreditTransaction.objects.create(
+            project=project, amount=100, description="Initial credit"
+        )
+        CreditTransaction.objects.create(
+            project=project, amount=50, description="Additional credit"
+        )
+        CreditTransaction.objects.create(
+            project=project, amount=-30, description="Debit"
+        )
+
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/project_detail.html",
+            context={"project": project, "settings": settings},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
+        assert "Credit Balance" in content
+        assert "120 credits" in content
+        assert "fa-coins" in content
+        assert "border-primary" in content
+
+    def test_credit_balance_hidden_when_disabled(self, request_, project, settings):
+        """Test that credit balance is not displayed when SHOW_CREDIT_BALANCE is False."""  # noqa: E501
+        settings.SHOW_CREDIT_BALANCE = False
+
+        CreditTransaction.objects.create(
+            project=project, amount=100, description="Credit"
+        )
+
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/project_detail.html",
+            context={"project": project, "settings": settings},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
+        assert "Credit Balance" not in content
+        assert "fa-coins" not in content

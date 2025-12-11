@@ -2,6 +2,8 @@
 {% load humanize %}
 {% load static %}
 {% load shortname %}
+{% load projects %}
+{% load common_tags %}
 
 {% if is_allowed_to_update_project and project.needs_review%}
   <div class="alert alert-warning">
@@ -22,6 +24,30 @@
   <h2 class="text-justify">{{ project.title }}</h2>
   <hr>
 </div>
+
+{% if settings.SHOW_CREDIT_BALANCE %}
+<!-- Start Credit Balance Display -->
+<div class="card mb-3 bg-light border-primary">
+  <div class="card-body">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h3 class="card-title mb-0">
+          <i class="fas fa-coins" aria-hidden="true"></i> Credit Balance
+        </h3>
+      </div>
+      <div class="col-md-4 text-right">
+        {% get_project_credit_balance project as credit_balance %}
+        <h2 class="mb-0">
+        <span class="badge badge-lg" style="font-size: 1.5rem; padding: 0.5rem 1rem;">
+            {{ credit_balance|intcomma }} credits
+        </span>
+        </h2>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- End Credit Balance Display -->
+{% endif %}
 
 <!-- {% if project.status.name != 'Archived' and is_allowed_to_update_project %}
   <div class="card mb-3 bg-light">
