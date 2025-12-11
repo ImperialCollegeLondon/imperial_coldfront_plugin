@@ -393,7 +393,9 @@ def create_credit_transaction(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def project_credit_transactions(request: HttpRequest, pk: int) -> HttpResponse:
+def project_credit_transactions(
+    request: "AuthenticatedHttpRequest", pk: int
+) -> HttpResponse:
     """Display all credit transactions for a project with running balance."""
     project = get_object_or_404(Project, pk=pk)
     check_project_pi_or_superuser(project, request.user)
@@ -403,7 +405,7 @@ def project_credit_transactions(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
     running = 0
-    rows: list[dict] = []
+    rows: list[dict[str, int | CreditTransaction]] = []
     for tx in tx_qs:
         running += tx.amount
         rows.append({"tx": tx, "running_balance": running})
