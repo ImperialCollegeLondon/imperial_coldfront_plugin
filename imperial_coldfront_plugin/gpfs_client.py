@@ -4,11 +4,11 @@ import logging
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, get, json, post, put, response_handler, retry
+from uplink import Body, Consumer, Query, get, json, post, put, response_handler, retry
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -146,43 +146,50 @@ class GPFSClient(Consumer):
     ) -> requests.Response:
         """Query the status of a job."""
 
-    def _paginate(  # type: ignore[misc]
+    def _paginate(
         self,
         request_callable: Callable[..., requests.Response],
+        *,
         item_key: str,
-        start: int = 0,
-        limit: int = 1000,
-        **kwargs: str,
-    ) -> list[dict[str, Any]]:
-        """Helper method to paginate through GPFS API results.
+        initial_kwargs: dict[str, object],
+    ) -> list[dict[str, object]]:
+        """Helper method to paginate through GPFS paging lastId.
 
         Args:
-            request_callable: Bound method that accepts 'start' and 'limit'.
+            request_callable: Bound method of GPFSClient that makes API call.
             item_key: Key in response JSON where the list of items is found.
-            start: Starting index for pagination.
-            limit: Maximum number of items to retrieve per request.
-            **kwargs: Additional arguments to pass to the request callable.
+            initial_kwargs: Initial kwargs to pass to the request callable.
 
         Returns:
             A list of all items retrieved across all pages.
         """
-        all_items: list[dict[str, Any]] = []  # type: ignore[misc]
+        all_items: list[dict[str, object]] = []
+        last_id: int | None = None
 
         while True:
-            response = request_callable(start=start, limit=limit, **kwargs)
+            kwargs: dict[str, object] = dict(initial_kwargs)
+            if last_id is not None:
+                kwargs["lastId"] = last_id
+
+            response = request_callable(**kwargs)
             response.raise_for_status()
-            data = response.json()
-            items: list[dict[str, Any]] = data.get(item_key, [])  # type: ignore[misc]
+            payload: dict[str, object] = response.json()
 
-            if not items:
+            items = payload.get(item_key, [])
+            if isinstance(items, list):
+                all_items.extend(items)
+            else:
                 break
 
-            all_items.extend(items)
-
-            if len(items) < limit:
+            paging = payload.get("paging")
+            if not isinstance(paging, dict):
                 break
 
-            start += limit
+            next_last_id = paging.get("lastId")
+            if not isinstance(next_last_id, int):
+                break
+
+            last_id = next_last_id
 
         return all_items
 
@@ -411,10 +418,13 @@ class GPFSClient(Consumer):
         return retrieved_data
 
     @json
-    @get("filesystems/{filesystemName}/quotas?filter=quotaType=FILESET")
-    def _retrieve_all_fileset_quotas(  # type: ignore[empty-body]
+    @get("filesystems/{filesystemName}/quotas")
+    def _retrieve_all_fileset_quotas(
         self,
         filesystemName: str,
+        filter: Query = "quotaType=FILESET",  # str
+        lastId: Query = None,  # int
+        fields: Query = None,  # str
     ) -> requests.Response:
         """Method (private) to retrieve the quotas of a filesystem."""
 
@@ -432,13 +442,13 @@ class GPFSClient(Consumer):
         quotas = self._paginate(
             self._retrieve_all_fileset_quotas,
             item_key="quotas",
-            filesystemName=filesystem_name,
+            initial_kwargs={"filesystemName": filesystem_name},
         )
 
         return {
-            quota["objectName"]: {
-                "files_usage": quota["filesUsage"],
-                "block_usage_tb": quota["blockUsage"] / 1024**3,
+            str(quota["objectName"]): {
+                "files_usage": float(quota["filesUsage"]),
+                "block_usage_tb": float(quota["blockUsage"]) / 1024**3,
             }
             for quota in quotas
         }
