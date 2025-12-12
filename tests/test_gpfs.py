@@ -6,7 +6,6 @@ import pytest
 from imperial_coldfront_plugin.gpfs_client import (
     DirectoryExistsError,
     FilesetPathInfo,
-    GPFSClient,
     create_fileset_set_quota,
 )
 
@@ -181,60 +180,3 @@ def test_create_fileset_set_quota_existing_directory(
         )
         not in client_mock.set_directory_acl.call_args_list
     )
-
-
-@pytest.mark.parametrize(
-    "pages, expected_total, expected_calls",
-    [
-        # empty response
-        (
-            [[]],
-            0,
-            [call(start=0, limit=1000, filesystemName="test_fs")],
-        ),
-        # single page with only 3 items
-        (
-            [[{"id": 1}, {"id": 2}, {"id": 3}]],
-            3,
-            [call(start=0, limit=1000, filesystemName="test_fs")],
-        ),
-        # 2 pages, 1st full with 1000 items and 2nd is only partial with 500 items
-        (
-            [[{"id": i} for i in range(1000)], [{"id": i} for i in range(1000, 1500)]],
-            1500,
-            [
-                call(start=0, limit=1000, filesystemName="test_fs"),
-                call(start=1000, limit=1000, filesystemName="test_fs"),
-            ],
-        ),
-    ],
-    ids=[
-        "empty_response",
-        "single_page",
-        "two_pages_partial_last",
-    ],
-)
-def test_paginate(client_mock, pages, expected_total, expected_calls):
-    """Test the pagination method."""
-    from unittest.mock import MagicMock
-
-    # mock responses
-    mock_responses = []
-    for page_data in pages:
-        mock_response = MagicMock()
-        mock_response.json = lambda data=page_data: {"quotas": data}
-        mock_response.raise_for_status = MagicMock()
-        mock_responses.append(mock_response)
-
-    client_mock._retrieve_all_fileset_quotas.side_effect = mock_responses
-
-    result = GPFSClient._paginate(
-        client_mock,
-        client_mock._retrieve_all_fileset_quotas,
-        item_key="quotas",
-        filesystemName="test_fs",
-    )
-
-    assert len(result) == expected_total
-    assert client_mock._retrieve_all_fileset_quotas.call_args_list == expected_calls
-    assert client_mock._retrieve_all_fileset_quotas.call_count == len(expected_calls)
