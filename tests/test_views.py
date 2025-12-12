@@ -618,8 +618,21 @@ class TestProjectDetailView:
         assert "fa-coins" not in content
 
 
-class TestProjectCreditTransactionsView:
+class TestProjectCreditTransactionsView(LoginRequiredMixin):
     """Tests for the project credit transactions view."""
+
+    def _get_url(self, pk: int | None = None) -> str:
+        """Return the URL for the project credit transactions view.
+
+        If `pk` is None, a dummy pk of 1 is used so the login-required test
+        can call `_get_url()` without needing a fixture.
+        """
+        if pk is None:
+            pk = 1
+        return reverse(
+            "imperial_coldfront_plugin:project-credit-transactions",
+            kwargs={"pk": pk},
+        )
 
     def test_permission_denied_non_member(
         self, user_factory, auth_client_factory, project
@@ -628,34 +641,26 @@ class TestProjectCreditTransactionsView:
         non_member = user_factory()
         client = auth_client_factory(non_member)
 
-        url = reverse(
-            "imperial_coldfront_plugin:project-credit-transactions",
-            kwargs={"pk": project.pk},
-        )
+        url = self._get_url(project.pk)
         response = client.get(url)
         assert response.status_code == 403
 
     def test_pi_can_access(self, client, project):
         """Test that PI can access the transactions page."""
         client.force_login(project.pi)
-        url = reverse(
-            "imperial_coldfront_plugin:project-credit-transactions",
-            kwargs={"pk": project.pk},
-        )
+        url = self._get_url(project.pk)
         response = client.get(url)
         assert response.status_code == 200
 
     def test_superuser_can_access(self, superuser_client, project):
         """Test that superuser can access the transactions page."""
-        url = reverse(
-            "imperial_coldfront_plugin:project-credit-transactions",
-            kwargs={"pk": project.pk},
-        )
+        url = self._get_url(project.pk)
         response = superuser_client.get(url)
         assert response.status_code == 200
 
     def test_transactions_dispalyed_with_total(self, superuser_client, project):
         """Test that transactions are sorted and running balance is calculated."""
+        settings.SHOW_CREDIT_BALANCE = True
         t1 = CreditTransaction.objects.create(
             project=project, amount=100, description="First"
         )
@@ -677,10 +682,7 @@ class TestProjectCreditTransactionsView:
             timestamp=now - timedelta(days=1)
         )
 
-        url = reverse(
-            "imperial_coldfront_plugin:project-credit-transactions",
-            kwargs={"pk": project.pk},
-        )
+        url = self._get_url(project.pk)
         response = superuser_client.get(url)
         assert response.status_code == 200
 
@@ -704,10 +706,7 @@ class TestProjectCreditTransactionsView:
             project=project, amount=-50, description="Debit"
         )
 
-        url = reverse(
-            "imperial_coldfront_plugin:project-credit-transactions",
-            kwargs={"pk": project.pk},
-        )
+        url = self._get_url(project.pk)
         response = superuser_client.get(url)
         content = response.content.decode()
 
@@ -716,13 +715,10 @@ class TestProjectCreditTransactionsView:
 
     def test_back_link_to_project(self, superuser_client, project):
         """Test that back link to project detail exists."""
-        url = reverse(
-            "imperial_coldfront_plugin:project-credit-transactions",
-            kwargs={"pk": project.pk},
-        )
+        url = self._get_url(project.pk)
         response = superuser_client.get(url)
         content = response.content.decode()
 
         project_url = reverse("project-detail", kwargs={"pk": project.pk})
         assert f'href="{project_url}"' in content
-        assert "Back to Project" in content
+        assert "Back to Group" in content
