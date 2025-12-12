@@ -38,4 +38,9 @@ urlpatterns = [
         views.ProjectAddUsersSearchResultsShortnameView.as_view(),
         name="project-add-users-search-results",
     ),
+    path(
+        "projects/<int:pk>/credits/",
+        views.project_credit_transactions,
+        name="project-credit-transactions",
+    ),
 ]

@@ -34,6 +34,7 @@ from .forms import (
     get_department_choices,
 )
 from .microsoft_graph_client import get_graph_api_client
+from .models import CreditTransaction
 from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
 from .tasks import create_rdf_allocation
 
@@ -388,4 +389,33 @@ def create_credit_transaction(request: HttpRequest) -> HttpResponse:
         request,
         "imperial_coldfront_plugin/credit_transaction_form.html",
         context=dict(form=form),
+    )
+
+
+@login_required
+def project_credit_transactions(
+    request: "AuthenticatedHttpRequest", pk: int
+) -> HttpResponse:
+    """Display all credit transactions for a project with running balance."""
+    project = get_object_or_404(Project, pk=pk)
+    check_project_pi_or_superuser(project, request.user)
+
+    transactions = CreditTransaction.objects.filter(project=project).order_by(
+        "timestamp", "id"
+    )
+
+    running = 0
+    rows: list[dict[str, int | CreditTransaction]] = []
+    for transaction in transactions:
+        running += transaction.amount
+        rows.append({"transaction": transaction, "running_balance": running})
+
+    return render(
+        request,
+        "imperial_coldfront_plugin/project_credit_transactions.html",
+        context={
+            "project": project,
+            "rows": rows,
+            "total_balance": running,
+        },
     )
