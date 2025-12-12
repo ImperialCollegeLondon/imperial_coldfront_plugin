@@ -400,15 +400,15 @@ def project_credit_transactions(
     project = get_object_or_404(Project, pk=pk)
     check_project_pi_or_superuser(project, request.user)
 
-    tx_qs = CreditTransaction.objects.filter(project=project).order_by(
+    transactions = CreditTransaction.objects.filter(project=project).order_by(
         "timestamp", "id"
     )
 
     running = 0
     rows: list[dict[str, int | CreditTransaction]] = []
-    for tx in tx_qs:
-        running += tx.amount
-        rows.append({"tx": tx, "running_balance": running})
+    for transaction in transactions:
+        running += transaction.amount
+        rows.append({"transaction": transaction, "running_balance": running})
 
     return render(
         request,
