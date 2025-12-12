@@ -25,11 +25,11 @@
             <tbody>
               {% for row in rows %}
                 <tr>
-                  <td>{{ row.tx.timestamp|date:"Y-m-d H:i" }}</td>
-                  <td>{{ row.tx.description }}</td>
+                  <td>{{ row.transaction.timestamp|date:"Y-m-d H:i" }}</td>
+                  <td>{{ row.transaction.description }}</td>
                   <td class="text-right">
-                    <span class="{% if row.tx.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
-                      {{ row.tx.amount|intcomma }}
+                    <span class="{% if row.transaction.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
+                      {{ row.transaction.amount|intcomma }}
                     </span>
                   </td>
                   <td class="text-right font-weight-bold">{{ row.running_balance|intcomma }}</td>
