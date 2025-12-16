@@ -42,6 +42,12 @@
             {{ credit_balance|intcomma }} credits
         </span>
         </h2>
+        <a
+          class="btn btn-sm btn-outline-primary mt-2"
+          href="{% url 'imperial_coldfront_plugin:project-credit-transactions' project.pk %}"
+        >
+          View transactions
+        </a>
       </div>
     </div>
   </div>
