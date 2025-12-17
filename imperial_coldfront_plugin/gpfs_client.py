@@ -203,7 +203,7 @@ class GPFSClient(Consumer):
         """Method (public) to return information on filesystems available.
 
         Returns:
-            The response from the GPFS API.
+            A list of filesystems.
         """
         return self._paginate(self._filesystems, item_key="filesystems")
 
