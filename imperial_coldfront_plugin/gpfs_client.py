@@ -381,6 +381,7 @@ class GPFSClient(Consumer):
         self,
         filesystemName: str,
         filesetName: str,
+        lastId: Query = None,
     ) -> requests.Response:
         """Method (private) to retrieve the quota usage of a fileset."""
         pass
@@ -399,25 +400,28 @@ class GPFSClient(Consumer):
         Returns:
             The block and files usage values.
         """
-        response = self._retrieve_quota_usage(
-            filesystemName=filesystem_name, filesetName=fileset_name
+        quotas = self._paginate(
+            self._retrieve_quota_usage,
+            item_key="quotas",
+            filesystemName=filesystem_name,
+            filesetName=fileset_name,
         )
-        data = response.json()
 
-        block_usage = data["quotas"][0][
-            "blockUsage"
-        ]  # denotes the "Usage": Current capacity quota usage.
+        if not quotas:
+            return {"block_usage_tb": 0.0, "files_usage": 0.0}
 
-        files_usage = data["quotas"][0][
-            "filesUsage"
-        ]  # denotes the "Number of files in usage": Number of inodes.
+        quota = quotas[0]
+        block_usage = quota.get(
+            "blockUsage", 0
+        )  # denotes the "Usage": Current capacity quota usage.
+        files_usage = quota.get(
+            "filesUsage", 0
+        )  # denotes the "Number of files in usage": Number of inodes.
 
-        retrieved_data = {
+        return {
             "block_usage_tb": block_usage / 1024**3,
             "files_usage": files_usage,
         }
-
-        return retrieved_data
 
     @json
     @get("filesystems/{filesystemName}/quotas?filter=quotaType=FILESET")
