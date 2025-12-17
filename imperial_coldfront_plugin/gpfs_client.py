@@ -8,7 +8,17 @@ from typing import TypedDict
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, Query, get, json, post, put, response_handler, retry
+from uplink import (
+    Body,
+    Consumer,
+    Query,
+    get,
+    json,
+    post,
+    put,
+    response_handler,
+    retry,
+)
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -146,53 +156,6 @@ class GPFSClient(Consumer):
     ) -> requests.Response:
         """Query the status of a job."""
 
-    def _paginate(
-        self,
-        request_callable: Callable[..., requests.Response],
-        *,
-        item_key: str,
-        initial_kwargs: dict[str, object],
-    ) -> list[dict[str, object]]:
-        """Helper method to paginate through GPFS paging lastId.
-
-        Args:
-            request_callable: Bound method of GPFSClient that makes API call.
-            item_key: Key in response JSON where the list of items is found.
-            initial_kwargs: Initial kwargs to pass to the request callable.
-
-        Returns:
-            A list of all items retrieved across all pages.
-        """
-        all_items: list[dict[str, object]] = []
-        last_id: int | None = None
-
-        while True:
-            kwargs: dict[str, object] = dict(initial_kwargs)
-            if last_id is not None:
-                kwargs["lastId"] = last_id
-
-            response = request_callable(**kwargs)
-            response.raise_for_status()
-            payload: dict[str, object] = response.json()
-
-            items = payload.get(item_key, [])
-            if isinstance(items, list):
-                all_items.extend(items)
-            else:
-                break
-
-            paging = payload.get("paging")
-            if not isinstance(paging, dict):
-                break
-
-            next_last_id = paging.get("lastId")
-            if not isinstance(next_last_id, int):
-                break
-
-            last_id = next_last_id
-
-        return all_items
-
     @get("filesystems")
     def filesystems(self) -> requests.Response:  # type: ignore[empty-body]
         """Return the information on the filesystems available.
@@ -200,6 +163,45 @@ class GPFSClient(Consumer):
         Returns:
             The response from the GPFS API.
         """
+
+    def _paginate(
+        self,
+        request_callable: Callable[..., requests.Response],
+        item_key: str,
+        last_id: str = "lastId",
+        **kwargs,
+    ) -> list[dict]:
+        """Paginate helper for API endpoints that return a 'paging' section.
+
+        Args:
+            request_callable: Bound method of GPFSClient that makes API call.
+            item_key: Key in response JSON where the list of items is found.
+            last_id: Name of the query parameter used to pass the last id.
+            **kwargs: Other kwargs to pass to the request callable.
+
+        Returns:
+            Aggregated list of items from all pages.
+        """
+        results: list[dict] = []
+        last_id_value: int | None = None
+
+        while True:
+            call_kwargs = dict(kwargs)
+            if last_id_value is not None:
+                call_kwargs[last_id] = last_id_value
+
+            response = request_callable(**call_kwargs)
+            response.raise_for_status()
+            data = response.json()
+
+            results.extend(data.get(item_key, []))
+
+            paging = data.get("paging")
+            if not paging or "lastId" not in paging:
+                break
+            last_id_value = paging.get("lastId")
+
+        return results
 
     @check_job_status
     @json
@@ -418,13 +420,11 @@ class GPFSClient(Consumer):
         return retrieved_data
 
     @json
-    @get("filesystems/{filesystemName}/quotas")
-    def _retrieve_all_fileset_quotas(
+    @get("filesystems/{filesystemName}/quotas?filter=quotaType=FILESET")
+    def _retrieve_all_fileset_quotas(  # type: ignore[empty-body]
         self,
         filesystemName: str,
-        filter: Query = "quotaType=FILESET",  # str
-        lastId: Query = None,  # int
-        fields: Query = None,  # str
+        lastId: Query = None,
     ) -> requests.Response:
         """Method (private) to retrieve the quotas of a filesystem."""
 
@@ -442,13 +442,12 @@ class GPFSClient(Consumer):
         quotas = self._paginate(
             self._retrieve_all_fileset_quotas,
             item_key="quotas",
-            initial_kwargs={"filesystemName": filesystem_name},
+            filesystemName=filesystem_name,
         )
-
         return {
-            str(quota["objectName"]): {
-                "files_usage": float(quota["filesUsage"]),
-                "block_usage_tb": float(quota["blockUsage"]) / 1024**3,
+            quota["objectName"]: {
+                "files_usage": quota["filesUsage"],
+                "block_usage_tb": quota["blockUsage"] / 1024**3,
             }
             for quota in quotas
         }
