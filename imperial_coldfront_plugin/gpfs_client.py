@@ -196,10 +196,10 @@ class GPFSClient(Consumer):
         return results
 
     @get("filesystems")
-    def _filesystems(self) -> requests.Response:  # type: ignore[empty-body]
+    def _filesystems(self, lastId: Query = None) -> requests.Response:  # type: ignore[empty-body]
         """Method (private) to return information on filesystems available."""
 
-    def filesystems(self) -> requests.Response:
+    def filesystems(self) -> list[dict]:
         """Method (public) to return information on filesystems available.
 
         Returns:
