@@ -156,14 +156,6 @@ class GPFSClient(Consumer):
     ) -> requests.Response:
         """Query the status of a job."""
 
-    @get("filesystems")
-    def filesystems(self) -> requests.Response:  # type: ignore[empty-body]
-        """Return the information on the filesystems available.
-
-        Returns:
-            The response from the GPFS API.
-        """
-
     def _paginate(
         self,
         request_callable: Callable[..., requests.Response],
@@ -202,6 +194,18 @@ class GPFSClient(Consumer):
             last_id_value = paging.get("lastId")
 
         return results
+
+    @get("filesystems")
+    def _filesystems(self) -> requests.Response:  # type: ignore[empty-body]
+        """Method (private) to return information on filesystems available."""
+
+    def filesystems(self) -> requests.Response:
+        """Method (public) to return information on filesystems available.
+
+        Returns:
+            The response from the GPFS API.
+        """
+        return self._paginate(self._filesystems, item_key="filesystems")
 
     @check_job_status
     @json
