@@ -547,10 +547,10 @@ class TestProjectDetailView:
     """Tests for the project detail view."""
 
     @pytest.fixture
-    def request_(self, rf, superuser):
+    def request_(self, rf, user):
         """A request object with a user."""
         request = rf.get("/")
-        request.superuser = superuser
+        request.user = user
         return request
 
     def test_zero_credits_render(self, request_, project, settings):
