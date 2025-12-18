@@ -617,6 +617,42 @@ class TestProjectDetailView:
         assert "Credit Balance" not in content
         assert "fa-coins" not in content
 
+    def test_credit_balance_only_visible_to_pi_and_superuser(
+        self, rf, project, settings, user_factory, user
+    ):
+        """Ensure credit balance section is only rendered for the PI and superusers."""
+        settings.SHOW_CREDIT_BALANCE = True
+        tmpl = "imperial_coldfront_plugin/overrides/project_detail.html"
+
+        # non-member should not see the section
+        request = rf.get("/")
+        request.user = user_factory()
+        response = render(
+            request, tmpl, context={"project": project, "settings": settings}
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "Credit Balance" not in content
+        assert "View transactions" not in content
+
+        # project PI should see the section
+        request.user = project.pi
+        response = render(
+            request, tmpl, context={"project": project, "settings": settings}
+        )
+        content = response.content.decode("utf-8")
+        assert "Credit Balance" in content
+        assert "View transactions" in content
+
+        # superuser should see the section
+        request.user = user
+        response = render(
+            request, tmpl, context={"project": project, "settings": settings}
+        )
+        content = response.content.decode("utf-8")
+        assert "Credit Balance" in content
+        assert "View transactions" in content
+
 
 class TestProjectCreditTransactionsView(LoginRequiredMixin):
     """Tests for the project credit transactions view."""
