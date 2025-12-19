@@ -252,3 +252,23 @@ def test_pagination_retrieve_all_fileset_quotas(settings, mock_requests):
         headers={"Authorization": "Basic Og=="},
         json={},
     )
+
+
+def test_pagination_retrieve_quota_usage(settings, mock_requests):
+    """Test that retrieve_quota_usage method paginates correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._retrieve_quota_usage(
+        filesystemName="gpfs0", filesetName="myfileset", lastId=30
+    )
+
+    mock_requests.assert_called_once_with(
+        method="GET",
+        url="http://example.com/api/filesystems/gpfs0/filesets/myfileset/quotas",
+        params={"lastId": "30"},
+        headers={"Authorization": "Basic Og=="},
+        json={},
+    )
