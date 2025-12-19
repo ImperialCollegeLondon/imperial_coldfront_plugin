@@ -78,6 +78,13 @@ def client_mock(mocker):
     return mock()
 
 
+@pytest.fixture
+def mock_requests(mocker):
+    """Mock the requests module."""
+    mock = mocker.patch("requests.Session.request")
+    return mock
+
+
 def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
     """Test creating a fileset, setting ACLs and quotas."""
     create_fileset_set_quota(
@@ -182,7 +189,7 @@ def test_create_fileset_set_quota_existing_directory(
     )
 
 
-def make_response(data: dict) -> Mock:
+def make_response(data: dict[str, object]) -> Mock:
     """Helper to make a mock response with .json() method."""
     response_mock = Mock()
     response_mock.json = Mock(return_value=data)
@@ -210,3 +217,20 @@ def test_paginate():
     assert api_mock.call_count == 2
     _, second_kwargs = api_mock.call_args_list[1]
     assert "lastId" in second_kwargs and second_kwargs["lastId"] == 100
+
+
+def test_pagination_filesystems(settings, mock_requests):
+    """Test that filesystems method paginates correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._filesystems(lastId=10)
+
+    mock_requests.assert_called_once_with(
+        method="GET",
+        url="http://example.com/api/filesystems",
+        params={"lastId": "10"},
+        headers={"Authorization": "Basic Og=="},
+    )

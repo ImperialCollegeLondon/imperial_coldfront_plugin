@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import requests
 from django.conf import settings
@@ -156,13 +156,13 @@ class GPFSClient(Consumer):
     ) -> requests.Response:
         """Query the status of a job."""
 
-    def _paginate(
+    def _paginate(  # type: ignore[misc]
         self,
         request_callable: Callable[..., requests.Response],
         item_key: str,
         last_id: str = "lastId",
-        **kwargs,
-    ) -> list[dict]:
+        **kwargs: object,
+    ) -> list[dict[str, Any]]:
         """Paginate helper for API endpoints that return a 'paging' section.
 
         Args:
@@ -174,7 +174,7 @@ class GPFSClient(Consumer):
         Returns:
             Aggregated list of items from all pages.
         """
-        results: list[dict] = []
+        results: list[dict[str, Any]] = []  # type: ignore[misc]
         last_id_value: int | None = None
 
         while True:
@@ -199,7 +199,7 @@ class GPFSClient(Consumer):
     def _filesystems(self, lastId: Query = None) -> requests.Response:  # type: ignore[empty-body]
         """Method (private) to return information on filesystems available."""
 
-    def filesystems(self) -> list[dict]:
+    def filesystems(self) -> list[dict[str, object]]:
         """Method (public) to return information on filesystems available.
 
         Returns:
