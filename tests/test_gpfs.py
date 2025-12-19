@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import call
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -74,7 +74,9 @@ def test_fileset_path_info(fileset_path_info):
 @pytest.fixture
 def client_mock(mocker):
     """Mock the GPFS client."""
-    mock = mocker.patch("imperial_coldfront_plugin.gpfs_client.GPFSClient")
+    mock = mocker.create_autospec(
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient", instance=True
+    )
     return mock()
 
 
@@ -180,3 +182,31 @@ def test_create_fileset_set_quota_existing_directory(
         )
         not in client_mock.set_directory_acl.call_args_list
     )
+
+
+def make_response(data: dict) -> Mock:
+    """Helper to make a mock response with .json() method."""
+    response_mock = Mock()
+    response_mock.json = Mock(return_value=data)
+    response_mock.raise_for_status = Mock()
+    return response_mock
+
+
+def test_paginate(client_mock):
+    """Test the _paginate method handles multiple pages."""
+    first_page = {"paging": {"lastId": 100}, "quotas": [{"id": 1}]}
+    second_page = {"quotas": [{"id": 2}]}
+
+    api_mock = Mock(
+        side_effect=[
+            make_response(first_page),
+            make_response(second_page),
+        ]
+    )
+
+    items = client_mock._paginate(api_mock, item_key="quotas", filesystemName="gpfs")
+
+    assert items == [{"id": 1}, {"id": 2}]
+    assert api_mock.call_count == 2
+    _, second_kwargs = api_mock.call_args_list[1]
+    assert "lastId" in second_kwargs and second_kwargs["lastId"] == 100
