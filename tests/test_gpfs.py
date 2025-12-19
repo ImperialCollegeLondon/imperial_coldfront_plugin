@@ -74,9 +74,7 @@ def test_fileset_path_info(fileset_path_info):
 @pytest.fixture
 def client_mock(mocker):
     """Mock the GPFS client."""
-    mock = mocker.create_autospec(
-        "imperial_coldfront_plugin.gpfs_client.GPFSClient", instance=True
-    )
+    mock = mocker.patch("imperial_coldfront_plugin.gpfs_client.GPFSClient")
     return mock()
 
 
@@ -192,8 +190,10 @@ def make_response(data: dict) -> Mock:
     return response_mock
 
 
-def test_paginate(client_mock):
+def test_paginate():
     """Test the _paginate method handles multiple pages."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
     first_page = {"paging": {"lastId": 100}, "quotas": [{"id": 1}]}
     second_page = {"quotas": [{"id": 2}]}
 
@@ -204,7 +204,7 @@ def test_paginate(client_mock):
         ]
     )
 
-    items = client_mock._paginate(api_mock, item_key="quotas", filesystemName="gpfs")
+    items = GPFSClient()._paginate(api_mock, item_key="quotas", filesystemName="gpfs")
 
     assert items == [{"id": 1}, {"id": 2}]
     assert api_mock.call_count == 2
