@@ -1,14 +1,24 @@
 """Interface for interacting with the GPFS API."""
 
 import logging
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import requests
 from django.conf import settings
-from uplink import Body, Consumer, get, json, post, put, response_handler, retry
+from uplink import (
+    Body,
+    Consumer,
+    Query,
+    get,
+    json,
+    post,
+    put,
+    response_handler,
+    retry,
+)
 from uplink.auth import BasicAuth
 from uplink.retry.backoff import exponential
 from uplink.retry.stop import after_delay
@@ -146,13 +156,56 @@ class GPFSClient(Consumer):
     ) -> requests.Response:
         """Query the status of a job."""
 
-    @get("filesystems")
-    def filesystems(self) -> requests.Response:  # type: ignore[empty-body]
-        """Return the information on the filesystems available.
+    def _paginate(  # type: ignore[misc]
+        self,
+        request_callable: Callable[..., requests.Response],
+        item_key: str,
+        last_id: str = "lastId",
+        **kwargs: object,
+    ) -> list[dict[str, Any]]:
+        """Paginate helper for API endpoints that return a 'paging' section.
+
+        Args:
+            request_callable: Bound method of GPFSClient that makes API call.
+            item_key: Key in response JSON where the list of items is found.
+            last_id: Name of the query parameter used to pass the last id.
+            **kwargs: Other kwargs to pass to the request callable.
 
         Returns:
-            The response from the GPFS API.
+            Aggregated list of items from all pages.
         """
+        results: list[dict[str, Any]] = []  # type: ignore[misc]
+        last_id_value: int | None = None
+
+        while True:
+            call_kwargs = dict(kwargs)
+            if last_id_value is not None:
+                call_kwargs[last_id] = last_id_value
+
+            response = request_callable(**call_kwargs)
+            response.raise_for_status()
+            data = response.json()
+
+            results.extend(data.get(item_key, []))
+
+            paging = data.get("paging")
+            if not paging or "lastId" not in paging:
+                break
+            last_id_value = paging.get("lastId")
+
+        return results
+
+    @get("filesystems")
+    def _filesystems(self, lastId: Query = None) -> requests.Response:  # type: ignore[empty-body]
+        """Method (private) to return information on filesystems available."""
+
+    def filesystems(self) -> list[dict[str, object]]:
+        """Method (public) to return information on filesystems available.
+
+        Returns:
+            A list of filesystems.
+        """
+        return self._paginate(self._filesystems, item_key="filesystems")
 
     @check_job_status
     @json
@@ -332,6 +385,7 @@ class GPFSClient(Consumer):
         self,
         filesystemName: str,
         filesetName: str,
+        lastId: Query = None,
     ) -> requests.Response:
         """Method (private) to retrieve the quota usage of a fileset."""
         pass
@@ -350,31 +404,35 @@ class GPFSClient(Consumer):
         Returns:
             The block and files usage values.
         """
-        response = self._retrieve_quota_usage(
-            filesystemName=filesystem_name, filesetName=fileset_name
+        quotas = self._paginate(
+            self._retrieve_quota_usage,
+            item_key="quotas",
+            filesystemName=filesystem_name,
+            filesetName=fileset_name,
         )
-        data = response.json()
 
-        block_usage = data["quotas"][0][
-            "blockUsage"
-        ]  # denotes the "Usage": Current capacity quota usage.
+        if not quotas:
+            return {"block_usage_tb": 0.0, "files_usage": 0.0}
 
-        files_usage = data["quotas"][0][
-            "filesUsage"
-        ]  # denotes the "Number of files in usage": Number of inodes.
+        quota = quotas[0]
+        block_usage = quota.get(
+            "blockUsage", 0
+        )  # denotes the "Usage": Current capacity quota usage.
+        files_usage = quota.get(
+            "filesUsage", 0
+        )  # denotes the "Number of files in usage": Number of inodes.
 
-        retrieved_data = {
+        return {
             "block_usage_tb": block_usage / 1024**3,
             "files_usage": files_usage,
         }
-
-        return retrieved_data
 
     @json
     @get("filesystems/{filesystemName}/quotas?filter=quotaType=FILESET")
     def _retrieve_all_fileset_quotas(  # type: ignore[empty-body]
         self,
         filesystemName: str,
+        lastId: Query = None,
     ) -> requests.Response:
         """Method (private) to retrieve the quotas of a filesystem."""
 
@@ -389,13 +447,17 @@ class GPFSClient(Consumer):
         Returns:
             Mapping of fileset names to their file and block usage statistics.
         """
-        data = self._retrieve_all_fileset_quotas(filesystem_name).json()
+        quotas = self._paginate(
+            self._retrieve_all_fileset_quotas,
+            item_key="quotas",
+            filesystemName=filesystem_name,
+        )
         return {
             quota["objectName"]: {
                 "files_usage": quota["filesUsage"],
                 "block_usage_tb": quota["blockUsage"] / 1024**3,
             }
-            for quota in data["quotas"]
+            for quota in quotas
         }
 
     @json
