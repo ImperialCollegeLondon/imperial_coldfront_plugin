@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import call
+from unittest.mock import Mock, call
 
 import pytest
 
@@ -76,6 +76,13 @@ def client_mock(mocker):
     """Mock the GPFS client."""
     mock = mocker.patch("imperial_coldfront_plugin.gpfs_client.GPFSClient")
     return mock()
+
+
+@pytest.fixture
+def mock_requests(mocker):
+    """Mock the requests module."""
+    mock = mocker.patch("requests.Session.request")
+    return mock
 
 
 def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
@@ -179,4 +186,89 @@ def test_create_fileset_set_quota_existing_directory(
             acl=settings.GPFS_PARENT_DIRECTORY_ACL,
         )
         not in client_mock.set_directory_acl.call_args_list
+    )
+
+
+def make_response(data: dict[str, object]) -> Mock:
+    """Helper to make a mock response with .json() method."""
+    response_mock = Mock()
+    response_mock.json = Mock(return_value=data)
+    response_mock.raise_for_status = Mock()
+    return response_mock
+
+
+def test_paginate():
+    """Test the _paginate method handles multiple pages."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    first_page = {"paging": {"lastId": 100}, "quotas": [{"id": 1}]}
+    second_page = {"quotas": [{"id": 2}]}
+
+    api_mock = Mock(
+        side_effect=[
+            make_response(first_page),
+            make_response(second_page),
+        ]
+    )
+
+    items = GPFSClient()._paginate(api_mock, item_key="quotas", filesystemName="gpfs")
+
+    assert items == [{"id": 1}, {"id": 2}]
+    assert api_mock.call_count == 2
+    _, second_kwargs = api_mock.call_args_list[1]
+    assert "lastId" in second_kwargs and second_kwargs["lastId"] == 100
+
+
+def test_pagination_filesystems(settings, mock_requests):
+    """Test that filesystems method paginates correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._filesystems(lastId=10)
+
+    mock_requests.assert_called_once_with(
+        method="GET",
+        url="http://example.com/api/filesystems",
+        params={"lastId": "10"},
+        headers={"Authorization": "Basic Og=="},
+    )
+
+
+def test_pagination_retrieve_all_fileset_quotas(settings, mock_requests):
+    """Test that retrieve_all_fileset_usages method paginates correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._retrieve_all_fileset_quotas(filesystemName="gpfs0", lastId=20)
+
+    mock_requests.assert_called_once_with(
+        method="GET",
+        url="http://example.com/api/filesystems/gpfs0/quotas?filter=quotaType=FILESET",
+        params={"lastId": "20"},
+        headers={"Authorization": "Basic Og=="},
+        json={},
+    )
+
+
+def test_pagination_retrieve_quota_usage(settings, mock_requests):
+    """Test that retrieve_quota_usage method paginates correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._retrieve_quota_usage(
+        filesystemName="gpfs0", filesetName="myfileset", lastId=30
+    )
+
+    mock_requests.assert_called_once_with(
+        method="GET",
+        url="http://example.com/api/filesystems/gpfs0/filesets/myfileset/quotas",
+        params={"lastId": "30"},
+        headers={"Authorization": "Basic Og=="},
+        json={},
     )
