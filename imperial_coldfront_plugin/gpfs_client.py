@@ -58,7 +58,10 @@ class JobRunning(RetryPredicate):
         Returns:
             True if the request should be retried, False otherwise.
         """
-        if not 200 <= response.status_code < 300:
+        try:
+            if not 200 <= response.status_code < 300:
+                return False
+        except Exception:
             return False
 
         job_data: JobResponseData = response.json()["jobs"][0]
@@ -110,15 +113,40 @@ def check_job_status(
         The response after successfully completing the request.
     """
     try:
-        if not 200 <= response.status_code < 300:
-            return response
+        try:
+            if not 200 <= response.status_code < 300:
+                response.raise_for_status()
+        except Exception:
+            response.raise_for_status()
 
         data = response.json()
         jobId = data["jobs"][0]["jobId"]
-        return client._get_job_status(jobId)
+        job_response = client._get_job_status(jobId)
+
+        try:
+            if not 200 <= job_response.status_code < 300:
+                job_response.raise_for_status()
+        except Exception:
+            job_response.raise_for_status()
+        return job_response
 
     except JobTimeout:
-        raise JobTimeout(f"JobID={jobId} failed to complete in time.")
+        try:
+            return_code = f"JobID={jobId}"
+        except UnboundLocalError:
+            return_code = "JobID=<unknown>"
+        raise JobTimeout(f"{return_code} failed to complete in time.")
+
+
+@response_handler
+def status_success(response: requests.Response) -> requests.Response:
+    """Raise an exception if the call returns a non-2xx status code."""
+    try:
+        if not 200 <= response.status_code < 300:
+            response.raise_for_status()
+    except Exception:
+        response.raise_for_status()
+    return response
 
 
 class GPFSClient(Consumer):
@@ -195,6 +223,7 @@ class GPFSClient(Consumer):
 
         return results
 
+    @status_success
     @get("filesystems")
     def _filesystems(self, lastId: Query = None) -> requests.Response:  # type: ignore[empty-body]
         """Method (private) to return information on filesystems available."""
@@ -379,6 +408,7 @@ class GPFSClient(Consumer):
                 f"{e.response.json()}"
             ) from e
 
+    @status_success
     @json
     @get("filesystems/{filesystemName}/filesets/{filesetName}/quotas")
     def _retrieve_quota_usage(  # type: ignore[empty-body]
@@ -427,6 +457,7 @@ class GPFSClient(Consumer):
             "files_usage": files_usage,
         }
 
+    @status_success
     @json
     @get("filesystems/{filesystemName}/quotas?filter=quotaType=FILESET")
     def _retrieve_all_fileset_quotas(  # type: ignore[empty-body]
@@ -460,6 +491,7 @@ class GPFSClient(Consumer):
             for quota in quotas
         }
 
+    @status_success
     @json
     @get("filesystems/{filesystem_name}/acl/{path}")
     def get_directory_acl(  # type: ignore[empty-body]
