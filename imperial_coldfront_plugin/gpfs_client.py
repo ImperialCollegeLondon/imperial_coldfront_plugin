@@ -116,7 +116,7 @@ def check_job_status(
         try:
             if not 200 <= response.status_code < 300:
                 response.raise_for_status()
-        except Exception:
+        except TypeError:
             response.raise_for_status()
 
         data = response.json()
@@ -126,7 +126,7 @@ def check_job_status(
         try:
             if not 200 <= job_response.status_code < 300:
                 job_response.raise_for_status()
-        except Exception:
+        except TypeError:
             job_response.raise_for_status()
         return job_response
 
