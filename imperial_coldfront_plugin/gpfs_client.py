@@ -144,7 +144,7 @@ def status_success(response: requests.Response) -> requests.Response:
     try:
         if not 200 <= response.status_code < 300:
             response.raise_for_status()
-    except Exception:
+    except TypeError:
         response.raise_for_status()
     return response
 
