@@ -1,7 +1,10 @@
+from unittest.mock import call
+
 import pytest
 from coldfront.core.allocation.models import (
     AllocationAttribute,
     AllocationAttributeType,
+    AllocationStatusChoice,
     AllocationUser,
     AllocationUserStatusChoice,
 )
@@ -176,3 +179,29 @@ def test_ensure_no_existing_gid_ldap(
             allocation=rdf_allocation,
             value=rdf_allocation_gid,
         )
+
+
+def test_remove_ldap_group_members_if_allocation_inactive(
+    ldap_remove_member_mock,
+    mocker,
+    rdf_allocation,
+    rdf_allocation_ldap_name,
+    enable_ldap,
+):
+    """Test removing LDAP group members when allocation is not Active."""
+    mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_group_member_search",
+        return_value={rdf_allocation_ldap_name: ["alice", "bob"]},
+    )
+
+    inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
+    rdf_allocation.status = inactive_status
+    rdf_allocation.save()
+
+    ldap_remove_member_mock.assert_has_calls(
+        [
+            call(rdf_allocation_ldap_name, "alice", allow_missing=True),
+            call(rdf_allocation_ldap_name, "bob", allow_missing=True),
+        ],
+        any_order=True,
+    )
