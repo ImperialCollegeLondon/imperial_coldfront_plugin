@@ -19,6 +19,7 @@ from django_q.tasks import async_task
 from .ldap import (
     ldap_add_member_to_group,
     ldap_gid_in_use,
+    ldap_group_member_search,
     ldap_remove_member_from_group,
 )
 
@@ -169,3 +170,31 @@ def remove_ldap_group_membership(
         instance.user.username,
         allow_missing=True,
     )
+
+
+@receiver(post_save, sender=Allocation)
+def remove_ldap_group_members_if_allocation_inactive(
+    sender: object, instance: Allocation, **kwargs: object
+) -> None:
+    """Remove all LDAP group members if allocation is not Active.
+
+    The LDAP group itself is not deleted.
+    """
+    if not settings.LDAP_ENABLED:
+        return
+
+    if instance.status.name == "Active":
+        return
+
+    if (group_id := _get_shortname_from_allocation(instance)) is None:
+        return
+
+    members_by_group = ldap_group_member_search(group_id)
+    members = members_by_group.get(group_id, [])
+    for username in members:
+        async_task(
+            ldap_remove_member_from_group,
+            group_id,
+            username,
+            allow_missing=True,
+        )
