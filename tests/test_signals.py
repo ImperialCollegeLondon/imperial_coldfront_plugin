@@ -205,3 +205,47 @@ def test_remove_ldap_group_members_if_allocation_inactive(
         ],
         any_order=True,
     )
+
+
+def test_remove_ldap_group_members_if_allocation_inactive_ldap_disabled(
+    ldap_remove_member_mock,
+    mocker,
+    rdf_allocation,
+    rdf_allocation_ldap_name,
+    settings,
+):
+    """LDAP disabled -> no LDAP calls."""
+    settings.LDAP_ENABLED = False
+
+    member_search = mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_group_member_search",
+        return_value={rdf_allocation_ldap_name: ["alice"]},
+    )
+
+    inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
+    rdf_allocation.status = inactive_status
+    rdf_allocation.save()
+
+    member_search.assert_not_called()
+    ldap_remove_member_mock.assert_not_called()
+
+
+def test_remove_ldap_group_members_if_allocation_active(
+    ldap_remove_member_mock,
+    mocker,
+    rdf_allocation,
+    rdf_allocation_ldap_name,
+    enable_ldap,
+):
+    """Active status -> signal returns early."""
+    member_search = mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_group_member_search",
+        return_value={rdf_allocation_ldap_name: ["alice"]},
+    )
+
+    active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+    rdf_allocation.status = active_status
+    rdf_allocation.save()
+
+    member_search.assert_not_called()
+    ldap_remove_member_mock.assert_not_called()
