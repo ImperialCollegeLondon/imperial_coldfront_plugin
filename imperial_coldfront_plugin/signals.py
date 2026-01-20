@@ -36,6 +36,18 @@ def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
         return None
 
 
+def _remove_allocation_group_members(group_id: str) -> None:
+    """Background task: remove all members from an LDAP group."""
+    members_by_group = ldap_group_member_search(group_id)
+    members = members_by_group.get(group_id, [])
+    for username in members:
+        ldap_remove_member_from_group(
+            group_id,
+            username,
+            allow_missing=True,
+        )
+
+
 @receiver(pre_save, sender=AllocationAttribute)
 def ensure_no_existing_gid(
     sender: object, instance: AllocationAttribute, **kwargs: object
@@ -189,12 +201,4 @@ def remove_ldap_group_members_if_allocation_inactive(
     if (group_id := _get_shortname_from_allocation(instance)) is None:
         return
 
-    members_by_group = ldap_group_member_search(group_id)
-    members = members_by_group.get(group_id, [])
-    for username in members:
-        async_task(
-            ldap_remove_member_from_group,
-            group_id,
-            username,
-            allow_missing=True,
-        )
+    async_task(_remove_allocation_group_members, group_id)
