@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from coldfront.core.allocation.models import (
@@ -15,6 +15,7 @@ from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.tasks import (
     check_ldap_consistency,
     create_rdf_allocation,
+    send_rdf_allocation_notifications_task,
 )
 
 
@@ -302,3 +303,80 @@ def test_check_ldap_consistency_extra_members(
     assert extra_user in discrepancy["extra_members"]
 
     notify_mock.assert_called_once()
+
+
+@pytest.fixture
+def send_allocation_notification_mock(mocker):
+    """Mock the send_allocation_notification function in tasks.py."""
+    return mocker.patch("imperial_coldfront_plugin.tasks.send_allocation_notification")
+
+
+def test_send_rdf_allocation_notifications_sends_email(
+    rdf_allocation,
+    rdf_allocation_ldap_name,
+    send_allocation_notification_mock,
+    settings,
+):
+    """Test send_rdf_allocation_notifications_task sends email on match."""
+    settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = [7]
+    settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = []
+    settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = []
+    settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = []
+
+    rdf_allocation.end_date = timezone.localdate() + timedelta(days=7)
+    rdf_allocation.save()
+
+    send_rdf_allocation_notifications_task()
+
+    subject = "RDF allocation expiry warning"
+    shortname = rdf_allocation_ldap_name.replace(settings.LDAP_SHORTNAME_PREFIX, "")
+    message = (
+        "Placeholder: expiry warning for allocation "
+        f"{shortname} (project: {rdf_allocation.project.title})."
+    )
+    send_allocation_notification_mock.assert_called_once_with(
+        rdf_allocation.project.pi.email,
+        subject,
+        message,
+    )
+
+
+def test_send_rdf_allocation_notifications_no_match_no_email(
+    rdf_allocation,
+    send_allocation_notification_mock,
+    settings,
+):
+    """Test send_rdf_allocation_notifications_task does not send email on no match."""
+    settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = [30]
+    settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = []
+    settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = []
+    settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = []
+
+    rdf_allocation.end_date = timezone.localdate() + timedelta(days=7)
+    rdf_allocation.save()
+
+    send_rdf_allocation_notifications_task()
+
+    send_allocation_notification_mock.assert_not_called()
+
+
+def test_send_rdf_allocation_notifications_no_pi_email(
+    rdf_allocation,
+    send_allocation_notification_mock,
+    settings,
+):
+    """Test send_rdf_allocation_notifications_task does not send email if no PI email."""  # noqa E501
+    settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = [7]
+    settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = []
+    settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = []
+    settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = []
+
+    rdf_allocation.project.pi.email = ""
+    rdf_allocation.project.pi.save()
+
+    rdf_allocation.end_date = timezone.localdate() + timedelta(days=7)
+    rdf_allocation.save()
+
+    send_rdf_allocation_notifications_task()
+
+    send_allocation_notification_mock.assert_not_called()
