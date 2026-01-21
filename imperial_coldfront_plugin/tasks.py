@@ -16,8 +16,13 @@ from coldfront.core.allocation.models import (
 from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
-from .emails import Discrepancy, send_discrepancy_notification
+from .emails import (
+    Discrepancy,
+    send_allocation_notification,
+    send_discrepancy_notification,
+)
 from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
@@ -264,10 +269,58 @@ def _update_quota_usages_task() -> None:
         files_attribute_usage.save()
 
 
+def _get_allocation_shortname(allocation: Allocation) -> str | None:
+    """Get the Shortname allocation attribute if present."""
+    try:
+        return allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+    except AllocationAttribute.DoesNotExist:
+        return None
+
+
+def _send_rdf_allocation_notifications_task() -> None:
+    """Send scheduled RDF allocation notifications to project owners."""
+    today = timezone.localdate()
+    schedules = {
+        "expiry warning": settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE,
+        "removal warning": settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE,
+        "deletion warning": settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE,
+        "deletion notification": settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE,
+    }
+
+    allocations = (
+        Allocation.objects.filter(resources__name="RDF Active")
+        .select_related("project__pi")
+        .prefetch_related("allocationattribute_set")
+    )
+
+    for allocation in allocations:
+        delta_days = (allocation.end_date - today).days
+        for notification_type, schedule in schedules.items():
+            if delta_days in schedule:
+                recipient = allocation.project.pi.email
+                if not recipient:
+                    continue
+
+                shortname = _get_allocation_shortname(allocation) or "unknown"
+                subject = f"RDF allocation {notification_type}"
+                message = (
+                    f"Placeholder: {notification_type} for allocation "
+                    f"{shortname} (project: {allocation.project.title})."
+                )
+
+                send_allocation_notification(recipient, subject, message)
+                break
+
+
 # note that we can't use log_task_exceptions_to_django_logger as a decorator
 # here as django-q needs to be able to serialize the function for use as a task
 create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocation)
 check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consistency)
 update_quota_usages_task = log_task_exceptions_to_django_logger(
     _update_quota_usages_task
+)
+send_rdf_allocation_notifications_task = log_task_exceptions_to_django_logger(
+    _send_rdf_allocation_notifications_task
 )
