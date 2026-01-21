@@ -3,7 +3,7 @@
 from typing import TypedDict
 
 from django.conf import settings
-from django.core.mail import mail_admins
+from django.core.mail import mail_admins, send_mail
 
 
 class Discrepancy(TypedDict):
@@ -46,4 +46,17 @@ def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
     mail_admins(
         subject="LDAP Consistency Check - Discrepancies Found",
         message=message,
+    )
+
+
+def send_allocation_notification(
+    recipient_email: str, subject: str, message: str
+) -> None:
+    """Send an allocation notification email."""
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[recipient_email],
+        fail_silently=False,
     )
