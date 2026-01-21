@@ -141,3 +141,15 @@ DEPARTMENTS_IN_FACULTY = {
     "foe": ["dsde", "aero"],
     "fons": ["physics", "chemistry"],
 }
+
+RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = [90, 60, 30, 7, 1]
+"""Days before expiry to send expiry warnings."""
+
+RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = [0, -3, -6]
+"""Days relative to expiry to send removal warnings."""
+
+RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = [-7, -10, -13]
+"""Days relative to expiry to send deletion warnings."""
+
+RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = [-14]
+"""Days relative to expiry to send deletion notifications."""
