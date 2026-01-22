@@ -140,12 +140,16 @@ def check_job_status(
 
 @response_handler
 def status_success(response: requests.Response) -> requests.Response:
-    """Raise an exception if the call returns a non-2xx status code."""
-    try:
-        if not 200 <= response.status_code < 300:
-            response.raise_for_status()
-    except TypeError:
-        response.raise_for_status()
+    """Check if the response status code indicates success.
+
+    Args:
+        response: Response of the request.
+    """
+    if not 200 <= response.status_code < 300:
+        raise requests.HTTPError(
+            f"Request failed with status code {response.status_code}",
+            response=response,
+        )
     return response
 
 
