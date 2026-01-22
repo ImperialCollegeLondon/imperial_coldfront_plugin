@@ -224,6 +224,7 @@ class GPFSClient(Consumer):
         return self._paginate(self._filesystems, item_key="filesystems")
 
     @check_job_status
+    @status_success
     @json
     @post("filesystems/{filesystemName}/filesets")
     def _create_fileset(  # type: ignore[empty-body]
@@ -280,6 +281,7 @@ class GPFSClient(Consumer):
             ) from e
 
     @check_job_status
+    @status_success
     @json
     @post("filesystems/{filesystemName}/quotas")
     def _set_quota(  # type: ignore[empty-body]
@@ -335,6 +337,7 @@ class GPFSClient(Consumer):
             ) from e
 
     @check_job_status
+    @status_success
     @json
     @post("filesystems/{filesystemName}/filesets/{filesetName}/directory/{path}")
     def _create_fileset_directory(  # type: ignore[empty-body]
@@ -495,6 +498,7 @@ class GPFSClient(Consumer):
         """
 
     @check_job_status
+    @status_success
     @json
     @put("filesystems/{filesystem_name}/acl/{path}")
     def _set_directory_acl(  # type: ignore[empty-body]
