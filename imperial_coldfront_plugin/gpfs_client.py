@@ -269,7 +269,7 @@ class GPFSClient(Consumer):
         self,
         filesystemName: str,
         filesetName: str,
-        force: bool = False,
+        force: Query = False,
     ) -> requests.Response:
         """Method to unlink (delete) a fileset from the filesystem.
 
