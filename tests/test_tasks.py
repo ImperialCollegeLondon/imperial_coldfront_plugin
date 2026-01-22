@@ -52,6 +52,12 @@ def ldap_gid_in_use_mock(mocker):
 
 
 @pytest.fixture
+def ldap_remove_member_mock(mocker):
+    """Mock ldap_remove_member_from_group in tasks.py."""
+    return mocker.patch("imperial_coldfront_plugin.ldap.ldap_remove_member_from_group")
+
+
+@pytest.fixture
 def rdf_form_data(project, settings):
     """Fixture to provide RDFAllocationForm data."""
     faculty_id = "foe"
@@ -302,3 +308,78 @@ def test_check_ldap_consistency_extra_members(
     assert extra_user in discrepancy["extra_members"]
 
     notify_mock.assert_called_once()
+
+
+def test_remove_allocation_group_members(
+    ldap_remove_member_mock,
+    rdf_allocation,
+    allocation_user,
+    rdf_allocation_ldap_name,
+    enable_ldap,
+):
+    """Test _remove_allocation_group_members removes all active users."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
+    username = allocation_user.user.username
+
+    remove_allocation_group_members(rdf_allocation.pk)
+
+    ldap_remove_member_mock.assert_called_once_with(
+        rdf_allocation_ldap_name,
+        username,
+        allow_missing=True,
+    )
+
+
+def test_remove_allocation_group_members_multiple_users(
+    ldap_remove_member_mock,
+    rdf_allocation,
+    allocation_user,
+    allocation_user_active_status,
+    user_factory,
+    rdf_allocation_ldap_name,
+    enable_ldap,
+):
+    """Test _remove_allocation_group_members removes multiple active users."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
+    # Create additional active users
+    user2 = user_factory()
+    user3 = user_factory()
+
+    remove_allocation_group_members(rdf_allocation.pk)
+
+    assert ldap_remove_member_mock.call_count == 3
+    ldap_remove_member_mock.assert_any_call(
+        rdf_allocation_ldap_name,
+        allocation_user.user.username,
+        allow_missing=True,
+    )
+    ldap_remove_member_mock.assert_any_call(
+        rdf_allocation_ldap_name,
+        user2.username,
+        allow_missing=True,
+    )
+    ldap_remove_member_mock.assert_any_call(
+        rdf_allocation_ldap_name,
+        user3.username,
+        allow_missing=True,
+    )
+
+
+def test_remove_allocation_group_members_no_shortname(
+    ldap_remove_member_mock,
+    rdf_allocation,
+    allocation_user,
+):
+    """Test _remove_allocation_group_members handles missing shortname gracefully."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
+    # Remove the shortname attribute
+    rdf_allocation.allocationattribute_set.get(
+        allocation_attribute_type__name="Shortname"
+    ).delete()
+
+    remove_allocation_group_members(rdf_allocation.pk)
+
+    ldap_remove_member_mock.assert_not_called()
