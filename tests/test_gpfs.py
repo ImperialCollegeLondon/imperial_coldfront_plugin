@@ -82,6 +82,7 @@ def client_mock(mocker):
 def mock_requests(mocker):
     """Mock the requests module."""
     mock = mocker.patch("requests.Session.request")
+    mock.return_value.status_code = 200
     return mock
 
 
