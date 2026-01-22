@@ -264,6 +264,43 @@ def _update_quota_usages_task() -> None:
         files_attribute_usage.save()
 
 
+def _remove_allocation_group_members(allocation_id: int) -> None:
+    """Background task: remove all active members from an LDAP group.
+
+    Args:
+        allocation_id: The primary key of the allocation.
+    """
+    from .ldap import ldap_remove_member_from_group
+
+    allocation = Allocation.objects.get(pk=allocation_id)
+
+    # Get the shortname/group_id from the allocation
+    try:
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+        group_id = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
+    except AllocationAttribute.DoesNotExist:
+        return
+
+    # Get all active users from the database
+    active_users = AllocationUser.objects.filter(
+        allocation=allocation, status__name="Active"
+    )
+
+    # Remove each user from the LDAP group
+    for allocation_user in active_users:
+        ldap_remove_member_from_group(
+            group_id,
+            allocation_user.user.username,
+            allow_missing=True,
+        )
+
+
+remove_allocation_group_members = log_task_exceptions_to_django_logger(
+    _remove_allocation_group_members
+)
+
 # note that we can't use log_task_exceptions_to_django_logger as a decorator
 # here as django-q needs to be able to serialize the function for use as a task
 create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocation)

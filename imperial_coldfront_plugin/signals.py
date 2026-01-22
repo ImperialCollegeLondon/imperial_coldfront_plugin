@@ -19,7 +19,6 @@ from django_q.tasks import async_task
 from .ldap import (
     ldap_add_member_to_group,
     ldap_gid_in_use,
-    ldap_group_member_search,
     ldap_remove_member_from_group,
 )
 
@@ -34,18 +33,6 @@ def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
         raise ValueError(f"Multiple shortnames found for allocation - {allocation}")
     except AllocationAttribute.DoesNotExist:
         return None
-
-
-def _remove_allocation_group_members(group_id: str) -> None:
-    """Background task: remove all members from an LDAP group."""
-    members_by_group = ldap_group_member_search(group_id)
-    members = members_by_group.get(group_id, [])
-    for username in members:
-        ldap_remove_member_from_group(
-            group_id,
-            username,
-            allow_missing=True,
-        )
 
 
 @receiver(pre_save, sender=AllocationAttribute)
@@ -192,13 +179,15 @@ def remove_ldap_group_members_if_allocation_inactive(
 
     The LDAP group itself is not deleted.
     """
+    from .tasks import remove_allocation_group_members
+
     if not settings.LDAP_ENABLED:
         return
 
     if instance.status.name == "Active":
         return
 
-    if (group_id := _get_shortname_from_allocation(instance)) is None:
+    if _get_shortname_from_allocation(instance) is None:
         return
 
-    async_task(_remove_allocation_group_members, group_id)
+    async_task(remove_allocation_group_members, instance.pk)
