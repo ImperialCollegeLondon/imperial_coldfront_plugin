@@ -58,10 +58,7 @@ class JobRunning(RetryPredicate):
         Returns:
             True if the request should be retried, False otherwise.
         """
-        try:
-            if not 200 <= response.status_code < 300:
-                return False
-        except Exception:
+        if not 200 <= response.status_code < 300:
             return False
 
         job_data: JobResponseData = response.json()["jobs"][0]
@@ -113,29 +110,15 @@ def check_job_status(
         The response after successfully completing the request.
     """
     try:
-        try:
-            if not 200 <= response.status_code < 300:
-                response.raise_for_status()
-        except TypeError:
-            response.raise_for_status()
+        if not 200 <= response.status_code < 300:
+            return response
 
         data = response.json()
         jobId = data["jobs"][0]["jobId"]
-        job_response = client._get_job_status(jobId)
-
-        try:
-            if not 200 <= job_response.status_code < 300:
-                job_response.raise_for_status()
-        except TypeError:
-            job_response.raise_for_status()
-        return job_response
+        return client._get_job_status(jobId)
 
     except JobTimeout:
-        try:
-            return_code = f"JobID={jobId}"
-        except UnboundLocalError:
-            return_code = "JobID=<unknown>"
-        raise JobTimeout(f"{return_code} failed to complete in time.")
+        raise JobTimeout(f"JobID={jobId} failed to complete in time.")
 
 
 @response_handler
