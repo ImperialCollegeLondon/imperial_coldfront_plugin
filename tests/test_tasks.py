@@ -347,6 +347,17 @@ def test_remove_allocation_group_members_multiple_users(
     user2 = user_factory()
     user3 = user_factory()
 
+    allocation_user2 = AllocationUser.objects.create(  # noqa F841
+        allocation=rdf_allocation,
+        user=user2,
+        status=allocation_user_active_status,
+    )
+    allocation_user3 = AllocationUser.objects.create(  # noqa F841
+        allocation=rdf_allocation,
+        user=user3,
+        status=allocation_user_active_status,
+    )
+
     remove_allocation_group_members(rdf_allocation.pk)
 
     assert ldap_remove_member_mock.call_count == 3
