@@ -3,7 +3,7 @@
 from typing import TypedDict
 
 from django.conf import settings
-from django.core.mail import mail_admins
+from django.core.mail import mail_admins, send_mail
 
 
 class Discrepancy(TypedDict):
@@ -46,4 +46,109 @@ def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
     mail_admins(
         subject="LDAP Consistency Check - Discrepancies Found",
         message=message,
+    )
+
+
+def send_allocation_expiry_warning(
+    allocation_id: int, project_owner_email: str, days_until_expiry: int
+) -> None:
+    """Send expiry warning notification to project owner.
+
+    Args:
+        allocation_id: The allocation ID.
+        project_owner_email: Email address of the project owner.
+        days_until_expiry: Number of days until the allocation expires.
+    """
+    subject = f"RDF Allocation Expiry Warning - {days_until_expiry} days remaining"
+    message = f"""
+Your RDF allocation (ID: {allocation_id}) will expire in {days_until_expiry} days.
+
+Please take necessary action to renew or backup your data.
+
+[Placeholder text for expiry warning]
+"""
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[project_owner_email],
+    )
+
+
+def send_allocation_removal_warning(
+    allocation_id: int, project_owner_email: str, days_since_expiry: int
+) -> None:
+    """Send removal warning notification to project owner.
+
+    Args:
+        allocation_id: The allocation ID.
+        project_owner_email: Email address of the project owner.
+        days_since_expiry: Number of days since the allocation expired.
+    """
+    subject = (
+        f"RDF Allocation Removal Warning - Expired {abs(days_since_expiry)} days ago"
+    )
+    message = f"""
+Your RDF allocation (ID: {allocation_id}) expired {abs(days_since_expiry)} days ago.
+
+Data removal will occur soon if no action is taken.
+
+[Placeholder text for removal warning]
+"""
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[project_owner_email],
+    )
+
+
+def send_allocation_deletion_warning(
+    allocation_id: int, project_owner_email: str, days_since_expiry: int
+) -> None:
+    """Send deletion warning notification to project owner.
+
+    Args:
+        allocation_id: The allocation ID.
+        project_owner_email: Email address of the project owner.
+        days_since_expiry: Number of days since the allocation expired.
+    """
+    subject = "RDF Allocation Deletion Warning - Final Notice"
+    message = f"""
+Your RDF allocation (ID: {allocation_id}) expired {abs(days_since_expiry)} days ago.
+
+Data will be permanently deleted soon.
+
+[Placeholder text for deletion warning]
+"""
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[project_owner_email],
+    )
+
+
+def send_allocation_deletion_notification(
+    allocation_id: int, project_owner_email: str
+) -> None:
+    """Send deletion notification to project owner.
+
+    Args:
+        allocation_id: The allocation ID.
+        project_owner_email: Email address of the project owner.
+    """
+    subject = "RDF Allocation Deleted"
+    message = f"""
+Your RDF allocation (ID: {allocation_id}) has been deleted.
+
+All associated data has been permanently removed.
+
+[Placeholder text for deletion notification]
+"""
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[project_owner_email],
     )

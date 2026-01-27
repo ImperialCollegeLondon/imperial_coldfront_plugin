@@ -3,6 +3,7 @@
 import functools
 import logging
 from collections.abc import Callable
+from datetime import date
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -17,7 +18,14 @@ from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
 
-from .emails import Discrepancy, send_discrepancy_notification
+from .emails import (
+    Discrepancy,
+    send_allocation_deletion_notification,
+    send_allocation_deletion_warning,
+    send_allocation_expiry_warning,
+    send_allocation_removal_warning,
+    send_discrepancy_notification,
+)
 from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
@@ -297,6 +305,62 @@ def _remove_allocation_group_members(allocation_id: int) -> None:
         )
 
 
+def _check_rdf_allocation_expiry_notifications() -> None:
+    """Check RDF allocations and send appropriate expiry notifications."""
+    logger = logging.getLogger("django-q")
+
+    rdf_resource = Resource.objects.get(name="RDF Active")
+    today = date.today()
+
+    allocations = Allocation.objects.filter(
+        resources=rdf_resource, status__name="Active", end_date__isnull=False
+    ).select_related("project", "project__pi")
+
+    logger.info(
+        f"Checking {allocations.count()} RDF allocations for expiry notifications"
+    )
+
+    for allocation in allocations:
+        days_until_expiry = (allocation.end_date - today).days
+        project_owner = allocation.project.pi
+
+        if not project_owner or not project_owner.email:
+            logger.warning(f"No email for project owner of allocation {allocation.pk}")
+            continue
+
+        if days_until_expiry in settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE:
+            logger.info(
+                f"Sending expiry warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            )
+            send_allocation_expiry_warning(
+                allocation.pk, project_owner.email, days_until_expiry
+            )
+
+        elif days_until_expiry in settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE:
+            logger.info(
+                f"Sending removal warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            )
+            send_allocation_removal_warning(
+                allocation.pk, project_owner.email, days_until_expiry
+            )
+
+        elif days_until_expiry in settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE:
+            logger.info(
+                f"Sending deletion warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            )
+            send_allocation_deletion_warning(
+                allocation.pk, project_owner.email, days_until_expiry
+            )
+
+        elif (
+            days_until_expiry in settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE
+        ):
+            logger.info(
+                f"Sending deletion notification for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            )
+            send_allocation_deletion_notification(allocation.pk, project_owner.email)
+
+
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
     _remove_allocation_group_members
 )
@@ -307,4 +371,7 @@ create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocat
 check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consistency)
 update_quota_usages_task = log_task_exceptions_to_django_logger(
     _update_quota_usages_task
+)
+check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
+    _check_rdf_allocation_expiry_notifications
 )
