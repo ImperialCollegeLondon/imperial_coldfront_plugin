@@ -121,6 +121,21 @@ def check_job_status(
         raise JobTimeout(f"JobID={jobId} failed to complete in time.")
 
 
+@response_handler
+def status_success(response: requests.Response) -> requests.Response:
+    """Check if the response status code indicates success.
+
+    Args:
+        response: Response of the request.
+    """
+    if not 200 <= response.status_code < 300:
+        raise requests.HTTPError(
+            f"Request failed with status code {response.status_code}",
+            response=response,
+        )
+    return response
+
+
 class GPFSClient(Consumer):
     """Client for interacting with the GPFS API.
 
@@ -195,6 +210,7 @@ class GPFSClient(Consumer):
 
         return results
 
+    @status_success
     @get("filesystems")
     def _filesystems(self, lastId: Query = None) -> requests.Response:  # type: ignore[empty-body]
         """Method (private) to return information on filesystems available."""
@@ -208,6 +224,7 @@ class GPFSClient(Consumer):
         return self._paginate(self._filesystems, item_key="filesystems")
 
     @check_job_status
+    @status_success
     @json
     @post("filesystems/{filesystemName}/filesets")
     def _create_fileset(  # type: ignore[empty-body]
@@ -264,6 +281,7 @@ class GPFSClient(Consumer):
             ) from e
 
     @check_job_status
+    @status_success
     @json
     @post("filesystems/{filesystemName}/quotas")
     def _set_quota(  # type: ignore[empty-body]
@@ -319,6 +337,7 @@ class GPFSClient(Consumer):
             ) from e
 
     @check_job_status
+    @status_success
     @json
     @post("filesystems/{filesystemName}/filesets/{filesetName}/directory/{path}")
     def _create_fileset_directory(  # type: ignore[empty-body]
@@ -379,6 +398,7 @@ class GPFSClient(Consumer):
                 f"{e.response.json()}"
             ) from e
 
+    @status_success
     @json
     @get("filesystems/{filesystemName}/filesets/{filesetName}/quotas")
     def _retrieve_quota_usage(  # type: ignore[empty-body]
@@ -427,6 +447,7 @@ class GPFSClient(Consumer):
             "files_usage": files_usage,
         }
 
+    @status_success
     @json
     @get("filesystems/{filesystemName}/quotas?filter=quotaType=FILESET")
     def _retrieve_all_fileset_quotas(  # type: ignore[empty-body]
@@ -460,6 +481,7 @@ class GPFSClient(Consumer):
             for quota in quotas
         }
 
+    @status_success
     @json
     @get("filesystems/{filesystem_name}/acl/{path}")
     def get_directory_acl(  # type: ignore[empty-body]
@@ -476,6 +498,7 @@ class GPFSClient(Consumer):
         """
 
     @check_job_status
+    @status_success
     @json
     @put("filesystems/{filesystem_name}/acl/{path}")
     def _set_directory_acl(  # type: ignore[empty-body]
