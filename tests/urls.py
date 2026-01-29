@@ -21,4 +21,14 @@ urlpatterns = [
     ),
     path("<int:pk>/", dummy_view, name="project-detail"),
     path("project/", dummy_view, name="project-list"),
+    path(
+        "project/<int:pk>/attribute/create/",
+        dummy_view,
+        name="project-attribute-create",
+    ),
+    path(
+        "project/<int:pk>/note/create/",
+        dummy_view,
+        name="project-note-add",
+    ),
 ]

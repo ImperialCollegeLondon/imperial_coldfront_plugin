@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.shortcuts import render
 from django.urls import reverse
@@ -25,6 +26,15 @@ class LoginRequiredMixin:
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FOUND
         assert response.url.startswith(settings.LOGIN_URL)
+
+
+def tag_with_text_filter(tag_name, text):
+    """Return a filter function for BeautifulSoup to match a tag containing text."""
+
+    def _match(tag):
+        return tag.name == tag_name and text in tag.text
+
+    return _match
 
 
 @pytest.fixture
@@ -564,10 +574,22 @@ class TestProjectDetailView:
         )
 
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
 
-        assert "Credit Balance" in content
-        assert "0 credits" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        # do full check of the structure here then other tests can just check for
+        # relevant elements
+        card = soup.find("div", class_="card")  # first card in the template
+        assert card["id"] == "credit-balance-card"
+        assert card.find(tag_with_text_filter("h3", "Credit Balance"))
+        assert card.find(tag_with_text_filter("span", "0 credits"))
+        assert card.find(
+            tag_with_text_filter("a", "View transactions"),
+            class_="btn",
+            href=reverse(
+                "imperial_coldfront_plugin:project-credit-transactions",
+                kwargs={"pk": project.pk},
+            ),
+        )
 
     def test_credit_balance_display_when_enabled(self, request_, project, settings):
         """Test that credit balance is displayed when SHOW_CREDIT_BALANCE is True."""
@@ -590,12 +612,10 @@ class TestProjectDetailView:
         )
 
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
 
-        assert "Credit Balance" in content
-        assert "120 credits" in content
-        assert "fa-coins" in content
-        assert "border-primary" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        card = soup.find("div", class_="card", id="credit-balance-card")
+        assert card.find(tag_with_text_filter("span", "120 credits"))
 
     def test_credit_balance_hidden_when_disabled(self, request_, project, settings):
         """Test that credit balance is not displayed when SHOW_CREDIT_BALANCE is False."""  # noqa: E501
@@ -612,13 +632,11 @@ class TestProjectDetailView:
         )
 
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
-
-        assert "Credit Balance" not in content
-        assert "fa-coins" not in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("div", class_="card", id="credit-balance-card")
 
     def test_credit_balance_only_visible_to_pi_and_superuser(
-        self, rf, project, settings, user_factory, user
+        self, rf, project, settings, user_factory, user, superuser
     ):
         """Ensure credit balance section is only rendered for the PI and superusers."""
         settings.SHOW_CREDIT_BALANCE = True
@@ -631,27 +649,24 @@ class TestProjectDetailView:
             request, tmpl, context={"project": project, "settings": settings}
         )
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
-        assert "Credit Balance" not in content
-        assert "View transactions" not in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("div", class_="card", id="credit-balance-card")
 
         # project PI should see the section
         request.user = project.pi
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
-        content = response.content.decode("utf-8")
-        assert "Credit Balance" in content
-        assert "View transactions" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("div", class_="card", id="credit-balance-card")
 
         # superuser should see the section
-        request.user = user
+        request.user = superuser
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
-        content = response.content.decode("utf-8")
-        assert "Credit Balance" in content
-        assert "View transactions" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("div", class_="card", id="credit-balance-card")
 
 
 class TestProjectCreditTransactionsView(LoginRequiredMixin):
