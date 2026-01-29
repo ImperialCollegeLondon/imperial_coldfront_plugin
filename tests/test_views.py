@@ -648,7 +648,7 @@ class TestProjectDetailView:
         assert not soup.find("div", class_="card", id="credit-balance-card")
 
     def test_credit_balance_only_visible_to_pi_and_superuser(
-        self, rf, project, settings, user_factory, user, superuser
+        self, rf, project, settings, user_factory, superuser
     ):
         """Ensure credit balance section is only rendered for the PI and superusers."""
         settings.SHOW_CREDIT_BALANCE = True
@@ -721,7 +721,7 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         response = superuser_client.get(url)
         assert response.status_code == 200
 
-    def test_transactions_dispalyed_with_total(self, superuser_client, project):
+    def test_transactions_displayed_with_total(self, superuser_client, project):
         """Test that transactions are sorted and running balance is calculated."""
         settings.SHOW_CREDIT_BALANCE = True
         transactions = [
