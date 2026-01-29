@@ -712,41 +712,50 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
     def test_transactions_dispalyed_with_total(self, superuser_client, project):
         """Test that transactions are sorted and running balance is calculated."""
         settings.SHOW_CREDIT_BALANCE = True
-        t1 = CreditTransaction.objects.create(
-            project=project, amount=100, description="First"
-        )
-        t2 = CreditTransaction.objects.create(
-            project=project, amount=50, description="Second"
-        )
-        t3 = CreditTransaction.objects.create(
-            project=project, amount=-30, description="Third"
-        )
-
+        transactions = [
+            CreditTransaction.objects.create(
+                project=project, amount=100, description="First"
+            ),
+            CreditTransaction.objects.create(
+                project=project, amount=50, description="Second"
+            ),
+            CreditTransaction.objects.create(
+                project=project, amount=-30, description="Third"
+            ),
+        ]
         now = timezone.now()
-        CreditTransaction.objects.filter(pk=t1.pk).update(
-            timestamp=now - timedelta(days=3)
-        )
-        CreditTransaction.objects.filter(pk=t2.pk).update(
-            timestamp=now - timedelta(days=2)
-        )
-        CreditTransaction.objects.filter(pk=t3.pk).update(
-            timestamp=now - timedelta(days=1)
-        )
+
+        for offset, transaction in zip([3, 2, 1], transactions):
+            transaction.timestamp = now - timedelta(days=offset)
+            transaction.save()
 
         url = self._get_url(project.pk)
         response = superuser_client.get(url)
         assert response.status_code == 200
 
-        content = response.content.decode()
+        soup = BeautifulSoup(response.content, "html.parser")
+        # check link back to project detail
+        assert soup.find(
+            "a",
+            class_="btn",
+            href=reverse("project-detail", args=[project.pk]),
+            text="Back to Group",
+        )
+        table = soup.find("table")
 
-        first_pos = content.index("First")
-        second_pos = content.index("Second")
-        third_pos = content.index("Third")
-        assert first_pos < second_pos < third_pos
+        rows = table.tbody.findChildren("tr")
+        assert len(rows) == len(transactions)
+        # check ordering of table rows is chronological
+        total = 0
+        for row, transaction in zip(rows, transactions):
+            cells = row.findChildren("td")
+            assert cells[2].span.text.strip() == str(transaction.amount)
+            total += transaction.amount
+            assert cells[3].text.strip() == str(total)
 
-        assert "100" in content
-        assert "150" in content
-        assert "120" in content
+        # check total in footer
+        footer = table.tfoot.tr
+        assert footer.find(tag_with_text_filter("th", str(total)))
 
     def test_positive_negative_amounts_styled(self, superuser_client, project):
         """Test that positive amounts are green and negative are red."""
@@ -759,17 +768,10 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
 
         url = self._get_url(project.pk)
         response = superuser_client.get(url)
-        content = response.content.decode()
 
-        assert "text-success" in content
-        assert "text-danger" in content
-
-    def test_back_link_to_project(self, superuser_client, project):
-        """Test that back link to project detail exists."""
-        url = self._get_url(project.pk)
-        response = superuser_client.get(url)
-        content = response.content.decode()
-
-        project_url = reverse("project-detail", kwargs={"pk": project.pk})
-        assert f'href="{project_url}"' in content
-        assert "Back to Group" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        table = soup.find("table")
+        rows = table.tbody.findChildren("tr")
+        assert len(rows) == 2
+        assert rows[0].find("span", class_="text-success")
+        assert rows[1].find("span", class_="text-danger")
