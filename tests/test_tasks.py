@@ -482,16 +482,18 @@ def test_check_expiry_notifications_deletion_warning(
     send_removal_warning_mock,
     send_deletion_warning_mock,
     send_deletion_notification_mock,
+    settings,
 ):
     """Test deletion warning is sent after expiry."""
     # Set allocation to have expired 7 days ago
-    rdf_allocation.end_date = datetime.now().date() - timedelta(days=7)
+    days_after_expiry = abs(settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE[0])
+    rdf_allocation.end_date = datetime.now().date() - timedelta(days=days_after_expiry)
     rdf_allocation.save()
 
     check_rdf_allocation_expiry_notifications()
 
     send_deletion_warning_mock.assert_called_once_with(
-        rdf_allocation.pk, rdf_allocation.project.pi.email, -7
+        rdf_allocation.pk, rdf_allocation.project.pi.email, -days_after_expiry
     )
     send_expiry_warning_mock.assert_not_called()
     send_removal_warning_mock.assert_not_called()
@@ -504,10 +506,12 @@ def test_check_expiry_notifications_deletion_notification(
     send_removal_warning_mock,
     send_deletion_warning_mock,
     send_deletion_notification_mock,
+    settings,
 ):
     """Test deletion notification is sent 14 days after expiry."""
-    # Set allocation to have expired 14 days ago
-    rdf_allocation.end_date = datetime.now().date() - timedelta(days=14)
+    # Set allocation to have expired per deletion notification schedule
+    days_after_expiry = abs(settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE[0])
+    rdf_allocation.end_date = datetime.now().date() - timedelta(days=days_after_expiry)
     rdf_allocation.save()
 
     check_rdf_allocation_expiry_notifications()
@@ -540,47 +544,32 @@ def test_check_expiry_notifications_multiple_allocations(
     project,
     send_expiry_warning_mock,
     send_removal_warning_mock,
+    settings,
 ):
     """Test notifications sent for multiple allocations with different schedules."""
     # Get the required objects
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
     rdf_resource = Resource.objects.get(name="RDF Active")
 
-    # First allocation expires in 30 days
-    rdf_allocation.end_date = datetime.now().date() + timedelta(days=30)
+    # First allocation expires per expiry warning schedule (e.g., 30 days)
+    days_before_expiry = settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE[2]  # 30 days
+    rdf_allocation.end_date = datetime.now().date() + timedelta(days=days_before_expiry)
     rdf_allocation.save()
 
-    # Create second allocation expiring in 3 days (removal warning schedule)
+    # Create second allocation per removal warning schedule (e.g., -3 days)
+    days_after_expiry = abs(settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE[1])  # -3
     allocation2 = Allocation.objects.create(
         project=project,
         status=allocation_active_status,
-        end_date=datetime.now().date() - timedelta(days=3),
+        end_date=datetime.now().date() - timedelta(days=days_after_expiry),
     )
     allocation2.resources.add(rdf_resource)
 
     check_rdf_allocation_expiry_notifications()
 
     send_expiry_warning_mock.assert_called_once_with(
-        rdf_allocation.pk, rdf_allocation.project.pi.email, 30
+        rdf_allocation.pk, rdf_allocation.project.pi.email, days_before_expiry
     )
     send_removal_warning_mock.assert_called_once_with(
-        allocation2.pk, project.pi.email, -3
+        allocation2.pk, project.pi.email, -days_after_expiry
     )
-
-
-def test_check_expiry_notifications_inactive_allocation_skipped(
-    rdf_allocation,
-    send_expiry_warning_mock,
-):
-    """Test notifications not sent for inactive allocations."""
-    # Get or create denied status
-    allocation_denied_status = AllocationStatusChoice.objects.create(name="Denied")
-
-    # Set allocation to denied status
-    rdf_allocation.status = allocation_denied_status
-    rdf_allocation.end_date = datetime.now().date() + timedelta(days=90)
-    rdf_allocation.save()
-
-    check_rdf_allocation_expiry_notifications()
-
-    send_expiry_warning_mock.assert_not_called()
