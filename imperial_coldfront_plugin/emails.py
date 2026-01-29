@@ -50,7 +50,7 @@ def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
 
 
 def send_allocation_expiry_warning(
-    allocation_shortname: int, project_owner_email: str, days_until_expiry: int
+    allocation_shortname: str, project_owner_email: str, days_until_expiry: int
 ) -> None:
     """Send expiry warning notification to project owner.
 
@@ -75,12 +75,12 @@ Please take necessary action to renew or backup your data.
 
 
 def send_allocation_removal_warning(
-    allocation_id: int, project_owner_email: str, days_since_expiry: int
+    allocation_shortname: str, project_owner_email: str, days_since_expiry: int
 ) -> None:
     """Send removal warning notification to project owner.
 
     Args:
-        allocation_id: The allocation ID.
+        allocation_shortname: The allocation shortname.
         project_owner_email: Email address of the project owner.
         days_since_expiry: Number of days since the allocation expired.
     """
@@ -88,7 +88,7 @@ def send_allocation_removal_warning(
         f"RDF Allocation Removal Warning - Expired {abs(days_since_expiry)} days ago"
     )
     message = f"""
-Your RDF allocation (ID: {allocation_id}) expired {abs(days_since_expiry)} days ago.
+Your RDF allocation {allocation_shortname} expired {abs(days_since_expiry)} days ago.
 
 Data removal will occur soon if no action is taken.
 
@@ -103,18 +103,18 @@ Data removal will occur soon if no action is taken.
 
 
 def send_allocation_deletion_warning(
-    allocation_id: int, project_owner_email: str, days_since_expiry: int
+    allocation_shortname: str, project_owner_email: str, days_since_expiry: int
 ) -> None:
     """Send deletion warning notification to project owner.
 
     Args:
-        allocation_id: The allocation ID.
+        allocation_shortname: The allocation shortname.
         project_owner_email: Email address of the project owner.
         days_since_expiry: Number of days since the allocation expired.
     """
     subject = "RDF Allocation Deletion Warning - Final Notice"
     message = f"""
-Your RDF allocation (ID: {allocation_id}) expired {abs(days_since_expiry)} days ago.
+Your RDF allocation {allocation_shortname} expired {abs(days_since_expiry)} days ago.
 
 Data will be permanently deleted soon.
 
@@ -129,17 +129,17 @@ Data will be permanently deleted soon.
 
 
 def send_allocation_deletion_notification(
-    allocation_id: int, project_owner_email: str
+    allocation_shortname: str, project_owner_email: str
 ) -> None:
     """Send deletion notification to project owner.
 
     Args:
-        allocation_id: The allocation ID.
+        allocation_shortname: The allocation shortname.
         project_owner_email: Email address of the project owner.
     """
     subject = "RDF Allocation Deleted"
     message = f"""
-Your RDF allocation (ID: {allocation_id}) has been deleted.
+Your RDF allocation {allocation_shortname} has been deleted.
 
 All associated data has been permanently removed.
 
