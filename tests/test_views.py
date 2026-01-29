@@ -68,6 +68,18 @@ class TestHomeView:
         )
 
         assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("a", href=reverse("project-list"))
+
+    def test_group_member(self, request_, project):
+        """Test that the home view renders correctly for a group member/owner."""
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("a", href=reverse("project-list"))
 
 
 @pytest.fixture
