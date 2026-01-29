@@ -50,22 +50,21 @@ def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
 
 
 def send_allocation_expiry_warning(
-    allocation_id: int, project_owner_email: str, days_until_expiry: int
+    allocation_shortname: int, project_owner_email: str, days_until_expiry: int
 ) -> None:
     """Send expiry warning notification to project owner.
 
     Args:
-        allocation_id: The allocation ID.
+        allocation_shortname: The allocation shortname.
         project_owner_email: Email address of the project owner.
         days_until_expiry: Number of days until the allocation expires.
     """
     subject = f"RDF Allocation Expiry Warning - {days_until_expiry} days remaining"
     message = f"""
-Your RDF allocation (ID: {allocation_id}) will expire in {days_until_expiry} days.
+Your RDF allocation {allocation_shortname} will expire in {days_until_expiry} days.
 
 Please take necessary action to renew or backup your data.
 
-[Placeholder text for expiry warning]
 """
     send_mail(
         subject=subject,
