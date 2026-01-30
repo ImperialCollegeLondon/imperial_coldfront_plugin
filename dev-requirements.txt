@@ -16,6 +16,8 @@ asgiref==3.7.2
     #   django-stubs
 attrs==24.3.0
     # via pytest-mypy
+beautifulsoup4==4.14.3
+    # via imperial_coldfront_plugin (pyproject.toml)
 bibtexparser==1.4.1
     # via
     #   coldfront
@@ -215,6 +217,8 @@ six==1.16.0
     #   coldfront
     #   python-dateutil
     #   uplink
+soupsieve==2.8
+    # via beautifulsoup4
 sqlparse==0.4.4
     # via
     #   coldfront
@@ -235,6 +239,7 @@ types-requests==2.32.4.20250913
     # via imperial_coldfront_plugin (pyproject.toml)
 typing-extensions==4.10.0
     # via
+    #   beautifulsoup4
     #   coldfront
     #   django-stubs
     #   django-stubs-ext

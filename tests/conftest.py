@@ -246,10 +246,15 @@ def project(user):
         ProjectAttribute,
         ProjectAttributeType,
         ProjectStatusChoice,
+        ProjectUser,
+        ProjectUserRoleChoice,
+        ProjectUserStatusChoice,
     )
 
     project_active_status = ProjectStatusChoice.objects.create(name="Active")
     field_of_science_other = FieldOfScience.objects.create(description="Other")
+    project_user_active_status = ProjectUserStatusChoice.objects.create(name="Active")
+    project_user_role_manager = ProjectUserRoleChoice.objects.create(name="Manager")
 
     project = Project.objects.create(
         pi=user,
@@ -268,6 +273,12 @@ def project(user):
     )
     ProjectAttribute.objects.create(
         proj_attr_type=group_id_attribute_type, project=project, value=user.username
+    )
+    ProjectUser.objects.create(
+        project=project,
+        user=user,
+        status=project_user_active_status,
+        role=project_user_role_manager,
     )
     return project
 

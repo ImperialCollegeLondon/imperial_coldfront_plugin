@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.shortcuts import render
 from django.urls import reverse
@@ -25,6 +26,15 @@ class LoginRequiredMixin:
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FOUND
         assert response.url.startswith(settings.LOGIN_URL)
+
+
+def tag_with_text_filter(tag_name, text):
+    """Return a filter function for BeautifulSoup to match a tag containing text."""
+
+    def _match(tag):
+        return tag.name == tag_name and text in tag.text
+
+    return _match
 
 
 @pytest.fixture
@@ -58,6 +68,18 @@ class TestHomeView:
         )
 
         assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("a", href=reverse("project-list"))
+
+    def test_group_member(self, request_, project):
+        """Test that the home view renders correctly for a group member/owner."""
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("a", href=reverse("project-list"))
 
 
 @pytest.fixture
@@ -564,10 +586,22 @@ class TestProjectDetailView:
         )
 
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
 
-        assert "Credit Balance" in content
-        assert "0 credits" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        # do full check of the structure here then other tests can just check for
+        # relevant elements
+        card = soup.find("div", class_="card")  # first card in the template
+        assert card["id"] == "credit-balance-card"
+        assert card.find(tag_with_text_filter("h3", "Credit Balance"))
+        assert card.find(tag_with_text_filter("span", "0 credits"))
+        assert card.find(
+            tag_with_text_filter("a", "View transactions"),
+            class_="btn",
+            href=reverse(
+                "imperial_coldfront_plugin:project-credit-transactions",
+                kwargs={"pk": project.pk},
+            ),
+        )
 
     def test_credit_balance_display_when_enabled(self, request_, project, settings):
         """Test that credit balance is displayed when SHOW_CREDIT_BALANCE is True."""
@@ -590,12 +624,10 @@ class TestProjectDetailView:
         )
 
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
 
-        assert "Credit Balance" in content
-        assert "120 credits" in content
-        assert "fa-coins" in content
-        assert "border-primary" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        card = soup.find("div", class_="card", id="credit-balance-card")
+        assert card.find(tag_with_text_filter("span", "120 credits"))
 
     def test_credit_balance_hidden_when_disabled(self, request_, project, settings):
         """Test that credit balance is not displayed when SHOW_CREDIT_BALANCE is False."""  # noqa: E501
@@ -612,13 +644,11 @@ class TestProjectDetailView:
         )
 
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
-
-        assert "Credit Balance" not in content
-        assert "fa-coins" not in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("div", class_="card", id="credit-balance-card")
 
     def test_credit_balance_only_visible_to_pi_and_superuser(
-        self, rf, project, settings, user_factory, user
+        self, rf, project, settings, user_factory, superuser
     ):
         """Ensure credit balance section is only rendered for the PI and superusers."""
         settings.SHOW_CREDIT_BALANCE = True
@@ -631,27 +661,24 @@ class TestProjectDetailView:
             request, tmpl, context={"project": project, "settings": settings}
         )
         assert response.status_code == 200
-        content = response.content.decode("utf-8")
-        assert "Credit Balance" not in content
-        assert "View transactions" not in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("div", class_="card", id="credit-balance-card")
 
         # project PI should see the section
         request.user = project.pi
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
-        content = response.content.decode("utf-8")
-        assert "Credit Balance" in content
-        assert "View transactions" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("div", class_="card", id="credit-balance-card")
 
         # superuser should see the section
-        request.user = user
+        request.user = superuser
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
-        content = response.content.decode("utf-8")
-        assert "Credit Balance" in content
-        assert "View transactions" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("div", class_="card", id="credit-balance-card")
 
 
 class TestProjectCreditTransactionsView(LoginRequiredMixin):
@@ -694,44 +721,53 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         response = superuser_client.get(url)
         assert response.status_code == 200
 
-    def test_transactions_dispalyed_with_total(self, superuser_client, project):
+    def test_transactions_displayed_with_total(self, superuser_client, project):
         """Test that transactions are sorted and running balance is calculated."""
         settings.SHOW_CREDIT_BALANCE = True
-        t1 = CreditTransaction.objects.create(
-            project=project, amount=100, description="First"
-        )
-        t2 = CreditTransaction.objects.create(
-            project=project, amount=50, description="Second"
-        )
-        t3 = CreditTransaction.objects.create(
-            project=project, amount=-30, description="Third"
-        )
-
+        transactions = [
+            CreditTransaction.objects.create(
+                project=project, amount=100, description="First"
+            ),
+            CreditTransaction.objects.create(
+                project=project, amount=50, description="Second"
+            ),
+            CreditTransaction.objects.create(
+                project=project, amount=-30, description="Third"
+            ),
+        ]
         now = timezone.now()
-        CreditTransaction.objects.filter(pk=t1.pk).update(
-            timestamp=now - timedelta(days=3)
-        )
-        CreditTransaction.objects.filter(pk=t2.pk).update(
-            timestamp=now - timedelta(days=2)
-        )
-        CreditTransaction.objects.filter(pk=t3.pk).update(
-            timestamp=now - timedelta(days=1)
-        )
+
+        for offset, transaction in zip([3, 2, 1], transactions):
+            transaction.timestamp = now - timedelta(days=offset)
+            transaction.save()
 
         url = self._get_url(project.pk)
         response = superuser_client.get(url)
         assert response.status_code == 200
 
-        content = response.content.decode()
+        soup = BeautifulSoup(response.content, "html.parser")
+        # check link back to project detail
+        assert soup.find(
+            "a",
+            class_="btn",
+            href=reverse("project-detail", args=[project.pk]),
+            text="Back to Group",
+        )
+        table = soup.find("table")
 
-        first_pos = content.index("First")
-        second_pos = content.index("Second")
-        third_pos = content.index("Third")
-        assert first_pos < second_pos < third_pos
+        rows = table.tbody.findChildren("tr")
+        assert len(rows) == len(transactions)
+        # check ordering of table rows is chronological
+        total = 0
+        for row, transaction in zip(rows, transactions):
+            cells = row.findChildren("td")
+            assert cells[2].span.text.strip() == str(transaction.amount)
+            total += transaction.amount
+            assert cells[3].text.strip() == str(total)
 
-        assert "100" in content
-        assert "150" in content
-        assert "120" in content
+        # check total in footer
+        footer = table.tfoot.tr
+        assert footer.find(tag_with_text_filter("th", str(total)))
 
     def test_positive_negative_amounts_styled(self, superuser_client, project):
         """Test that positive amounts are green and negative are red."""
@@ -744,17 +780,10 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
 
         url = self._get_url(project.pk)
         response = superuser_client.get(url)
-        content = response.content.decode()
 
-        assert "text-success" in content
-        assert "text-danger" in content
-
-    def test_back_link_to_project(self, superuser_client, project):
-        """Test that back link to project detail exists."""
-        url = self._get_url(project.pk)
-        response = superuser_client.get(url)
-        content = response.content.decode()
-
-        project_url = reverse("project-detail", kwargs={"pk": project.pk})
-        assert f'href="{project_url}"' in content
-        assert "Back to Group" in content
+        soup = BeautifulSoup(response.content, "html.parser")
+        table = soup.find("table")
+        rows = table.tbody.findChildren("tr")
+        assert len(rows) == 2
+        assert rows[0].find("span", class_="text-success")
+        assert rows[1].find("span", class_="text-danger")
