@@ -441,7 +441,8 @@ def test_check_expiry_notifications_expiry_warning(
 ):
     """Test expiry warning is sent at scheduled intervals."""
     # Set allocation to expire in 90 days
-    rdf_allocation.end_date = datetime.now().date() + timedelta(days=90)
+    days_before_expiry = settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE[0]
+    rdf_allocation.end_date = datetime.now().date() + timedelta(days=days_before_expiry)
     rdf_allocation.save()
 
     check_rdf_allocation_expiry_notifications()
