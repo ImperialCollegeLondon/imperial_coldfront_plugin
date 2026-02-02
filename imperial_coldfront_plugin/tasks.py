@@ -3,7 +3,7 @@
 import functools
 import logging
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -19,7 +19,14 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .emails import Discrepancy, send_discrepancy_notification
+from .emails import (
+    Discrepancy,
+    send_allocation_deletion_notification,
+    send_allocation_deletion_warning,
+    send_allocation_expiry_warning,
+    send_allocation_removal_warning,
+    send_discrepancy_notification,
+)
 from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
@@ -310,6 +317,98 @@ def _change_expired_allocations_to_deleted() -> None:
     expired_allocations.update(status=deleted_status)
 
 
+def _check_rdf_allocation_expiry_notifications() -> None:
+    """Check RDF allocations and send appropriate expiry notifications."""
+    logger = logging.getLogger("django-q")
+
+    rdf_resource = Resource.objects.get(name="RDF Active")
+    today = date.today()
+
+    # Build date lists for each notification type
+    expiry_warning_dates = [
+        today + timedelta(days=days)
+        for days in settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE
+    ]
+    removal_warning_dates = [
+        today + timedelta(days=days)
+        for days in settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE
+    ]
+    deletion_warning_dates = [
+        today + timedelta(days=days)
+        for days in settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE
+    ]
+    deletion_notification_dates = [
+        today + timedelta(days=days)
+        for days in settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE
+    ]
+
+    # Query for expiry warnings
+    expiry_allocations = Allocation.objects.filter(
+        resources=rdf_resource, end_date__in=expiry_warning_dates
+    ).select_related("project", "project__pi")
+
+    for allocation in expiry_allocations:
+        days_until_expiry = (allocation.end_date - today).days
+        project_owner = allocation.project.pi
+
+        logger.info(
+            f"Sending expiry warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+        )
+        send_allocation_expiry_warning(
+            allocation.pk, project_owner.email, days_until_expiry
+        )
+
+    # Query for removal warnings
+    removal_allocations = Allocation.objects.filter(
+        resources=rdf_resource, end_date__in=removal_warning_dates
+    ).select_related("project", "project__pi")
+
+    for allocation in removal_allocations:
+        days_until_expiry = (allocation.end_date - today).days
+        project_owner = allocation.project.pi
+
+        logger.info(
+            f"Sending removal warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+        )
+        send_allocation_removal_warning(
+            allocation.pk, project_owner.email, days_until_expiry
+        )
+
+    # Query for deletion warnings
+    deletion_warning_allocations = Allocation.objects.filter(
+        resources=rdf_resource, end_date__in=deletion_warning_dates
+    ).select_related("project", "project__pi")
+
+    for allocation in deletion_warning_allocations:
+        days_until_expiry = (allocation.end_date - today).days
+        project_owner = allocation.project.pi
+
+        logger.info(
+            f"Sending deletion warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+        )
+        send_allocation_deletion_warning(
+            allocation.pk, project_owner.email, days_until_expiry
+        )
+
+    # Query for deletion notifications
+    deletion_notification_allocations = Allocation.objects.filter(
+        resources=rdf_resource, end_date__in=deletion_notification_dates
+    ).select_related("project", "project__pi")
+
+    for allocation in deletion_notification_allocations:
+        project_owner = allocation.project.pi
+
+        logger.info(f"Sending deletion notification for allocation {allocation.pk}")
+        send_allocation_deletion_notification(allocation.pk, project_owner.email)
+
+    logger.info(
+        f"Sent {expiry_allocations.count()} expiry warnings, "
+        f"{removal_allocations.count()} removal warnings, "
+        f"{deletion_warning_allocations.count()} deletion warnings, "
+        f"{deletion_notification_allocations.count()} deletion notifications"
+    )
+
+
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
     _remove_allocation_group_members
 )
@@ -321,6 +420,11 @@ check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consis
 update_quota_usages_task = log_task_exceptions_to_django_logger(
     _update_quota_usages_task
 )
+
 change_expired_allocations_to_deleted = log_task_exceptions_to_django_logger(
     _change_expired_allocations_to_deleted
+)
+
+check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
+    _check_rdf_allocation_expiry_notifications
 )
