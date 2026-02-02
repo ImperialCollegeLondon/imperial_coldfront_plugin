@@ -118,6 +118,19 @@ ALLOCATION_SHORTNAME_MAX_LENGTH = 12
 ALLOCATION_DEFAULT_PERIOD_DAYS = 365
 """Days from current date for the initial form default end date for an allocation."""
 
+# RDF Allocation Expiry Notification Schedules
+RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = [90, 60, 30, 7, 1]
+"""Days before expiry to send expiry warning notifications."""
+
+RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = [0, -3, -6]
+"""Days relative to expiry to send removal warning notifications."""
+
+RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = [-7, -10, -13]
+"""Days after expiry to send deletion warning notifications."""
+
+RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = [-14]
+"""Days after expiry to send deletion notifications."""
+
 SHOW_CREDIT_BALANCE = ENV.bool("SHOW_CREDIT_BALANCE", default=False)
 """Whether to display the credit balance section on project detail pages."""
 

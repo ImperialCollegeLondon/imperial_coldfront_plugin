@@ -1,19 +1,22 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
     AllocationAttributeUsage,
+    AllocationStatusChoice,
     AllocationUser,
 )
+from coldfront.core.resource.models import Resource
 
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.tasks import (
     check_ldap_consistency,
+    check_rdf_allocation_expiry_notifications,
     create_rdf_allocation,
 )
 
@@ -52,6 +55,12 @@ def ldap_gid_in_use_mock(mocker):
 
 
 @pytest.fixture
+def ldap_remove_member_mock(mocker):
+    """Mock ldap_remove_member_from_group in tasks.py."""
+    return mocker.patch("imperial_coldfront_plugin.ldap.ldap_remove_member_from_group")
+
+
+@pytest.fixture
 def rdf_form_data(project, settings):
     """Fixture to provide RDFAllocationForm data."""
     faculty_id = "foe"
@@ -65,6 +74,38 @@ def rdf_form_data(project, settings):
         size=10,
         allocation_shortname="shorty",
         description="The allocation description",
+    )
+
+
+@pytest.fixture
+def send_expiry_warning_mock(mocker):
+    """Mock send_allocation_expiry_warning."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_allocation_expiry_warning"
+    )
+
+
+@pytest.fixture
+def send_removal_warning_mock(mocker):
+    """Mock send_allocation_removal_warning."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_allocation_removal_warning"
+    )
+
+
+@pytest.fixture
+def send_deletion_warning_mock(mocker):
+    """Mock send_allocation_deletion_warning."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_allocation_deletion_warning"
+    )
+
+
+@pytest.fixture
+def send_deletion_notification_mock(mocker):
+    """Mock send_allocation_deletion_notification."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_allocation_deletion_notification"
     )
 
 
@@ -302,3 +343,234 @@ def test_check_ldap_consistency_extra_members(
     assert extra_user in discrepancy["extra_members"]
 
     notify_mock.assert_called_once()
+
+
+def test_remove_allocation_group_members(
+    ldap_remove_member_mock,
+    rdf_allocation,
+    allocation_user,
+    rdf_allocation_ldap_name,
+    enable_ldap,
+):
+    """Test _remove_allocation_group_members removes all active users."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
+    username = allocation_user.user.username
+
+    remove_allocation_group_members(rdf_allocation.pk)
+
+    ldap_remove_member_mock.assert_called_once_with(
+        rdf_allocation_ldap_name,
+        username,
+        allow_missing=True,
+    )
+
+
+def test_remove_allocation_group_members_multiple_users(
+    ldap_remove_member_mock,
+    rdf_allocation,
+    allocation_user,
+    allocation_user_active_status,
+    user_factory,
+    rdf_allocation_ldap_name,
+    enable_ldap,
+):
+    """Test _remove_allocation_group_members removes multiple active users."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
+    # Create additional active users
+    user2 = user_factory()
+    user3 = user_factory()
+
+    allocation_user2 = AllocationUser.objects.create(  # noqa F841
+        allocation=rdf_allocation,
+        user=user2,
+        status=allocation_user_active_status,
+    )
+    allocation_user3 = AllocationUser.objects.create(  # noqa F841
+        allocation=rdf_allocation,
+        user=user3,
+        status=allocation_user_active_status,
+    )
+
+    remove_allocation_group_members(rdf_allocation.pk)
+
+    assert ldap_remove_member_mock.call_count == 3
+    ldap_remove_member_mock.assert_any_call(
+        rdf_allocation_ldap_name,
+        allocation_user.user.username,
+        allow_missing=True,
+    )
+    ldap_remove_member_mock.assert_any_call(
+        rdf_allocation_ldap_name,
+        user2.username,
+        allow_missing=True,
+    )
+    ldap_remove_member_mock.assert_any_call(
+        rdf_allocation_ldap_name,
+        user3.username,
+        allow_missing=True,
+    )
+
+
+def test_remove_allocation_group_members_no_shortname(
+    ldap_remove_member_mock,
+    rdf_allocation,
+    allocation_user,
+):
+    """Test _remove_allocation_group_members handles missing shortname gracefully."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
+    # Remove the shortname attribute
+    rdf_allocation.allocationattribute_set.get(
+        allocation_attribute_type__name="Shortname"
+    ).delete()
+
+    remove_allocation_group_members(rdf_allocation.pk)
+
+    ldap_remove_member_mock.assert_not_called()
+
+
+def test_check_expiry_notifications_expiry_warning(
+    rdf_allocation,
+    send_expiry_warning_mock,
+    send_removal_warning_mock,
+    send_deletion_warning_mock,
+    send_deletion_notification_mock,
+    settings,
+):
+    """Test expiry warning is sent at scheduled intervals."""
+    # Set allocation to expire in 90 days
+    days_before_expiry = settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE[0]
+    rdf_allocation.end_date = datetime.now().date() + timedelta(days=days_before_expiry)
+    rdf_allocation.save()
+
+    check_rdf_allocation_expiry_notifications()
+
+    send_expiry_warning_mock.assert_called_once_with(
+        rdf_allocation.pk, rdf_allocation.project.pi.email, 90
+    )
+    send_removal_warning_mock.assert_not_called()
+    send_deletion_warning_mock.assert_not_called()
+    send_deletion_notification_mock.assert_not_called()
+
+
+def test_check_expiry_notifications_removal_warning(
+    rdf_allocation,
+    send_expiry_warning_mock,
+    send_removal_warning_mock,
+    send_deletion_warning_mock,
+    send_deletion_notification_mock,
+):
+    """Test removal warning is sent on expiry day."""
+    # Set allocation to expire today
+    rdf_allocation.end_date = datetime.now().date()
+    rdf_allocation.save()
+
+    check_rdf_allocation_expiry_notifications()
+
+    send_removal_warning_mock.assert_called_once_with(
+        rdf_allocation.pk, rdf_allocation.project.pi.email, 0
+    )
+    send_expiry_warning_mock.assert_not_called()
+    send_deletion_warning_mock.assert_not_called()
+    send_deletion_notification_mock.assert_not_called()
+
+
+def test_check_expiry_notifications_deletion_warning(
+    rdf_allocation,
+    send_expiry_warning_mock,
+    send_removal_warning_mock,
+    send_deletion_warning_mock,
+    send_deletion_notification_mock,
+    settings,
+):
+    """Test deletion warning is sent after expiry."""
+    # Set allocation to have expired 7 days ago
+    days_after_expiry = abs(settings.RDF_ALLOCATION_DELETION_WARNING_SCHEDULE[0])
+    rdf_allocation.end_date = datetime.now().date() - timedelta(days=days_after_expiry)
+    rdf_allocation.save()
+
+    check_rdf_allocation_expiry_notifications()
+
+    send_deletion_warning_mock.assert_called_once_with(
+        rdf_allocation.pk, rdf_allocation.project.pi.email, -days_after_expiry
+    )
+    send_expiry_warning_mock.assert_not_called()
+    send_removal_warning_mock.assert_not_called()
+    send_deletion_notification_mock.assert_not_called()
+
+
+def test_check_expiry_notifications_deletion_notification(
+    rdf_allocation,
+    send_expiry_warning_mock,
+    send_removal_warning_mock,
+    send_deletion_warning_mock,
+    send_deletion_notification_mock,
+    settings,
+):
+    """Test deletion notification is sent 14 days after expiry."""
+    # Set allocation to have expired per deletion notification schedule
+    days_after_expiry = abs(settings.RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE[0])
+    rdf_allocation.end_date = datetime.now().date() - timedelta(days=days_after_expiry)
+    rdf_allocation.save()
+
+    check_rdf_allocation_expiry_notifications()
+
+    send_deletion_notification_mock.assert_called_once_with(
+        rdf_allocation.pk, rdf_allocation.project.pi.email
+    )
+    send_expiry_warning_mock.assert_not_called()
+    send_removal_warning_mock.assert_not_called()
+    send_deletion_warning_mock.assert_not_called()
+
+
+def test_check_expiry_notifications_no_end_date(
+    rdf_allocation,
+    send_expiry_warning_mock,
+):
+    """Test notification skipped when allocation has no end date."""
+    # Remove end date
+    rdf_allocation.end_date = None
+    rdf_allocation.save()
+
+    check_rdf_allocation_expiry_notifications()
+
+    send_expiry_warning_mock.assert_not_called()
+
+
+def test_check_expiry_notifications_multiple_allocations(
+    rdf_allocation,
+    rdf_allocation_dependencies,
+    project,
+    send_expiry_warning_mock,
+    send_removal_warning_mock,
+    settings,
+):
+    """Test notifications sent for multiple allocations with different schedules."""
+    # Get the required objects
+    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+    rdf_resource = Resource.objects.get(name="RDF Active")
+
+    # First allocation expires per expiry warning schedule (e.g., 30 days)
+    days_before_expiry = settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE[2]  # 30 days
+    rdf_allocation.end_date = datetime.now().date() + timedelta(days=days_before_expiry)
+    rdf_allocation.save()
+
+    # Create second allocation per removal warning schedule (e.g., -3 days)
+    days_after_expiry = abs(settings.RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE[1])  # -3
+    allocation2 = Allocation.objects.create(
+        project=project,
+        status=allocation_active_status,
+        end_date=datetime.now().date() - timedelta(days=days_after_expiry),
+    )
+    allocation2.resources.add(rdf_resource)
+
+    check_rdf_allocation_expiry_notifications()
+
+    send_expiry_warning_mock.assert_called_once_with(
+        rdf_allocation.pk, rdf_allocation.project.pi.email, days_before_expiry
+    )
+    send_removal_warning_mock.assert_called_once_with(
+        allocation2.pk, project.pi.email, -days_after_expiry
+    )
