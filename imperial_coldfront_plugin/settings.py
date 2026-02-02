@@ -121,6 +121,9 @@ ALLOCATION_DEFAULT_PERIOD_DAYS = 365
 SHOW_CREDIT_BALANCE = ENV.bool("SHOW_CREDIT_BALANCE", default=False)
 """Whether to display the credit balance section on project detail pages."""
 
+RDF_ALLOCATION_EXPIRY_DELETION_DAYS = 14
+"""Number of days after an allocation expiry to delete the allocation automatically."""
+
 # Mappings for faculty and department names and shortnames for development purposes.
 # These should be overridden in prod via prod_settings.py.
 DEPARTMENTS = {

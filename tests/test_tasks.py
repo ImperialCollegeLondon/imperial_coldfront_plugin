@@ -6,6 +6,7 @@ from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
     AllocationAttributeUsage,
+    AllocationStatusChoice,
     AllocationUser,
 )
 
@@ -394,3 +395,30 @@ def test_remove_allocation_group_members_no_shortname(
     remove_allocation_group_members(rdf_allocation.pk)
 
     ldap_remove_member_mock.assert_not_called()
+
+
+def test_change_expired_allocations_to_deleted(
+    rdf_allocation,
+    enable_ldap,
+):
+    """Test mark_expired_allocations_as_deleted functionality."""
+    from imperial_coldfront_plugin.tasks import change_expired_allocations_to_deleted
+
+    # Test that expired allocations are changed to "Deleted":
+    allocation_status_deleted = AllocationStatusChoice.objects.get(name="Deleted")
+    rdf_allocation.end_date = datetime(2000, 1, 1).date()
+    rdf_allocation.save()
+
+    change_expired_allocations_to_deleted()
+    rdf_allocation.refresh_from_db()
+    assert rdf_allocation.status == allocation_status_deleted
+
+    # Test that non-expired allocations are not changed:
+    allocation_status_active = AllocationStatusChoice.objects.get(name="Active")
+    rdf_allocation.status = allocation_status_active
+    rdf_allocation.end_date = datetime.now()
+    rdf_allocation.save()
+
+    change_expired_allocations_to_deleted()
+    rdf_allocation.refresh_from_db()
+    assert rdf_allocation.status == allocation_status_active

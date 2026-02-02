@@ -3,6 +3,7 @@
 import functools
 import logging
 from collections.abc import Callable
+from datetime import timedelta
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -16,6 +17,7 @@ from coldfront.core.allocation.models import (
 from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from .emails import Discrepancy, send_discrepancy_notification
 from .forms import AllocationFormData
@@ -297,6 +299,17 @@ def _remove_allocation_group_members(allocation_id: int) -> None:
         )
 
 
+def _change_expired_allocations_to_deleted() -> None:
+    """Change the status of allocations when X days past expiry to "Deleted"."""
+    expiry_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS)
+    expired_allocations = Allocation.objects.filter(
+        # Change delete status when current time - expiry date > expiry limit
+        end_date__lt=(timezone.now() - expiry_limit),
+    )
+    deleted_status = AllocationStatusChoice.objects.get(name="Deleted")
+    expired_allocations.update(status=deleted_status)
+
+
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
     _remove_allocation_group_members
 )
@@ -307,4 +320,7 @@ create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocat
 check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consistency)
 update_quota_usages_task = log_task_exceptions_to_django_logger(
     _update_quota_usages_task
+)
+change_expired_allocations_to_deleted = log_task_exceptions_to_django_logger(
+    _change_expired_allocations_to_deleted
 )
