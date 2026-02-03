@@ -28,7 +28,7 @@
 {% if settings.SHOW_CREDIT_BALANCE %}
   {% if request.user == project.pi or request.user.is_superuser %}
 <!-- Start Credit Balance Display -->
-<div class="card mb-3 bg-light border-primary">
+<div class="card mb-3 bg-light border-primary" id="credit-balance-card">
   <div class="card-body">
     <div class="row align-items-center">
       <div class="col-md-8">

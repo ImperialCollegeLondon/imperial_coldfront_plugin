@@ -169,3 +169,25 @@ def remove_ldap_group_membership(
         instance.user.username,
         allow_missing=True,
     )
+
+
+@receiver(post_save, sender=Allocation)
+def remove_ldap_group_members_if_allocation_inactive(
+    sender: object, instance: Allocation, **kwargs: object
+) -> None:
+    """Remove all LDAP group members if allocation is not Active.
+
+    The LDAP group itself is not deleted.
+    """
+    from .tasks import remove_allocation_group_members
+
+    if not settings.LDAP_ENABLED:
+        return
+
+    if instance.status.name == "Active":
+        return
+
+    if _get_shortname_from_allocation(instance) is None:
+        return
+
+    async_task(remove_allocation_group_members, instance.pk)

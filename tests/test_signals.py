@@ -2,6 +2,7 @@ import pytest
 from coldfront.core.allocation.models import (
     AllocationAttribute,
     AllocationAttributeType,
+    AllocationStatusChoice,
     AllocationUser,
     AllocationUserStatusChoice,
 )
@@ -27,6 +28,14 @@ def ldap_gid_in_use_mock(mocker):
     return mocker.patch(
         "imperial_coldfront_plugin.signals.ldap_gid_in_use",
         return_value=False,
+    )
+
+
+@pytest.fixture
+def remove_allocation_group_members_mock(mocker):
+    """Mock remove_allocation_group_members task in signals.py."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.remove_allocation_group_members"
     )
 
 
@@ -176,3 +185,64 @@ def test_ensure_no_existing_gid_ldap(
             allocation=rdf_allocation,
             value=rdf_allocation_gid,
         )
+
+
+def test_remove_ldap_group_members_if_allocation_inactive(
+    remove_allocation_group_members_mock,
+    rdf_allocation,
+    allocation_user,
+    enable_ldap,
+):
+    """Test remove_ldap_group_members_if_allocation_inactive signal."""
+    remove_allocation_group_members_mock.assert_not_called()
+
+    # Change allocation status to inactive
+    allocation_inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
+    rdf_allocation.status = allocation_inactive_status
+    rdf_allocation.save()
+
+    remove_allocation_group_members_mock.assert_called_once_with(rdf_allocation.pk)
+
+
+def test_remove_ldap_group_members_if_allocation_active(
+    remove_allocation_group_members_mock,
+    rdf_allocation,
+    allocation_user,
+    enable_ldap,
+):
+    """Test that task is not called when allocation is active."""
+    remove_allocation_group_members_mock.assert_not_called()
+
+    # Allocation is already active, so saving shouldn't trigger the task
+    rdf_allocation.save()
+
+    remove_allocation_group_members_mock.assert_not_called()
+
+
+def test_remove_ldap_group_members_no_shortname(
+    remove_allocation_group_members_mock,
+    rdf_allocation,
+    enable_ldap,
+):
+    """Test that task is not called when allocation has no shortname."""
+    rdf_allocation.allocationattribute_set.get(
+        allocation_attribute_type__name="Shortname"
+    ).delete()
+
+    allocation_inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
+    rdf_allocation.status = allocation_inactive_status
+    rdf_allocation.save()
+
+    remove_allocation_group_members_mock.assert_not_called()
+
+
+def test_remove_ldap_group_members_ldap_disabled(
+    remove_allocation_group_members_mock,
+    rdf_allocation,
+):
+    """Test that task is not called when LDAP is disabled."""
+    allocation_inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
+    rdf_allocation.status = allocation_inactive_status
+    rdf_allocation.save()
+
+    remove_allocation_group_members_mock.assert_not_called()
