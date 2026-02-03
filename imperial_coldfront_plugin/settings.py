@@ -134,8 +134,11 @@ RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = [-14]
 SHOW_CREDIT_BALANCE = ENV.bool("SHOW_CREDIT_BALANCE", default=False)
 """Whether to display the credit balance section on project detail pages."""
 
+RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS = 7
+"""Number of days after allocation expires to mark as removed."""
+
 RDF_ALLOCATION_EXPIRY_DELETION_DAYS = 14
-"""Number of days after an allocation expiry to delete the allocation automatically."""
+"""Number of days after an allocation expiry to mark as deleted."""
 
 # Mappings for faculty and department names and shortnames for development purposes.
 # These should be overridden in prod via prod_settings.py.

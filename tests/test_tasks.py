@@ -10,6 +10,8 @@ from coldfront.core.allocation.models import (
     AllocationUser,
 )
 from coldfront.core.resource.models import Resource
+from django.conf import settings
+from django.utils import timezone
 
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
@@ -431,31 +433,34 @@ def test_remove_allocation_group_members_no_shortname(
     ldap_remove_member_mock.assert_not_called()
 
 
-def test_change_expired_allocations_to_deleted(
+@pytest.mark.parametrize(
+    "days_offset, expected_status_name",
+    [
+        # Expired past deletion threshold
+        (-(settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS + 1), "Deleted"),
+        # Expired past removal threshold
+        (-(settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS + 1), "Removed"),
+        # Not expired
+        (0, "Active"),
+    ],
+)
+def test_check_allocation_status(
     rdf_allocation,
     enable_ldap,
+    days_offset,
+    expected_status_name,
 ):
     """Test mark_expired_allocations_as_deleted functionality."""
-    from imperial_coldfront_plugin.tasks import change_expired_allocations_to_deleted
+    from imperial_coldfront_plugin.tasks import check_allocation_status
 
     # Test that expired allocations are changed to "Deleted":
-    allocation_status_deleted = AllocationStatusChoice.objects.get(name="Deleted")
-    rdf_allocation.end_date = datetime(2000, 1, 1).date()
+    expected_status = AllocationStatusChoice.objects.get(name=expected_status_name)
+    rdf_allocation.end_date = timezone.now() + timedelta(days=days_offset)
     rdf_allocation.save()
 
-    change_expired_allocations_to_deleted()
+    check_allocation_status()
     rdf_allocation.refresh_from_db()
-    assert rdf_allocation.status == allocation_status_deleted
-
-    # Test that non-expired allocations are not changed:
-    allocation_status_active = AllocationStatusChoice.objects.get(name="Active")
-    rdf_allocation.status = allocation_status_active
-    rdf_allocation.end_date = datetime.now()
-    rdf_allocation.save()
-
-    change_expired_allocations_to_deleted()
-    rdf_allocation.refresh_from_db()
-    assert rdf_allocation.status == allocation_status_active
+    assert rdf_allocation.status == expected_status
 
 
 def test_check_expiry_notifications_expiry_warning(

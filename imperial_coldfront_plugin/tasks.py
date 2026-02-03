@@ -306,15 +306,34 @@ def _remove_allocation_group_members(allocation_id: int) -> None:
         )
 
 
-def _change_expired_allocations_to_deleted() -> None:
-    """Change the status of allocations when X days past expiry to "Deleted"."""
-    expiry_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS)
-    expired_allocations = Allocation.objects.filter(
-        # Change delete status when current time - expiry date > expiry limit
-        end_date__lt=(timezone.now() - expiry_limit),
+def _check_allocation_status() -> None:
+    """Change the status of expired allocations to "removed" or "deleted".
+
+    There are default values in the settings for how long after an allocation's end date
+    it should be marked as removed or deleted. Allocations within the two limits get
+    marked as "Removed", and allocations beyond the window get marked as "Deleted".
+    """
+    remove_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS)
+    delete_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS)
+
+    allocations_to_remove = Allocation.objects.filter(
+        # current time - end date >= remove limit
+        end_date__lte=(timezone.now() - remove_limit),
+        # current time - end date < delete limit
+        end_date__gt=(timezone.now() - delete_limit),
+        resources__name="RDF Active",
+    )
+    removed_status = AllocationStatusChoice.objects.get(name="Removed")
+    allocations_to_remove.update(status=removed_status)
+
+    # Delete Allocations that end beyond deletion limit
+    allocations_to_delete = Allocation.objects.filter(
+        # current time - expiry date > expiry limit
+        end_date__lte=(timezone.now() - delete_limit),
+        resources__name="RDF Active",
     )
     deleted_status = AllocationStatusChoice.objects.get(name="Deleted")
-    expired_allocations.update(status=deleted_status)
+    allocations_to_delete.update(status=deleted_status)
 
 
 def _check_rdf_allocation_expiry_notifications() -> None:
@@ -420,11 +439,7 @@ check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consis
 update_quota_usages_task = log_task_exceptions_to_django_logger(
     _update_quota_usages_task
 )
-
-change_expired_allocations_to_deleted = log_task_exceptions_to_django_logger(
-    _change_expired_allocations_to_deleted
-)
-
+check_allocation_status = log_task_exceptions_to_django_logger(_check_allocation_status)
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
 )
