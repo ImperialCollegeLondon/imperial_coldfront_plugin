@@ -428,7 +428,7 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
-def _expires_allocations_gpfs_quota_check() -> None:
+def _expired_allocations_gpfs_quota_check() -> None:
     """Set the GPFS quota to zero for expired RDF allocations."""
     logger = logging.getLogger("django-q")
 
@@ -495,6 +495,6 @@ update_allocation_status = log_task_exceptions_to_django_logger(
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
 )
-expires_allocations_gpfs_quota_check = log_task_exceptions_to_django_logger(
-    _expires_allocations_gpfs_quota_check
+expired_allocations_gpfs_quota_check = log_task_exceptions_to_django_logger(
+    _expired_allocations_gpfs_quota_check
 )

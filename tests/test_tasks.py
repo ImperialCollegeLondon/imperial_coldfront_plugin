@@ -21,6 +21,7 @@ from imperial_coldfront_plugin.tasks import (
     check_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
     create_rdf_allocation,
+    expired_allocations_gpfs_quota_check,
     remove_allocation_group_members,
 )
 
@@ -609,7 +610,7 @@ def test_check_expiry_notifications_multiple_allocations(
     )
 
 
-def test_expires_allocations_gpfs_quota_check_sets_quota_to_zero(
+def test_expired_allocations_gpfs_quota_check_sets_quota_to_zero(
     rdf_allocation,
     allocation_user,
     gpfs_client_mock,
@@ -633,7 +634,7 @@ def test_expires_allocations_gpfs_quota_check_sets_quota_to_zero(
         allocation_attribute_type__name="Shortname"
     ).value
 
-    expires_allocations_gpfs_quota_check()
+    expired_allocations_gpfs_quota_check()
 
     # Verify GPFS client was called correctly
     client_instance = gpfs_client_mock.return_value
@@ -649,7 +650,7 @@ def test_expires_allocations_gpfs_quota_check_sets_quota_to_zero(
     assert storage_quota_attr.value == "0"
 
 
-def test_expires_allocations_gpfs_quota_check_skips_active_allocations(
+def test_expired_allocations_gpfs_quota_check_skips_active_allocations(
     rdf_allocation,
     gpfs_client_mock,
 ):
@@ -666,14 +667,14 @@ def test_expires_allocations_gpfs_quota_check_skips_active_allocations(
         value=10,
     )
 
-    expires_allocations_gpfs_quota_check()
+    expired_allocations_gpfs_quota_check()
 
     # Verify GPFS client was not called
     client_instance = gpfs_client_mock.return_value
     client_instance.set_quota.assert_not_called()
 
 
-def test_expires_allocations_gpfs_quota_check_handles_missing_shortname(
+def test_expired_allocations_gpfs_quota_check_handles_missing_shortname(
     rdf_allocation,
     gpfs_client_mock,
 ):
@@ -696,7 +697,7 @@ def test_expires_allocations_gpfs_quota_check_handles_missing_shortname(
     ).delete()
 
     # Should not raise an exception
-    expires_allocations_gpfs_quota_check()
+    expired_allocations_gpfs_quota_check()
 
     # Verify GPFS client was not called
     client_instance = gpfs_client_mock.return_value
@@ -725,13 +726,13 @@ def test_expires_allocations_gpfs_quota_check_handles_gpfs_error(
     client_instance.set_quota.side_effect = RuntimeError("GPFS API error")
 
     # Should not raise an exception
-    expires_allocations_gpfs_quota_check()
+    expired_allocations_gpfs_quota_check()
 
     storage_quota_attr.refresh_from_db()
     assert storage_quota_attr.value == "10"
 
 
-def test_expires_allocations_gpfs_quota_check_multiple_allocations(
+def test_expired_allocations_gpfs_quota_check_multiple_allocations(
     rdf_allocation,
     rdf_allocation_dependencies,
     project,
@@ -774,7 +775,7 @@ def test_expires_allocations_gpfs_quota_check_multiple_allocations(
         value=20,
     )
 
-    expires_allocations_gpfs_quota_check()
+    expired_allocations_gpfs_quota_check()
 
     # Verify GPFS client was called twice
     client_instance = gpfs_client_mock.return_value
