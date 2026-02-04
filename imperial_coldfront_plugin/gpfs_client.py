@@ -198,7 +198,6 @@ class GPFSClient(Consumer):
                 call_kwargs[last_id] = last_id_value
 
             response = request_callable(**call_kwargs)
-            response.raise_for_status()
             data = response.json()
 
             results.extend(data.get(item_key, []))
@@ -269,7 +268,6 @@ class GPFSClient(Consumer):
                 permissionChangeMode="chmodAndSetAcl",
                 iamMode="advisory",
             )
-            response.raise_for_status()
             return response
         except requests.HTTPError as e:
             raise FilesetCreationError(
@@ -324,7 +322,6 @@ class GPFSClient(Consumer):
                 filesGracePeriod="null",
                 blockGracePeriod="null",
             )
-            response.raise_for_status()
             return response
         except requests.HTTPError as e:
             raise FilesetQuotaError(
@@ -532,7 +529,6 @@ class GPFSClient(Consumer):
             response = self._set_directory_acl(
                 filesystem_name, str(path), entries=list(acl.iter_as_dicts())
             )
-            response.raise_for_status()
             return response
         except requests.HTTPError as e:
             raise UnableToSetACLError(
