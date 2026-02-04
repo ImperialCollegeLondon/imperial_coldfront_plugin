@@ -704,7 +704,7 @@ def test_expired_allocations_gpfs_quota_check_handles_missing_shortname(
     client_instance.set_quota.assert_not_called()
 
 
-def test_expires_allocations_gpfs_quota_check_handles_gpfs_error(
+def test_expired_allocations_gpfs_quota_check_handles_gpfs_error(
     rdf_allocation,
     gpfs_client_mock,
 ):
