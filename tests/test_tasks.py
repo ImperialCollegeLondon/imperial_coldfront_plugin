@@ -450,7 +450,7 @@ def test_check_allocation_status(
     days_offset,
     expected_status_name,
 ):
-    """Test mark_expired_allocations_as_deleted functionality."""
+    """Test update_allocation_status task."""
     from imperial_coldfront_plugin.tasks import check_allocation_status
 
     # Test that expired allocations are changed to "Deleted":
@@ -458,7 +458,7 @@ def test_check_allocation_status(
     rdf_allocation.end_date = timezone.now() + timedelta(days=days_offset)
     rdf_allocation.save()
 
-    check_allocation_status()
+    update_allocation_status()
     rdf_allocation.refresh_from_db()
     assert rdf_allocation.status == expected_status
 

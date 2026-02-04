@@ -8,7 +8,7 @@ def schedule_check_allocation_status(apps, schema_editor):
     Schedule = apps.get_model("django_q", "Schedule")
     Schedule.objects.update_or_create(
         name="Change allocation status to deleted or removed for expired allocations",
-        func="imperial_coldfront_plugin.tasks.check_allocation_status",
+        func="imperial_coldfront_plugin.tasks.update_allocation_status",
         schedule_type="D",
     )
 
