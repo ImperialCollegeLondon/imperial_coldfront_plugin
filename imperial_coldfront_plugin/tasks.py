@@ -439,7 +439,9 @@ check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consis
 update_quota_usages_task = log_task_exceptions_to_django_logger(
     _update_quota_usages_task
 )
-update_allocation_status = log_task_exceptions_to_django_logger(_update_allocation_status)
+update_allocation_status = log_task_exceptions_to_django_logger(
+    _update_allocation_status
+)
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
 )
