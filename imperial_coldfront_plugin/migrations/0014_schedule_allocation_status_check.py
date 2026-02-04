@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def schedule_check_allocation_status(apps, schema_editor):
+def schedule_update_allocation_status(apps, schema_editor):
     """Adds scheduled task to check if any allocations should be marked as removed or deleted."""
     Schedule = apps.get_model("django_q", "Schedule")
     Schedule.objects.update_or_create(
@@ -20,5 +20,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(schedule_check_allocation_status)
+        migrations.RunPython(schedule_update_allocation_status)
     ]

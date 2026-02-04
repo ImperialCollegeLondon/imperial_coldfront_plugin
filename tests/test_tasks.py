@@ -444,14 +444,15 @@ def test_remove_allocation_group_members_no_shortname(
         (0, "Active"),
     ],
 )
-def test_check_allocation_status(
+def test_update_allocation_status(
     rdf_allocation,
     enable_ldap,
     days_offset,
     expected_status_name,
 ):
     """Test update_allocation_status task."""
-    # Test that expired allocations are changed to "Deleted":
+    from imperial_coldfront_plugin.tasks import update_allocation_status
+
     expected_status = AllocationStatusChoice.objects.get(name=expected_status_name)
     rdf_allocation.end_date = timezone.now() + timedelta(days=days_offset)
     rdf_allocation.save()
