@@ -397,6 +397,56 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
+def _expires_allocations_gpfs_quota_check() -> None:
+    """Set the GPFS quota to zero for expired RDF allocations."""
+    logger = logging.getLogger("django-q")
+
+    rdf_resource = Resource.objects.get(name="RDF Active")
+    today = date.today()
+
+    expired_allocations = Allocation.objects.filter(
+        resources=rdf_resource,
+        end_date__lt=today,
+        status__name="Active",
+    ).select_related("project")
+
+    if not settings.GPFS_ENABLED:
+        return
+
+    client = GPFSClient()
+
+    for allocation in expired_allocations:
+        try:
+            shortname = allocation.allocationattribute_set.get(
+                allocation_attribute_type__name="Shortname"
+            ).value
+            logger.info(f"Setting quota to zero for expired allocation {shortname}")
+            client.set_quota(
+                filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+                fileset_name=shortname,
+                block_quota="0",
+                files_quota="0",
+            )
+
+            storage_quota_attribute = allocation.allocationattribute_set.get(
+                allocation_attribute_type__name="Storage Quota (TB)"
+            )
+            storage_quota_attribute.value = 0
+            storage_quota_attribute.save()
+
+            logger.info(
+                f"Updated Storage Quota attribute to 0 for allocation {shortname}"
+            )
+        except AllocationAttribute.DoesNotExist:
+            logger.warning(
+                f"Could not find Shortname attribute for allocation {allocation.id}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Error setting quota to zero for allocation {allocation.id}: {e}"
+            )
+
+
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
     _remove_allocation_group_members
 )
@@ -410,4 +460,7 @@ update_quota_usages_task = log_task_exceptions_to_django_logger(
 )
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
+)
+expires_allocations_gpfs_quota_check = log_task_exceptions_to_django_logger(
+    _expires_allocations_gpfs_quota_check
 )
