@@ -462,7 +462,7 @@ def _expires_allocations_gpfs_quota_check() -> None:
             storage_quota_attribute = allocation.allocationattribute_set.get(
                 allocation_attribute_type__name="Storage Quota (TB)"
             )
-            storage_quota_attribute.value = 0
+            storage_quota_attribute.value = "0"
             storage_quota_attribute.save()
 
             logger.info(
