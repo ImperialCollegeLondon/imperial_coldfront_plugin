@@ -21,7 +21,7 @@ from imperial_coldfront_plugin.tasks import (
     check_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
     create_rdf_allocation,
-    expires_allocations_gpfs_quota_check,
+    expired_allocations_gpfs_quota_check,
     remove_allocation_group_members,
 )
 
