@@ -7,12 +7,10 @@ def create_schedule(apps, schema_editor):
     """Create a daily schedule for checking expired allocations and setting quota to zero."""
     Schedule = apps.get_model("django_q", "Schedule")
     Schedule.objects.get_or_create(
+        name="Check for expired allocations and set GPFS quota to zero",
         func="imperial_coldfront_plugin.tasks.expires_allocations_gpfs_quota_check",
-        defaults={
-            "name": "Expired Allocations GPFS Quota Check",
-            "schedule_type": Schedule.DAILY,
-            "repeats": -1,
-        },
+        schedule_type="D",
+        repeats=-1,
     )
 
 
