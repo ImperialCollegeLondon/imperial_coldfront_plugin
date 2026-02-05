@@ -16,14 +16,6 @@ def create_schedule(apps, schema_editor):
     )
 
 
-def delete_schedule(apps, schema_editor):
-    """Remove the expired allocations quota check schedule."""
-    Schedule = apps.get_model("django_q", "Schedule")
-    Schedule.objects.filter(
-        func="imperial_coldfront_plugin.tasks.expires_allocations_gpfs_quota_check"
-    ).delete()
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -32,5 +24,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(create_schedule, delete_schedule),
+        migrations.RunPython(create_schedule),
     ]
