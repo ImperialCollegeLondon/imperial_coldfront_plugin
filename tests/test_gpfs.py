@@ -22,6 +22,20 @@ BLOCK_QUOTA = "123456T"
 FILES_QUOTA = "654321T"
 
 
+@pytest.fixture(autouse=True)
+def patch_request_session(mocker):
+    """Backstop to prevent real HTTP requests during tests.
+
+    Raises an error if an un-mocked HTTP request is attempted.
+    """
+    return mocker.patch(
+        "requests.Session.send",
+        side_effect=RuntimeError(
+            "Un-mocked HTTP request, tests should never make it here."
+        ),
+    )
+
+
 @pytest.fixture
 def fileset_path_info():
     """A FilesetPathInfo for testing."""
@@ -270,6 +284,26 @@ def test_pagination_retrieve_quota_usage(settings, mock_requests):
         method="GET",
         url="http://example.com/api/filesystems/gpfs0/filesets/myfileset/quotas",
         params={"lastId": "30"},
+        headers={"Authorization": "Basic Og=="},
+        json={},
+    )
+
+
+def test_get_directory_acl(settings, mock_requests):
+    """Test that get_directory_acl method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client.get_directory_acl(
+        filesystem_name="gpfs0",
+        path="path_to_some_directory",
+    )
+
+    mock_requests.assert_called_once_with(
+        method="GET",
+        url="http://example.com/api/filesystems/gpfs0/acl/path_to_some_directory",
         headers={"Authorization": "Basic Og=="},
         json={},
     )
