@@ -605,3 +605,23 @@ def test_check_expiry_notifications_multiple_allocations(
     send_removal_warning_mock.assert_called_once_with(
         allocation2.pk, project.pi.email, -days_after_expiry
     )
+
+
+def test_check_quota_consistency(rdf_allocation):
+    """Test check_quota_consistency task."""
+    from unittest.mock import patch
+
+    from imperial_coldfront_plugin.tasks import _check_quota_consistency
+
+    with patch(
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_usages"
+    ) as mock_usage:
+        # Define exactly what the dictionary looks like after processing
+        mock_usage.return_value = {
+            "shorty": {
+                "files_usage": 500,
+                "block_usage_tb": 1.5,
+            }
+        }
+
+        _check_quota_consistency()

@@ -428,6 +428,41 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
+def _check_quota_consistency() -> None:
+    """Check consistency of quota usages with actual usage on the filesystem."""
+    # Get list of all active rdf storage allocations
+    allocations = Allocation.objects.filter(
+        resources__name="RDF Active",
+        status__name="Active",
+        allocationattribute__allocation_attribute_type__name="Shortname",
+    ).distinct()
+
+    client = GPFSClient()
+    usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)
+
+    for allocation in allocations:
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+        storage_attribute_usage = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Storage Quota (TB)"
+        )
+        files_attribute_usage = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Files Quota"
+        )
+
+        if shortname.removeprefix("pre-") in usages:
+            if storage_attribute_usage.value != usages[shortname]["block_usage_tb"]:
+                # log discrepancy
+                pass
+            elif files_attribute_usage.value != usages[shortname]["files_usage"]:
+                # log discrepancy
+                pass
+        else:
+            # Throw error?
+            pass
+
+
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
     _remove_allocation_group_members
 )
