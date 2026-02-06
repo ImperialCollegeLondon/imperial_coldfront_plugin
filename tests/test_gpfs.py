@@ -234,8 +234,8 @@ def test_paginate():
     assert "lastId" in second_kwargs and second_kwargs["lastId"] == 100
 
 
-def test_pagination_filesystems(settings, mock_requests):
-    """Test that filesystems method paginates correctly."""
+def test__filesystems(settings, mock_requests):
+    """Test that _filesystems method paginates correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
     settings.GPFS_API_URL = "http://example.com/api/v1"
@@ -251,8 +251,8 @@ def test_pagination_filesystems(settings, mock_requests):
     )
 
 
-def test_pagination_retrieve_all_fileset_quotas(settings, mock_requests):
-    """Test that retrieve_all_fileset_usages method paginates correctly."""
+def test__retrieve_all_fileset_quotas(settings, mock_requests):
+    """Test that _retrieve_all_fileset_quotas method paginates correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
     settings.GPFS_API_URL = "http://example.com/api/v1"
@@ -269,8 +269,8 @@ def test_pagination_retrieve_all_fileset_quotas(settings, mock_requests):
     )
 
 
-def test_pagination_retrieve_quota_usage(settings, mock_requests):
-    """Test that retrieve_quota_usage method paginates correctly."""
+def test__retrieve_quota_usage(settings, mock_requests):
+    """Test that _retrieve_quota_usage method paginates correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
     settings.GPFS_API_URL = "http://example.com/api/v1"
