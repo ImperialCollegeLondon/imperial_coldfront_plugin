@@ -303,7 +303,7 @@ def test_get_directory_acl(settings, mock_requests):
 
     mock_requests.assert_called_once_with(
         method="GET",
-        url="http://example.com/api/filesystems/gpfs0/acl/path_to_some_directory",
+        url="http://example.com/api/filesystems/gpfs0/acl/some/directory/path",
         headers={"Authorization": "Basic Og=="},
         json={},
     )
