@@ -307,3 +307,19 @@ def test_get_directory_acl(settings, mock_requests):
         headers={"Authorization": "Basic Og=="},
         json={},
     )
+
+
+def test__get_job_status(settings, mock_requests):
+    """Test that _get_job_status method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._get_job_status(jobId="12345")
+
+    mock_requests.assert_called_once_with(
+        method="GET",
+        url="http://example.com/api/jobs/12345",
+        headers={"Authorization": "Basic Og=="},
+    )
