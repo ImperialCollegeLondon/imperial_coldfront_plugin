@@ -329,3 +329,106 @@ def test__get_job_status(settings, mock_requests):
         url="http://example.com/api/jobs/12345",
         headers={"Authorization": "Basic Og=="},
     )
+
+
+def test__create_fileset(settings, mock_requests):
+    """Test that _create_fileset method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._get_job_status = Mock(
+        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
+    )
+
+    client._create_fileset(
+        filesystemName="gpfs0",
+        filesetName="myfileset",
+        ownerId="owner",
+        groupId="group",
+        absolutePath="/gpfs0/path/to/fileset",
+        permissions="755",
+        faculty="sci",
+    )
+
+    mock_requests.assert_called_once_with(
+        method="POST",
+        url="http://example.com/api/filesystems/gpfs0/filesets",
+        headers={"Authorization": "Basic Og=="},
+        json={
+            "filesetName": "myfileset",
+            "ownerId": "owner",
+            "groupId": "group",
+            "absolutePath": "/gpfs0/path/to/fileset",
+            "permissions": "755",
+            "faculty": "sci",
+        },
+    )
+
+
+def test__set_quota(settings, mock_requests):
+    """Test that _set_quota method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._get_job_status = Mock(
+        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
+    )
+
+    client._set_quota(
+        filesystemName="gpfs0",
+        filesetName="myfileset",
+        blockQuota="123456T",
+        filesQuota="654321T",
+    )
+
+    mock_requests.assert_called_once_with(
+        method="POST",
+        url="http://example.com/api/filesystems/gpfs0/quotas",
+        headers={"Authorization": "Basic Og=="},
+        json={
+            "filesetName": "myfileset",
+            "blockQuota": "123456T",
+            "filesQuota": "654321T",
+        },
+    )
+
+
+def test__create_fileset_directory(settings, mock_requests):
+    """Test that _create_fileset_directory method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._get_job_status = Mock(
+        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
+    )
+
+    path = "path/to/directory"
+
+    client._create_fileset_directory(
+        filesystemName="gpfs0",
+        filesetName="myfileset",
+        path=path,
+        permissions="755",
+        allow_existing=False,
+    )
+
+    expected_url = (
+        "http://example.com/api/filesystems/gpfs0/filesets/myfileset/directory/"
+        + urllib.parse.quote_plus(path)
+    )
+
+    mock_requests.assert_called_once_with(
+        method="POST",
+        url=expected_url,
+        headers={"Authorization": "Basic Og=="},
+        json={
+            "permissions": "755",
+            "allow_existing": False,
+        },
+    )
