@@ -1,3 +1,4 @@
+import urllib
 from pathlib import Path
 from unittest.mock import Mock, call
 
@@ -235,7 +236,7 @@ def test_paginate():
 
 
 def test__filesystems(settings, mock_requests):
-    """Test that _filesystems method paginates correctly."""
+    """Test that _filesystems method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
     settings.GPFS_API_URL = "http://example.com/api/v1"
@@ -252,7 +253,7 @@ def test__filesystems(settings, mock_requests):
 
 
 def test__retrieve_all_fileset_quotas(settings, mock_requests):
-    """Test that _retrieve_all_fileset_quotas method paginates correctly."""
+    """Test that _retrieve_all_fileset_quotas method workscorrectly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
     settings.GPFS_API_URL = "http://example.com/api/v1"
@@ -270,7 +271,7 @@ def test__retrieve_all_fileset_quotas(settings, mock_requests):
 
 
 def test__retrieve_quota_usage(settings, mock_requests):
-    """Test that _retrieve_quota_usage method paginates correctly."""
+    """Test that _retrieve_quota_usage method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
     settings.GPFS_API_URL = "http://example.com/api/v1"
@@ -296,14 +297,19 @@ def test_get_directory_acl(settings, mock_requests):
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
+    path = "path/to/some/directory"
     client.get_directory_acl(
         filesystem_name="gpfs0",
-        path="path_to_some_directory",
+        path=path,
+    )
+
+    expected_url = (
+        "http://example.com/api/filesystems/gpfs0/acl/" + urllib.parse.quote_plus(path)
     )
 
     mock_requests.assert_called_once_with(
         method="GET",
-        url="http://example.com/api/filesystems/gpfs0/acl/path_to_some_directory",
+        url=expected_url,
         headers={"Authorization": "Basic Og=="},
         json={},
     )
