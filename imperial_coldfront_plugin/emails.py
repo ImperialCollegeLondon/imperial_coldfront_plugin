@@ -151,3 +151,70 @@ All associated data has been permanently removed.
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[project_owner_email],
     )
+
+
+class QuotaDiscrepancy(TypedDict):
+    """Structure for holding discrepancies found during LDAP consistency check."""
+
+    shortname: str
+    attribute_storage_quota: int
+    fileset_storage_quota: int
+    attribute_files_quota: int
+    fileset_files_quota: int
+
+
+def send_quota_discrepancy_notification(discrepancies: list[QuotaDiscrepancy]) -> None:
+    """Send quota discrepancy notification to project owner.
+
+    Args:
+        discrepancies: List of discrepancies.
+    """
+    if not settings.ADMINS:
+        return
+
+    message = (
+        "The following discrepancies were detected between Coldfront and GPFS:\n\n"
+    )
+
+    message += "Quota Discrepancies:\n"
+    for discrepancy in discrepancies:
+        shortname = discrepancy["shortname"]
+        message += f"\n- Allocation shortname: {shortname}\n"
+
+        if discrepancy["storage_attribute_quota"]:
+            storage_attribute_quota = discrepancy["storage_attribute_quota"]
+            gpfs_storage_quota = discrepancy["gpfs_storage_quota"]
+            message += f"""
+                Allocation storage quota of {storage_attribute_quota},
+                 GPFS storage quota of {gpfs_storage_quota}.\n"""
+
+        if discrepancy["files_attribute_quota"]:
+            files_attribute_quota = discrepancy["files_attribute_quota"]
+            gpfs_files_quota = discrepancy["gpfs_files_quota"]
+            message += f"""
+                Allocation files quota of {files_attribute_quota},
+                 GPFS files quota of {gpfs_files_quota}.\n"""
+
+    mail_admins(
+        subject="Quota Consistency Check - Discrepancies Found",
+        message=message,
+    )
+
+
+def send_fileset_not_found_notification(shortnames: list[str]) -> None:
+    """Send notification to admins that fileset was not found.
+
+    Args:
+        shortnames: The allocation shortnames.
+    """
+    if not settings.ADMINS:
+        return
+
+    subject = "Filesets Not Found"
+    message = "The fileset for the following allocation(s) were not found:"
+    for shortname in shortnames:
+        message += f"\n- {shortname}"
+    mail_admins(
+        subject=subject,
+        message=message,
+    )

@@ -335,10 +335,6 @@ def rdf_allocation(
     rdf_resource = Resource.objects.get(name="RDF Active")
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
-    storage_attribute_type = AllocationAttributeType.objects.get(
-        name="Storage Quota (TB)"
-    )
-    files_attribute_type = AllocationAttributeType.objects.get(name="Files Quota")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
     allocation = Allocation.objects.create(
@@ -355,16 +351,6 @@ def rdf_allocation(
         allocation_attribute_type=gid_attribute_type,
         allocation=allocation,
         value=rdf_allocation_gid,
-    )
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_attribute_type,
-        allocation=allocation,
-        value="1000",
-    )
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=files_attribute_type,
-        allocation=allocation,
-        value="5",
     )
     return allocation
 

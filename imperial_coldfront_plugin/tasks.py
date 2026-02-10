@@ -21,11 +21,14 @@ from django.utils import timezone
 
 from .emails import (
     Discrepancy,
+    QuotaDiscrepancy,
     send_allocation_deletion_notification,
     send_allocation_deletion_warning,
     send_allocation_expiry_warning,
     send_allocation_removal_warning,
     send_discrepancy_notification,
+    send_fileset_not_found_notification,
+    send_quota_discrepancy_notification,
 )
 from .forms import AllocationFormData
 from .gid import get_new_gid
@@ -429,8 +432,13 @@ def _check_rdf_allocation_expiry_notifications() -> None:
 
 
 def _check_quota_consistency() -> None:
-    """Check consistency of quota usages with actual usage on the filesystem."""
-    # Get list of all active rdf storage allocations
+    """Check consistency of file and storage quotas between allocations and filesets.
+
+    Compares the active allocations to ensure the matching filesets have the same
+    storage and file quotas. If discrepancies are found, a notification email is sent
+    to admins. Also sends a notification if any allocations are found that do not have a
+    matching fileset in GPFS.
+    """
     allocations = Allocation.objects.filter(
         resources__name="RDF Active",
         status__name="Active",
@@ -440,27 +448,55 @@ def _check_quota_consistency() -> None:
     client = GPFSClient()
     usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)
 
+    discrepancies: list[QuotaDiscrepancy] = []
+    missing_filesets = []
+
     for allocation in allocations:
         shortname = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Shortname"
         ).value
-        storage_attribute_usage = allocation.allocationattribute_set.get(
+        storage_attribute_quota = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Storage Quota (TB)"
         )
-        files_attribute_usage = allocation.allocationattribute_set.get(
+        files_attribute_quota = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Files Quota"
         )
 
-        if shortname.removeprefix("pre-") in usages:
-            if storage_attribute_usage.value != usages[shortname]["block_usage_tb"]:
-                # log discrepancy
-                pass
-            elif files_attribute_usage.value != usages[shortname]["files_usage"]:
-                # log discrepancy
-                pass
+        if shortname in usages:
+            storage_quota_discrepancy = (
+                storage_attribute_quota.value != usages[shortname]["block_limit_tb"]
+            )
+            file_quota_discrepancy = (
+                files_attribute_quota.value != usages[shortname]["files_limit"]
+            )
+            if storage_quota_discrepancy or file_quota_discrepancy:
+                # If either are not consistent, create a discrepancy record
+                discrepancies.append(
+                    {
+                        "shortname": shortname,
+                        "attribute_storage_quota": storage_attribute_quota.value
+                        if storage_quota_discrepancy
+                        else None,
+                        "fileset_storage_quota": usages[shortname]["block_limit_tb"]
+                        if storage_quota_discrepancy
+                        else None,
+                        "attribute_files_quota": files_attribute_quota.value
+                        if file_quota_discrepancy
+                        else None,
+                        "fileset_files_quota": usages[shortname]["files_limit"]
+                        if file_quota_discrepancy
+                        else None,
+                    }
+                )
         else:
-            # Throw error?
-            pass
+            # The allocation was not found in GPFS - notify admins
+            missing_filesets.append(shortname)
+
+    if discrepancies:
+        send_quota_discrepancy_notification(discrepancies)
+
+    if missing_filesets:
+        send_fileset_not_found_notification(missing_filesets)
 
 
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
@@ -480,3 +516,4 @@ update_allocation_status = log_task_exceptions_to_django_logger(
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
 )
+check_quota_consistency = log_task_exceptions_to_django_logger(_check_quota_consistency)

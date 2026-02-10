@@ -111,6 +111,22 @@ def send_deletion_notification_mock(mocker):
     )
 
 
+@pytest.fixture
+def send_quota_discrepancy_notification_mock(mocker):
+    """Mock send_quota_discrepancy_notification."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_quota_discrepancy_notification"
+    )
+
+
+@pytest.fixture
+def send_fileset_not_found_notification_mock(mocker):
+    """Mock send_fileset_not_found_notification."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_fileset_not_found_notification"
+    )
+
+
 def test_create_rdf_allocation(
     gpfs_create_fileset_mock,
     ldap_create_group_mock,
@@ -607,21 +623,143 @@ def test_check_expiry_notifications_multiple_allocations(
     )
 
 
-def test_check_quota_consistency(rdf_allocation):
+def helper_add_quota_attributes(allocation, storage_quota, files_quota):
+    """Helper function to add quota attributes to an allocation."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    storage_quota_attribute_type = AllocationAttributeType.objects.get(
+        name="Storage Quota (TB)"
+    )
+    files_quota_attribute_type = AllocationAttributeType.objects.get(name="Files Quota")
+    AllocationAttribute.objects.create(
+        allocation_attribute_type=storage_quota_attribute_type,
+        allocation=allocation,
+        value=storage_quota,
+    )
+    AllocationAttribute.objects.create(
+        allocation_attribute_type=files_quota_attribute_type,
+        allocation=allocation,
+        value=files_quota,
+    )
+
+
+@pytest.mark.parametrize(
+    "alloc_storage_quota, alloc_files_quota, gpfs_storage_quota, gpfs_files_quota,"
+    "fileset_shortname, expected_discrpancy",
+    [
+        # Case 1: No discrepancies
+        (
+            "1.5",
+            "500",
+            "1.5",
+            "500",
+            "shorty",
+            [],
+        ),
+        # Case 2: Storage quota discrepancy only
+        (
+            "1.5",
+            "500",
+            "2.0",
+            "500",
+            "shorty",
+            [
+                {
+                    "shortname": "shorty",
+                    "attribute_storage_quota": "1.5",
+                    "fileset_storage_quota": "2.0",
+                    "attribute_files_quota": None,
+                    "fileset_files_quota": None,
+                }
+            ],
+        ),
+        # Case 3: Files quota discrepancy only
+        (
+            "1.5",
+            "500",
+            "1.5",
+            "600",
+            "shorty",
+            [
+                {
+                    "shortname": "shorty",
+                    "attribute_storage_quota": None,
+                    "fileset_storage_quota": None,
+                    "attribute_files_quota": "500",
+                    "fileset_files_quota": "600",
+                }
+            ],
+        ),
+        # Case 4: Both storage and files quota discrepancies
+        (
+            "1.5",
+            "500",
+            "2.0",
+            "600",
+            "shorty",
+            [
+                {
+                    "shortname": "shorty",
+                    "attribute_storage_quota": "1.5",
+                    "fileset_storage_quota": "2.0",
+                    "attribute_files_quota": "500",
+                    "fileset_files_quota": "600",
+                }
+            ],
+        ),
+        # Case 5: Allocation not found in GPFS
+        (
+            "1.5",
+            "500",
+            "1.5",
+            "500",
+            "diff_shortname",
+            [],
+        ),
+    ],
+)
+def test_check_quota_consistency_issues(
+    rdf_allocation,
+    send_quota_discrepancy_notification_mock,
+    send_fileset_not_found_notification_mock,
+    alloc_storage_quota,
+    alloc_files_quota,
+    gpfs_storage_quota,
+    gpfs_files_quota,
+    fileset_shortname,
+    expected_discrpancy,
+):
     """Test check_quota_consistency task."""
     from unittest.mock import patch
 
-    from imperial_coldfront_plugin.tasks import _check_quota_consistency
+    from imperial_coldfront_plugin.tasks import check_quota_consistency
 
+    # Configure allocation and fileset with specific parameters:
+    helper_add_quota_attributes(rdf_allocation, alloc_storage_quota, alloc_files_quota)
     with patch(
         "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_usages"
     ) as mock_usage:
         # Define exactly what the dictionary looks like after processing
         mock_usage.return_value = {
-            "shorty": {
-                "files_usage": 500,
-                "block_usage_tb": 1.5,
+            fileset_shortname: {
+                "files_limit": gpfs_files_quota,
+                "block_limit_tb": gpfs_storage_quota,
             }
         }
 
-        _check_quota_consistency()
+        check_quota_consistency()
+
+        # Checks that the proper discrepancies have been logged (or nonea at all).
+        if expected_discrpancy:
+            send_quota_discrepancy_notification_mock.assert_called_once_with(
+                expected_discrpancy
+            )
+        else:
+            send_quota_discrepancy_notification_mock.assert_not_called()
+
+        # Checks that the fileset not found email is only sent when there is a shortname
+        # mismatch.
+        if fileset_shortname == "shorty":
+            send_fileset_not_found_notification_mock.assert_not_called()
+        else:
+            send_fileset_not_found_notification_mock.assert_called_once_with(["shorty"])
