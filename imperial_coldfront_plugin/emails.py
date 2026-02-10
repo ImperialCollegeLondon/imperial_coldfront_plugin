@@ -157,10 +157,10 @@ class QuotaDiscrepancy(TypedDict):
     """Structure for holding discrepancies found during LDAP consistency check."""
 
     shortname: str
-    attribute_storage_quota: int
-    fileset_storage_quota: int
-    attribute_files_quota: int
-    fileset_files_quota: int
+    attribute_storage_quota: str
+    fileset_storage_quota: str
+    attribute_files_quota: str
+    fileset_files_quota: str
 
 
 def send_quota_discrepancy_notification(discrepancies: list[QuotaDiscrepancy]) -> None:
