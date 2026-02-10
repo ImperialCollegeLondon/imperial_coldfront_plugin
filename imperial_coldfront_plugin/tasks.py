@@ -463,6 +463,8 @@ def _check_quota_consistency() -> None:
         )
 
         if shortname in usages:
+            # Check for discrepancies between the allocation and fileset for both
+            # storage and file quotas:
             storage_quota_discrepancy = (
                 storage_attribute_quota.value != usages[shortname]["block_limit_tb"]
             )
