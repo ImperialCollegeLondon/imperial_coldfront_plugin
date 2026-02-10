@@ -181,19 +181,19 @@ def send_quota_discrepancy_notification(discrepancies: list[QuotaDiscrepancy]) -
         shortname = discrepancy["shortname"]
         message += f"\n- Allocation shortname: {shortname}\n"
 
-        if discrepancy["storage_attribute_quota"]:
-            storage_attribute_quota = discrepancy["storage_attribute_quota"]
-            gpfs_storage_quota = discrepancy["gpfs_storage_quota"]
+        if discrepancy["attribute_storage_quota"]:
+            attribute_storage_quota = discrepancy["attribute_storage_quota"]
+            fileset_storage_quota = discrepancy["fileset_storage_quota"]
             message += f"""
-                Allocation storage quota of {storage_attribute_quota},
-                 GPFS storage quota of {gpfs_storage_quota}.\n"""
+                Allocation storage quota of {attribute_storage_quota},
+                 GPFS storage quota of {fileset_storage_quota}.\n"""
 
-        if discrepancy["files_attribute_quota"]:
-            files_attribute_quota = discrepancy["files_attribute_quota"]
-            gpfs_files_quota = discrepancy["gpfs_files_quota"]
+        if discrepancy["attribute_files_quota"]:
+            attribute_files_quota = discrepancy["attribute_files_quota"]
+            fileset_files_quota = discrepancy["fileset_files_quota"]
             message += f"""
-                Allocation files quota of {files_attribute_quota},
-                 GPFS files quota of {gpfs_files_quota}.\n"""
+                Allocation files quota of {attribute_files_quota},
+                 GPFS files quota of {fileset_files_quota}.\n"""
 
     mail_admins(
         subject="Quota Consistency Check - Discrepancies Found",
