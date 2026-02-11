@@ -649,25 +649,25 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
     [
         # Case 1: No discrepancies
         (
-            "1.5",
-            "500",
-            "1.5",
-            "500",
+            1,
+            500,
+            1,
+            500,
             "shorty",
             [],
         ),
         # Case 2: Storage quota discrepancy only
         (
-            "1.5",
-            "500",
-            "2.0",
-            "500",
+            1,
+            500,
+            2,
+            500,
             "shorty",
             [
                 {
                     "shortname": "shorty",
-                    "attribute_storage_quota": "1.5",
-                    "fileset_storage_quota": "2.0",
+                    "attribute_storage_quota": 1,
+                    "fileset_storage_quota": 2,
                     "attribute_files_quota": None,
                     "fileset_files_quota": None,
                 }
@@ -675,44 +675,44 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
         ),
         # Case 3: Files quota discrepancy only
         (
-            "1.5",
-            "500",
-            "1.5",
-            "600",
+            1,
+            500,
+            1,
+            600,
             "shorty",
             [
                 {
                     "shortname": "shorty",
                     "attribute_storage_quota": None,
                     "fileset_storage_quota": None,
-                    "attribute_files_quota": "500",
-                    "fileset_files_quota": "600",
+                    "attribute_files_quota": 500,
+                    "fileset_files_quota": 600,
                 }
             ],
         ),
         # Case 4: Both storage and files quota discrepancies
         (
-            "1.5",
-            "500",
-            "2.0",
-            "600",
+            1,
+            500,
+            2,
+            600,
             "shorty",
             [
                 {
                     "shortname": "shorty",
-                    "attribute_storage_quota": "1.5",
-                    "fileset_storage_quota": "2.0",
-                    "attribute_files_quota": "500",
-                    "fileset_files_quota": "600",
+                    "attribute_storage_quota": 1,
+                    "fileset_storage_quota": 2,
+                    "attribute_files_quota": 500,
+                    "fileset_files_quota": 600,
                 }
             ],
         ),
         # Case 5: Allocation not found in GPFS
         (
-            "1.5",
-            "500",
-            "1.5",
-            "500",
+            1,
+            500,
+            1,
+            500,
             "diff_shortname",
             [],
         ),

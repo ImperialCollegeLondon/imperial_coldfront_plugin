@@ -457,32 +457,33 @@ def _check_quota_consistency() -> None:
         ).value
         storage_attribute_quota = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Storage Quota (TB)"
-        )
+        ).typed_value()
+
         files_attribute_quota = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Files Quota"
-        )
+        ).typed_value()
 
         if shortname in usages:
             # Check for discrepancies between the allocation and fileset for both
             # storage and file quotas:
             storage_quota_discrepancy = (
-                storage_attribute_quota.value != usages[shortname]["block_limit_tb"]
+                storage_attribute_quota != usages[shortname]["block_limit_tb"]
             )
             file_quota_discrepancy = (
-                files_attribute_quota.value != usages[shortname]["files_limit"]
+                files_attribute_quota != usages[shortname]["files_limit"]
             )
             if storage_quota_discrepancy or file_quota_discrepancy:
                 # If either are not consistent, create a discrepancy record
                 discrepancies.append(
                     {
                         "shortname": shortname,
-                        "attribute_storage_quota": storage_attribute_quota.value
+                        "attribute_storage_quota": storage_attribute_quota
                         if storage_quota_discrepancy
                         else None,
                         "fileset_storage_quota": usages[shortname]["block_limit_tb"]
                         if storage_quota_discrepancy
                         else None,
-                        "attribute_files_quota": files_attribute_quota.value
+                        "attribute_files_quota": files_attribute_quota
                         if file_quota_discrepancy
                         else None,
                         "fileset_files_quota": usages[shortname]["files_limit"]
