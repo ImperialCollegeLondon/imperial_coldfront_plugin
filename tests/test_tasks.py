@@ -651,8 +651,8 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
         (
             1,
             500,
-            1,
-            500,
+            1.0,
+            500.0,
             "shorty",
             [],
         ),
@@ -660,14 +660,14 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
         (
             1,
             500,
-            2,
-            500,
+            2.0,
+            500.0,
             "shorty",
             [
                 {
                     "shortname": "shorty",
                     "attribute_storage_quota": 1,
-                    "fileset_storage_quota": 2,
+                    "fileset_storage_quota": 2.0,
                     "attribute_files_quota": None,
                     "fileset_files_quota": None,
                 }
@@ -677,8 +677,8 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
         (
             1,
             500,
-            1,
-            600,
+            1.0,
+            600.0,
             "shorty",
             [
                 {
@@ -686,7 +686,7 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
                     "attribute_storage_quota": None,
                     "fileset_storage_quota": None,
                     "attribute_files_quota": 500,
-                    "fileset_files_quota": 600,
+                    "fileset_files_quota": 600.0,
                 }
             ],
         ),
@@ -694,16 +694,16 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
         (
             1,
             500,
-            2,
-            600,
+            2.0,
+            600.0,
             "shorty",
             [
                 {
                     "shortname": "shorty",
                     "attribute_storage_quota": 1,
-                    "fileset_storage_quota": 2,
+                    "fileset_storage_quota": 2.0,
                     "attribute_files_quota": 500,
-                    "fileset_files_quota": 600,
+                    "fileset_files_quota": 600.0,
                 }
             ],
         ),
@@ -711,8 +711,8 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
         (
             1,
             500,
-            1,
-            500,
+            1.0,
+            500.0,
             "diff_shortname",
             [],
         ),

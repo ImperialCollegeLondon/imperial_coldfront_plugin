@@ -455,11 +455,11 @@ def _check_quota_consistency() -> None:
         shortname = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Shortname"
         ).value
-        storage_attribute_quota = allocation.allocationattribute_set.get(
+        storage_attribute_quota: int = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Storage Quota (TB)"
         ).typed_value()
 
-        files_attribute_quota = allocation.allocationattribute_set.get(
+        files_attribute_quota: int = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Files Quota"
         ).typed_value()
 
