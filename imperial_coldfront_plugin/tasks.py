@@ -428,54 +428,53 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
-def _expired_allocations_gpfs_quota_check() -> None:
-    """Set the GPFS quota to zero for expired RDF allocations."""
+def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
+    """Set the GPFS quota to zero for a single expired RDF allocation.
+
+    Args:
+        allocation_id: The primary key of the allocation.
+    """
     logger = logging.getLogger("django-q")
-
-    rdf_resource = Resource.objects.get(name="RDF Active")
-    today = date.today()
-
-    expired_allocations = Allocation.objects.filter(
-        resources=rdf_resource,
-        end_date__lt=today,
-        status__name="Active",
-    ).select_related("project")
 
     if not settings.GPFS_ENABLED:
         return
 
+    allocation = Allocation.objects.get(pk=allocation_id)
+
+    # Only process RDF Active allocations
+    if not allocation.resources.filter(name="RDF Active").exists():
+        logger.info(
+            f"Allocation {allocation_id} is not an RDF Active allocation, skipping."
+        )
+        return
+
     client = GPFSClient()
 
-    for allocation in expired_allocations:
-        try:
-            shortname = allocation.allocationattribute_set.get(
-                allocation_attribute_type__name="Shortname"
-            ).value
-            logger.info(f"Setting quota to zero for expired allocation {shortname}")
-            client.set_quota(
-                filesystem_name=settings.GPFS_FILESYSTEM_NAME,
-                fileset_name=shortname,
-                block_quota="0",
-                files_quota="0",
-            )
+    try:
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+        logger.info(f"Setting quota to zero for expired allocation {shortname}")
+        client.set_quota(
+            filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+            fileset_name=shortname,
+            block_quota="0",
+            files_quota="0",
+        )
 
-            storage_quota_attribute = allocation.allocationattribute_set.get(
-                allocation_attribute_type__name="Storage Quota (TB)"
-            )
-            storage_quota_attribute.value = "0"
-            storage_quota_attribute.save()
+        storage_quota_attribute = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Storage Quota (TB)"
+        )
+        storage_quota_attribute.value = "0"
+        storage_quota_attribute.save()
 
-            logger.info(
-                f"Updated Storage Quota attribute to 0 for allocation {shortname}"
-            )
-        except AllocationAttribute.DoesNotExist:
-            logger.warning(
-                f"Could not find Shortname attribute for allocation {allocation.id}"
-            )
-        except Exception as e:
-            logger.error(
-                f"Error setting quota to zero for allocation {allocation.id}: {e}"
-            )
+        logger.info(f"Updated Storage Quota attribute to 0 for allocation {shortname}")
+    except AllocationAttribute.DoesNotExist:
+        logger.error(
+            f"Could not find required attribute for allocation {allocation_id}"
+        )
+    except Exception as e:
+        logger.error(f"Error setting quota to zero for allocation {allocation_id}: {e}")
 
 
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
@@ -495,6 +494,6 @@ update_allocation_status = log_task_exceptions_to_django_logger(
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
 )
-expired_allocations_gpfs_quota_check = log_task_exceptions_to_django_logger(
-    _expired_allocations_gpfs_quota_check
+zero_allocation_gpfs_quota = log_task_exceptions_to_django_logger(
+    _zero_allocation_gpfs_quota
 )

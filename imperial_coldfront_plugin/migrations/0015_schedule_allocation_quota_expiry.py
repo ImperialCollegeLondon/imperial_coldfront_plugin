@@ -2,13 +2,12 @@
 
 from django.db import migrations
 
-
 def create_schedule(apps, schema_editor):
-    """Create a daily schedule for checking expired allocations and setting quota to zero."""
+    """Re-create the schedule for rollback purposes."""
     Schedule = apps.get_model("django_q", "Schedule")
     Schedule.objects.get_or_create(
         name="Check for expired allocations and set GPFS quota to zero",
-        func="imperial_coldfront_plugin.tasks.expires_allocations_gpfs_quota_check",
+        func="imperial_coldfront_plugin.tasks.expired_allocations_gpfs_quota_check",
         schedule_type="D",
         repeats=-1,
     )
