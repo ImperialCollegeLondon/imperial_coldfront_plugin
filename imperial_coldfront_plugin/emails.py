@@ -154,7 +154,7 @@ All associated data has been permanently removed.
 
 
 class QuotaDiscrepancy(TypedDict):
-    """Structure for holding discrepancies found during LDAP consistency check."""
+    """Structure for holding discrepancies found during quota consistency check."""
 
     shortname: str
     attribute_storage_quota: int | None
