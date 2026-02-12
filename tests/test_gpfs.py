@@ -304,7 +304,10 @@ def test__retrieve_all_fileset_quotas(settings, request_mock):
 
     request_mock.assert_called_once_with(
         method="GET",
-        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/quotas?filter=quotaType=FILESET",
+        url=(
+            f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/quotas"
+            f"?filter=quotaType=FILESET"
+        ),
         params={"lastId": "20"},
         headers={"Authorization": "Basic Og=="},
         json={},
