@@ -454,7 +454,7 @@ class GPFSClient(Consumer):
     ) -> requests.Response:
         """Method (private) to retrieve the quotas of a filesystem."""
 
-    def retrieve_all_fileset_usages(
+    def retrieve_all_fileset_quotas(
         self, filesystem_name: str
     ) -> dict[str, dict[str, float]]:
         """Get the quotas for all filesets.

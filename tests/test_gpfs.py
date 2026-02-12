@@ -256,22 +256,21 @@ def test__filesystems(settings, request_mock):
     )
 
 
-def test__retrieve_all_fileset_quotas(settings, request_mock):
-    """Test that _retrieve_all_fileset_quotas method workscorrectly."""
+def test_filesystems(mocker):
+    """Test that filesystems wrapper works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
-    settings.GPFS_API_URL = "http://example.com/api/v1"
-
     client = GPFSClient()
-    client._retrieve_all_fileset_quotas(filesystemName=FILESYSTEM_NAME, lastId=20)
-
-    request_mock.assert_called_once_with(
-        method="GET",
-        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/quotas?filter=quotaType=FILESET",
-        params={"lastId": "20"},
-        headers={"Authorization": "Basic Og=="},
-        json={},
+    _filesystems_mock = mocker.patch.object(
+        client,
+        "_filesystems",
+        autospec=True,
+        side_effect=[make_response({"filesystems": [{"name": FILESYSTEM_NAME}]})],
     )
+
+    response = client.filesystems()
+    _filesystems_mock.assert_called_once_with()
+    assert response == [{"name": FILESYSTEM_NAME}]
 
 
 def test__retrieve_quota_usage(settings, request_mock):
@@ -289,6 +288,24 @@ def test__retrieve_quota_usage(settings, request_mock):
         method="GET",
         url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/quotas",
         params={"lastId": "30"},
+        headers={"Authorization": "Basic Og=="},
+        json={},
+    )
+
+
+def test__retrieve_all_fileset_quotas(settings, request_mock):
+    """Test that _retrieve_all_fileset_quotas method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._retrieve_all_fileset_quotas(filesystemName=FILESYSTEM_NAME, lastId=20)
+
+    request_mock.assert_called_once_with(
+        method="GET",
+        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/quotas?filter=quotaType=FILESET",
+        params={"lastId": "20"},
         headers={"Authorization": "Basic Og=="},
         json={},
     )
