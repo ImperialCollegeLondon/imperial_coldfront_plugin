@@ -7,6 +7,7 @@ import pytest
 from imperial_coldfront_plugin.gpfs_client import (
     DirectoryExistsError,
     FilesetPathInfo,
+    GPFSClient,
     create_fileset_set_quota,
 )
 
@@ -218,8 +219,6 @@ def make_response(data: dict[str, object]) -> Mock:
 
 def test_paginate():
     """Test the _paginate method handles multiple pages."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     first_page = {"paging": {"lastId": 100}, "quotas": [{"id": 1}]}
     second_page = {"quotas": [{"id": 2}]}
 
@@ -242,8 +241,6 @@ def test_paginate():
 
 def test__filesystems(settings, request_mock):
     """Test that _filesystems method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -259,8 +256,6 @@ def test__filesystems(settings, request_mock):
 
 def test_filesystems(mocker):
     """Test that filesystems wrapper works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     client = GPFSClient()
     _filesystems_mock = mocker.patch.object(
         client,
@@ -276,8 +271,6 @@ def test_filesystems(mocker):
 
 def test__retrieve_quota_usage(settings, request_mock):
     """Test that _retrieve_quota_usage method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -296,8 +289,6 @@ def test__retrieve_quota_usage(settings, request_mock):
 
 def test__retrieve_all_fileset_quotas(settings, request_mock):
     """Test that _retrieve_all_fileset_quotas method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -317,8 +308,6 @@ def test__retrieve_all_fileset_quotas(settings, request_mock):
 
 def test_get_directory_acl(settings, fileset_path_info, request_mock):
     """Test that get_directory_acl method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -341,8 +330,6 @@ def test_get_directory_acl(settings, fileset_path_info, request_mock):
 
 def test__get_job_status(settings, request_mock):
     """Test that _get_job_status method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -357,8 +344,6 @@ def test__get_job_status(settings, request_mock):
 
 def test__create_fileset(settings, request_mock):
     """Test that _create_fileset method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -404,8 +389,6 @@ def test__create_fileset(settings, request_mock):
 
 def test_create_fileset(mocker):
     """Test that create_fileset wrapper works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     client = GPFSClient()
     _create_fileset_mock = mocker.patch.object(
         client, "_create_fileset", autospec=True, return_value=None
@@ -440,8 +423,6 @@ def test_create_fileset(mocker):
 
 def test__set_quota(settings, request_mock):
     """Test that _set_quota method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -470,8 +451,6 @@ def test__set_quota(settings, request_mock):
 
 def test_set_quota(mocker):
     """Test that set_quota wrapper works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     client = GPFSClient()
     _set_quota_mock = mocker.patch.object(
         client, "_set_quota", autospec=True, return_value=None
@@ -502,8 +481,6 @@ def test_set_quota(mocker):
 
 def test__create_fileset_directory(settings, request_mock):
     """Test that _create_fileset_directory method works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
@@ -548,8 +525,6 @@ def test__create_fileset_directory(settings, request_mock):
 
 def test_create_fileset_directory(mocker):
     """Test that create_fileset_directory wrapper works correctly."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
     client = GPFSClient()
     _create_fileset_directory_mock = mocker.patch.object(
         client, "_create_fileset_directory", autospec=True, return_value=None
