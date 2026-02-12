@@ -23,6 +23,7 @@ BLOCK_QUOTA = "123456T"
 FILES_QUOTA = "654321T"
 PERMISSIONS = "755"
 PARENT_FILESET = "parentfileset"
+HEADERS = {"Authorization": "Basic Og=="}
 
 
 @pytest.fixture(autouse=True)
@@ -252,7 +253,7 @@ def test__filesystems(settings, request_mock):
         method="GET",
         url="http://example.com/api/filesystems",
         params={"lastId": "10"},
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
     )
 
 
@@ -288,7 +289,7 @@ def test__retrieve_quota_usage(settings, request_mock):
         method="GET",
         url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/quotas",
         params={"lastId": "30"},
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
         json={},
     )
 
@@ -309,7 +310,7 @@ def test__retrieve_all_fileset_quotas(settings, request_mock):
             f"?filter=quotaType=FILESET"
         ),
         params={"lastId": "20"},
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
         json={},
     )
 
@@ -333,7 +334,7 @@ def test_get_directory_acl(settings, fileset_path_info, request_mock):
     request_mock.assert_called_once_with(
         method="GET",
         url=url,
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
         json={},
     )
 
@@ -350,7 +351,7 @@ def test__get_job_status(settings, request_mock):
     request_mock.assert_called_once_with(
         method="GET",
         url="http://example.com/api/jobs/12345",
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
     )
 
 
@@ -389,7 +390,7 @@ def test__create_fileset(settings, request_mock):
     request_mock.assert_called_once_with(
         method="POST",
         url="http://example.com/api/filesystems/gpfs0/filesets",
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
         json={
             "filesetName": FILESET_NAME,
             "ownerId": OWNER_ID,
@@ -458,7 +459,7 @@ def test__set_quota(settings, request_mock):
     request_mock.assert_called_once_with(
         method="POST",
         url="http://example.com/api/filesystems/gpfs0/quotas",
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
         json={
             "filesetName": FILESET_NAME,
             "blockQuota": BLOCK_QUOTA,
@@ -537,7 +538,7 @@ def test__create_fileset_directory(settings, request_mock):
     request_mock.assert_called_once_with(
         method="POST",
         url=expected_url,
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
         json={
             "permissions": PERMISSIONS,
             "allow_existing": False,
