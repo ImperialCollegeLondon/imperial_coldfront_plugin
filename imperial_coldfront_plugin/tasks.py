@@ -441,10 +441,11 @@ def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
 
     allocation = Allocation.objects.get(pk=allocation_id)
 
-    # Only process RDF Active allocations
-    if not allocation.resources.filter(name="RDF Active").exists():
+    # Only process expired allocations
+    if allocation.status.name not in ("Expired", "Removed", "Deleted"):
         logger.info(
-            f"Allocation {allocation_id} is not an RDF Active allocation, skipping."
+            f"Allocation {allocation_id} has status {allocation.status.name}, "
+            "expected Expired/Removed/Deleted. Skipping."
         )
         return
 

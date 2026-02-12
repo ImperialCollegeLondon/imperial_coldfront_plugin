@@ -193,9 +193,6 @@ def remove_ldap_group_members_if_allocation_inactive(
     async_task(remove_allocation_group_members, instance.pk)
 
 
-"""Signal handlers for the imperial_coldfront_plugin."""
-
-
 @receiver(pre_save, sender=Allocation)
 def allocation_expired_handler(sender, instance, **kwargs):
     """Spawn a background task to zero GPFS quota when an allocation has expired."""
