@@ -378,7 +378,7 @@ def test__create_fileset(settings, completed_job_status, request_mock):
 
     request_mock.assert_called_once_with(
         method="POST",
-        url="http://example.com/api/filesystems/gpfs0/filesets",
+        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/filesets",
         headers=HEADERS,
         json={
             "filesetName": FILESET_NAME,
@@ -441,7 +441,7 @@ def test__set_quota(settings, completed_job_status, request_mock):
 
     request_mock.assert_called_once_with(
         method="POST",
-        url="http://example.com/api/filesystems/gpfs0/quotas",
+        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/quotas",
         headers=HEADERS,
         json={
             "filesetName": FILESET_NAME,
