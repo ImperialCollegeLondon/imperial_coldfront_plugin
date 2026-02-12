@@ -194,7 +194,11 @@ def remove_ldap_group_members_if_allocation_inactive(
 
 
 @receiver(pre_save, sender=Allocation)
-def allocation_expired_handler(sender, instance, **kwargs):
+def allocation_expired_handler(
+    sender: type[Allocation],
+    instance: Allocation,
+    **kwargs: object,
+) -> None:
     """Spawn a background task to zero GPFS quota when an allocation has expired."""
     if instance.pk is None:
         return
