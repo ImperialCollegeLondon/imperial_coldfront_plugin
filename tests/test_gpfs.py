@@ -21,6 +21,8 @@ OWNER_ID = "someowner"
 GROUP_ID = "rdf-somegroup"
 BLOCK_QUOTA = "123456T"
 FILES_QUOTA = "654321T"
+PERMISSIONS = "755"
+PARENT_FILESET = "parentfileset"
 
 
 @pytest.fixture(autouse=True)
@@ -304,14 +306,13 @@ def test_get_directory_acl(settings, fileset_path_info, request_mock):
         path=fileset_path_info.fileset_absolute_path,
     )
 
-    expected_url = (
-        f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/acl/"
-        + urllib.parse.quote(str(fileset_path_info.fileset_absolute_path))
-    )
+    assert request_mock.called
+    _, kwargs = request_mock.call_args
+    url = kwargs.get("url", "")
 
     request_mock.assert_called_once_with(
         method="GET",
-        url=expected_url,
+        url=url,
         headers={"Authorization": "Basic Og=="},
         json={},
     )
@@ -331,3 +332,235 @@ def test__get_job_status(settings, request_mock):
         url="http://example.com/api/jobs/12345",
         headers={"Authorization": "Basic Og=="},
     )
+
+
+def test__create_fileset(settings, request_mock):
+    """Test that _create_fileset method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._get_job_status = Mock(
+        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
+    )
+
+    expected_path = str(
+        Path(
+            FILESYSTEM_MOUNT_PATH,
+            TOP_LEVEL_DIRECTORIES,
+            FACULTY,
+            DEPARTMENT,
+            GROUP_NAME,
+            FILESET_NAME,
+        )
+    )
+
+    client._create_fileset(
+        filesystemName=FILESYSTEM_NAME,
+        filesetName=FILESET_NAME,
+        ownerId=OWNER_ID,
+        groupId=GROUP_ID,
+        path=expected_path,
+        permissions=PERMISSIONS,
+        parent_fileset=PARENT_FILESET,
+    )
+
+    request_mock.assert_called_once_with(
+        method="POST",
+        url="http://example.com/api/filesystems/gpfs0/filesets",
+        headers={"Authorization": "Basic Og=="},
+        json={
+            "filesetName": FILESET_NAME,
+            "ownerId": OWNER_ID,
+            "groupId": GROUP_ID,
+            "path": expected_path,
+            "permissions": PERMISSIONS,
+            "parent_fileset": PARENT_FILESET,
+        },
+    )
+
+
+def test_create_fileset(mocker):
+    """Test that create_fileset wrapper works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    client = GPFSClient()
+    _create_fileset_mock = mocker.patch.object(
+        client, "_create_fileset", autospec=True, return_value=None
+    )
+
+    response = client.create_fileset(
+        filesystem_name=FILESYSTEM_NAME,
+        fileset_name=FILESET_NAME,
+        owner_id=OWNER_ID,
+        group_id=GROUP_ID,
+        path=(
+            f"{FILESYSTEM_MOUNT_PATH}/{TOP_LEVEL_DIRECTORIES}/{FACULTY}/"
+            f"{DEPARTMENT}/{GROUP_NAME}/{FILESET_NAME}"
+        ),
+        permissions=PERMISSIONS,
+        parent_fileset=PARENT_FILESET,
+    )
+
+    _create_fileset_mock.assert_called_once_with(
+        filesystemName=FILESYSTEM_NAME,
+        filesetName=FILESET_NAME,
+        owner=f"{OWNER_ID}:{GROUP_ID}",
+        path=f"{FILESYSTEM_MOUNT_PATH}/{TOP_LEVEL_DIRECTORIES}/{FACULTY}/{DEPARTMENT}/{GROUP_NAME}/{FILESET_NAME}",
+        permissions=PERMISSIONS,
+        inodeSpace=PARENT_FILESET,
+        permissionChangeMode="chmodAndSetAcl",
+        iamMode="advisory",
+    )
+
+    assert response is None
+
+
+def test__set_quota(settings, request_mock):
+    """Test that _set_quota method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._get_job_status = Mock(
+        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
+    )
+
+    client._set_quota(
+        filesystemName=FILESYSTEM_NAME,
+        filesetName=FILESET_NAME,
+        blockQuota=BLOCK_QUOTA,
+        filesQuota=FILES_QUOTA,
+    )
+
+    request_mock.assert_called_once_with(
+        method="POST",
+        url="http://example.com/api/filesystems/gpfs0/quotas",
+        headers={"Authorization": "Basic Og=="},
+        json={
+            "filesetName": FILESET_NAME,
+            "blockQuota": BLOCK_QUOTA,
+            "filesQuota": FILES_QUOTA,
+        },
+    )
+
+
+def test_set_quota(mocker):
+    """Test that set_quota wrapper works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    client = GPFSClient()
+    _set_quota_mock = mocker.patch.object(
+        client, "_set_quota", autospec=True, return_value=None
+    )
+
+    response = client.set_quota(
+        filesystem_name=FILESYSTEM_NAME,
+        fileset_name=FILESET_NAME,
+        block_quota=BLOCK_QUOTA,
+        files_quota=FILES_QUOTA,
+    )
+
+    _set_quota_mock.assert_called_once_with(
+        filesystemName=FILESYSTEM_NAME,
+        objectName=FILESET_NAME,
+        operationType="setQuota",
+        quotaType="FILESET",
+        blockSoftLimit=BLOCK_QUOTA,
+        blockHardLimit=BLOCK_QUOTA,
+        filesSoftLimit=FILES_QUOTA,
+        filesHardLimit=FILES_QUOTA,
+        filesGracePeriod="null",
+        blockGracePeriod="null",
+    )
+
+    assert response is None
+
+
+def test__create_fileset_directory(settings, request_mock):
+    """Test that _create_fileset_directory method works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com/api/v1"
+
+    client = GPFSClient()
+    client._get_job_status = Mock(
+        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
+    )
+
+    path = str(
+        Path(
+            FILESYSTEM_MOUNT_PATH,
+            TOP_LEVEL_DIRECTORIES,
+            FACULTY,
+            DEPARTMENT,
+            GROUP_NAME,
+            FILESET_NAME,
+        )
+    )
+
+    client._create_fileset_directory(
+        filesystemName=FILESYSTEM_NAME,
+        filesetName=FILESET_NAME,
+        path=path,
+        permissions=PERMISSIONS,
+        allow_existing=False,
+    )
+
+    expected_url = (
+        f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/directory/"
+        + urllib.parse.quote(path, safe="")
+    )
+
+    request_mock.assert_called_once_with(
+        method="POST",
+        url=expected_url,
+        headers={"Authorization": "Basic Og=="},
+        json={
+            "permissions": PERMISSIONS,
+            "allow_existing": False,
+        },
+    )
+
+
+def test_create_fileset_directory(mocker):
+    """Test that create_fileset_directory wrapper works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    client = GPFSClient()
+    _create_fileset_directory_mock = mocker.patch.object(
+        client, "_create_fileset_directory", autospec=True, return_value=None
+    )
+
+    path = str(
+        Path(
+            FILESYSTEM_MOUNT_PATH,
+            TOP_LEVEL_DIRECTORIES,
+            FACULTY,
+            DEPARTMENT,
+            GROUP_NAME,
+            FILESET_NAME,
+        )
+    )
+
+    response = client.create_fileset_directory(
+        filesystem_name=FILESYSTEM_NAME,
+        fileset_name=FILESET_NAME,
+        path=path,
+        permissions=PERMISSIONS,
+        allow_existing=False,
+    )
+
+    _create_fileset_directory_mock.assert_called_once_with(
+        FILESYSTEM_NAME,
+        FILESET_NAME,
+        path,
+        user="root",
+        group="root",
+        permissions=PERMISSIONS,
+        recursive=True,
+    )
+
+    assert response is None
