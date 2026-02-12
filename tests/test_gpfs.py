@@ -94,8 +94,8 @@ def client_mock(mocker):
 
 
 @pytest.fixture
-def mock_requests(mocker):
-    """Mock the requests module."""
+def request_mock(mocker):
+    """Mock requests.Session.request to return a MockResponse."""
     mock = mocker.patch("requests.Session.request")
     mock.return_value.status_code = 200
     return mock
@@ -235,7 +235,7 @@ def test_paginate():
     assert "lastId" in second_kwargs and second_kwargs["lastId"] == 100
 
 
-def test__filesystems(settings, mock_requests):
+def test__filesystems(settings, request_mock):
     """Test that _filesystems method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -244,7 +244,7 @@ def test__filesystems(settings, mock_requests):
     client = GPFSClient()
     client._filesystems(lastId=10)
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="GET",
         url="http://example.com/api/filesystems",
         params={"lastId": "10"},
@@ -252,7 +252,7 @@ def test__filesystems(settings, mock_requests):
     )
 
 
-def test__retrieve_all_fileset_quotas(settings, mock_requests):
+def test__retrieve_all_fileset_quotas(settings, request_mock):
     """Test that _retrieve_all_fileset_quotas method workscorrectly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -261,7 +261,7 @@ def test__retrieve_all_fileset_quotas(settings, mock_requests):
     client = GPFSClient()
     client._retrieve_all_fileset_quotas(filesystemName="gpfs0", lastId=20)
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="GET",
         url="http://example.com/api/filesystems/gpfs0/quotas?filter=quotaType=FILESET",
         params={"lastId": "20"},
@@ -270,7 +270,7 @@ def test__retrieve_all_fileset_quotas(settings, mock_requests):
     )
 
 
-def test__retrieve_quota_usage(settings, mock_requests):
+def test__retrieve_quota_usage(settings, request_mock):
     """Test that _retrieve_quota_usage method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -281,7 +281,7 @@ def test__retrieve_quota_usage(settings, mock_requests):
         filesystemName="gpfs0", filesetName="myfileset", lastId=30
     )
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="GET",
         url="http://example.com/api/filesystems/gpfs0/filesets/myfileset/quotas",
         params={"lastId": "30"},
@@ -290,7 +290,7 @@ def test__retrieve_quota_usage(settings, mock_requests):
     )
 
 
-def test_get_directory_acl(settings, mock_requests):
+def test_get_directory_acl(settings, request_mock):
     """Test that get_directory_acl method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -307,7 +307,7 @@ def test_get_directory_acl(settings, mock_requests):
         "http://example.com/api/filesystems/gpfs0/acl/" + urllib.parse.quote_plus(path)
     )
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="GET",
         url=expected_url,
         headers={"Authorization": "Basic Og=="},
@@ -315,7 +315,7 @@ def test_get_directory_acl(settings, mock_requests):
     )
 
 
-def test__get_job_status(settings, mock_requests):
+def test__get_job_status(settings, request_mock):
     """Test that _get_job_status method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -324,14 +324,14 @@ def test__get_job_status(settings, mock_requests):
     client = GPFSClient()
     client._get_job_status(jobId="12345")
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="GET",
         url="http://example.com/api/jobs/12345",
         headers={"Authorization": "Basic Og=="},
     )
 
 
-def test__create_fileset(settings, mock_requests):
+def test__create_fileset(settings, request_mock):
     """Test that _create_fileset method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -352,7 +352,7 @@ def test__create_fileset(settings, mock_requests):
         parent_fileset="parentfileset",
     )
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="POST",
         url="http://example.com/api/filesystems/gpfs0/filesets",
         headers={"Authorization": "Basic Og=="},
@@ -408,7 +408,7 @@ def test_create_fileset(mocker):
     assert response is None
 
 
-def test__set_quota(settings, mock_requests):
+def test__set_quota(settings, request_mock):
     """Test that _set_quota method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -426,7 +426,7 @@ def test__set_quota(settings, mock_requests):
         filesQuota="654321T",
     )
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="POST",
         url="http://example.com/api/filesystems/gpfs0/quotas",
         headers={"Authorization": "Basic Og=="},
@@ -475,7 +475,7 @@ def test_set_quota(mocker):
     assert response is None
 
 
-def test__create_fileset_directory(settings, mock_requests):
+def test__create_fileset_directory(settings, request_mock):
     """Test that _create_fileset_directory method works correctly."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -501,7 +501,7 @@ def test__create_fileset_directory(settings, mock_requests):
         + urllib.parse.quote_plus(path)
     )
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="POST",
         url=expected_url,
         headers={"Authorization": "Basic Og=="},
