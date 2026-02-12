@@ -246,3 +246,79 @@ def test_remove_ldap_group_members_ldap_disabled(
     rdf_allocation.save()
 
     remove_allocation_group_members_mock.assert_not_called()
+
+
+@pytest.fixture
+def async_task_mock(mocker):
+    """Mock async_task from django_q.tasks."""
+    return mocker.patch("imperial_coldfront_plugin.signals.async_task")
+
+
+def test_allocation_expired_handler_triggers_task(
+    async_task_mock,
+    rdf_allocation,
+):
+    """Test that changing allocation status to Expired spawns the quota zeroing task."""
+    async_task_mock.assert_not_called()
+
+    expired_status = AllocationStatusChoice.objects.create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
+
+    async_task_mock.assert_called_once_with(
+        "imperial_coldfront_plugin.tasks.zero_allocation_gpfs_quota",
+        rdf_allocation.pk,
+    )
+
+
+def test_allocation_expired_handler_does_not_trigger_when_already_expired(
+    async_task_mock,
+    rdf_allocation,
+):
+    """Test that re-saving an already Expired allocation does not trigger the task."""
+    expired_status = AllocationStatusChoice.objects.create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
+
+    async_task_mock.reset_mock()
+    rdf_allocation.save()
+
+    async_task_mock.assert_not_called()
+
+
+def test_allocation_expired_handler_does_not_trigger_for_other_statuses(
+    async_task_mock,
+    rdf_allocation,
+):
+    """Test that changing to a non-Expired status does not trigger the task."""
+    async_task_mock.assert_not_called()
+
+    removed_status = AllocationStatusChoice.objects.create(name="Removed")
+    rdf_allocation.status = removed_status
+    rdf_allocation.save()
+
+    async_task_mock.assert_not_called()
+
+
+def test_allocation_expired_handler_skips_new_allocations(
+    async_task_mock,
+    project,
+):
+    """Test that creating a new allocation does not trigger the task (pk is None)."""
+    from coldfront.core.allocation.models import Allocation
+    from coldfront.core.resource.models import Resource
+
+    async_task_mock.assert_not_called()
+
+    expired_status = AllocationStatusChoice.objects.create(name="Expired")
+    rdf_resource = Resource.objects.filter(name__icontains="RDF").first()
+
+    allocation = Allocation(
+        project=project,
+        status=expired_status,
+    )
+    allocation.save()
+    if rdf_resource:
+        allocation.resources.add(rdf_resource)
+
+    async_task_mock.assert_not_called()

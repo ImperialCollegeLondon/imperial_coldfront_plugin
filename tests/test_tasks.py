@@ -5,7 +5,6 @@ import pytest
 from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
-    AllocationAttributeType,
     AllocationAttributeUsage,
     AllocationStatusChoice,
     AllocationUser,
@@ -21,8 +20,6 @@ from imperial_coldfront_plugin.tasks import (
     check_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
     create_rdf_allocation,
-    expired_allocations_gpfs_quota_check,
-    remove_allocation_group_members,
 )
 
 
@@ -30,12 +27,6 @@ from imperial_coldfront_plugin.tasks import (
 def gpfs_create_fileset_mock(mocker):
     """Mock create_fileset_and_set_quota in tasks.py."""
     return mocker.patch("imperial_coldfront_plugin.tasks.create_fileset_set_quota")
-
-
-@pytest.fixture
-def gpfs_client_mock(mocker):
-    """Mock GPFSClient for quota operations."""
-    return mocker.patch("imperial_coldfront_plugin.tasks.GPFSClient")
 
 
 @pytest.fixture(autouse=True)
@@ -118,6 +109,18 @@ def send_deletion_notification_mock(mocker):
     return mocker.patch(
         "imperial_coldfront_plugin.tasks.send_allocation_deletion_notification"
     )
+
+
+@pytest.fixture
+def async_task_mock(mocker):
+    """Mock async_task from django_q.tasks."""
+    return mocker.patch("imperial_coldfront_plugin.signals.async_task")
+
+
+@pytest.fixture
+def gpfs_client_mock(mocker):
+    """Mock the GPFSClient class."""
+    return mocker.patch("imperial_coldfront_plugin.tasks.GPFSClient")
 
 
 def test_create_rdf_allocation(
@@ -364,6 +367,8 @@ def test_remove_allocation_group_members(
     enable_ldap,
 ):
     """Test _remove_allocation_group_members removes all active users."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
     username = allocation_user.user.username
 
     remove_allocation_group_members(rdf_allocation.pk)
@@ -385,6 +390,8 @@ def test_remove_allocation_group_members_multiple_users(
     enable_ldap,
 ):
     """Test _remove_allocation_group_members removes multiple active users."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
     # Create additional active users
     user2 = user_factory()
     user3 = user_factory()
@@ -426,6 +433,8 @@ def test_remove_allocation_group_members_no_shortname(
     allocation_user,
 ):
     """Test _remove_allocation_group_members handles missing shortname gracefully."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
     # Remove the shortname attribute
     rdf_allocation.allocationattribute_set.get(
         allocation_attribute_type__name="Shortname"
@@ -610,173 +619,185 @@ def test_check_expiry_notifications_multiple_allocations(
     )
 
 
-def test_expired_allocations_gpfs_quota_check_sets_quota_to_zero(
-    rdf_allocation,
-    allocation_user,
+def test_zero_allocation_gpfs_quota_success(
+    async_task_mock,
     gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
     settings,
 ):
-    """Test that expired allocations have their GPFS quota set to zero."""
-    # Set allocation as expired
-    rdf_allocation.end_date = datetime.now().date() - timedelta(days=1)
-    rdf_allocation.save()
+    """Test zero_allocation_gpfs_quota successfully sets quota to zero."""
+    from coldfront.core.allocation.models import AllocationAttributeType
 
-    # Add Storage Quota attribute
-    storage_quota_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
-    storage_quota_attr = AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_quota_type,
-        allocation=rdf_allocation,
-        value=10,
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    # Ensure Storage Quota attribute exists
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
     )
 
-    # Get shortname
-    shortname = rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).value
+    # Create and set allocation to Expired status
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
 
-    expired_allocations_gpfs_quota_check()
+    # Mock the GPFSClient
+    mock_client = gpfs_client_mock.return_value
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
 
     # Verify GPFS client was called correctly
-    client_instance = gpfs_client_mock.return_value
-    client_instance.set_quota.assert_called_once_with(
+    mock_client.set_quota.assert_called_once_with(
         filesystem_name=settings.GPFS_FILESYSTEM_NAME,
-        fileset_name=shortname,
+        fileset_name=rdf_allocation_shortname,
         block_quota="0",
         files_quota="0",
     )
 
-    # Verify Storage Quota attribute was updated
+    # Verify storage quota attribute was updated to 0
     storage_quota_attr.refresh_from_db()
     assert storage_quota_attr.value == "0"
 
 
-def test_expired_allocations_gpfs_quota_check_skips_active_allocations(
-    rdf_allocation,
+def test_zero_allocation_gpfs_quota_removed_status(
+    async_task_mock,
     gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
 ):
-    """Test that active (non-expired) allocations are not processed."""
-    # Set allocation as active (expires in future)
-    rdf_allocation.end_date = datetime.now().date() + timedelta(days=30)
-    rdf_allocation.save()
+    """Test zero_allocation_gpfs_quota works with Removed status."""
+    from coldfront.core.allocation.models import AllocationAttributeType
 
-    # Add Storage Quota attribute
-    storage_quota_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_quota_type,
-        allocation=rdf_allocation,
-        value=10,
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
     )
 
-    expired_allocations_gpfs_quota_check()
-
-    # Verify GPFS client was not called
-    client_instance = gpfs_client_mock.return_value
-    client_instance.set_quota.assert_not_called()
-
-
-def test_expired_allocations_gpfs_quota_check_handles_missing_shortname(
-    rdf_allocation,
-    gpfs_client_mock,
-):
-    """Test graceful handling when shortname attribute is missing."""
-    # Set allocation as expired
-    rdf_allocation.end_date = datetime.now().date() - timedelta(days=1)
+    removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
+    rdf_allocation.status = removed_status
     rdf_allocation.save()
 
-    # Add Storage Quota attribute
-    storage_quota_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_quota_type,
-        allocation=rdf_allocation,
-        value=10,
+    mock_client = gpfs_client_mock.return_value
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_client.set_quota.assert_called_once_with(
+        filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+        fileset_name=rdf_allocation_shortname,
+        block_quota="0",
+        files_quota="0",
     )
 
-    # Remove shortname attribute
-    rdf_allocation.allocationattribute_set.filter(
+
+def test_zero_allocation_gpfs_quota_skips_active_allocation(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+):
+    """Test zero_allocation_gpfs_quota skips Active allocations."""
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    mock_client = gpfs_client_mock.return_value
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_client.set_quota.assert_not_called()
+
+
+def test_zero_allocation_gpfs_quota_gpfs_disabled(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    settings,
+):
+    """Test zero_allocation_gpfs_quota returns early when GPFS is disabled."""
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    settings.GPFS_ENABLED = False
+
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    gpfs_client_mock.assert_not_called()
+
+
+def test_zero_allocation_gpfs_quota_missing_shortname(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    mocker,
+):
+    """Test zero_allocation_gpfs_quota handles missing shortname attribute."""
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    logger_mock = mocker.patch("imperial_coldfront_plugin.tasks.logging.getLogger")
+    mock_logger = mocker.MagicMock()
+    logger_mock.return_value = mock_logger
+
+    rdf_allocation.allocationattribute_set.get(
         allocation_attribute_type__name="Shortname"
     ).delete()
 
-    # Should not raise an exception
-    expired_allocations_gpfs_quota_check()
-
-    # Verify GPFS client was not called
-    client_instance = gpfs_client_mock.return_value
-    client_instance.set_quota.assert_not_called()
-
-
-def test_expired_allocations_gpfs_quota_check_handles_gpfs_error(
-    rdf_allocation,
-    gpfs_client_mock,
-):
-    """Test error handling when GPFS API call fails."""
-    # Set allocation as expired
-    rdf_allocation.end_date = datetime.now().date() - timedelta(days=1)
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
     rdf_allocation.save()
 
-    # Add Storage Quota attribute
-    storage_quota_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
-    storage_quota_attr = AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_quota_type,
-        allocation=rdf_allocation,
-        value=10,
+    mock_client = gpfs_client_mock.return_value
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_logger.error.assert_called()
+    error_call_args = str(mock_logger.error.call_args)
+    assert "Could not find required attribute" in error_call_args
+    mock_client.set_quota.assert_not_called()
+
+
+def test_zero_allocation_gpfs_quota_gpfs_error(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+    mocker,
+):
+    """Test zero_allocation_gpfs_quota handles GPFS client exceptions."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    logger_mock = mocker.patch("imperial_coldfront_plugin.tasks.logging.getLogger")
+    mock_logger = mocker.MagicMock()
+    logger_mock.return_value = mock_logger
+
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
     )
 
-    # Make GPFS client raise an error
-    client_instance = gpfs_client_mock.return_value
-    client_instance.set_quota.side_effect = RuntimeError("GPFS API error")
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
 
-    # Should not raise an exception
-    expired_allocations_gpfs_quota_check()
+    mock_client = gpfs_client_mock.return_value
+    mock_client.set_quota.side_effect = RuntimeError("GPFS connection failed")
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_logger.error.assert_called()
+    error_call_args = str(mock_logger.error.call_args)
+    assert "Error setting quota to zero" in error_call_args
 
     storage_quota_attr.refresh_from_db()
-    assert storage_quota_attr.value == "10"
-
-
-def test_expired_allocations_gpfs_quota_check_multiple_allocations(
-    rdf_allocation,
-    rdf_allocation_dependencies,
-    project,
-    gpfs_client_mock,
-    settings,
-):
-    """Test processing multiple expired allocations."""
-    # Set first allocation as expired
-    rdf_allocation.end_date = datetime.now().date() - timedelta(days=1)
-    rdf_allocation.save()
-
-    # Add Storage Quota to first allocation
-    storage_quota_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_quota_type,
-        allocation=rdf_allocation,
-        value=10,
-    )
-
-    # Create second expired allocation
-    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-    rdf_resource = Resource.objects.get(name="RDF Active")
-    shortname_type = AllocationAttributeType.objects.get(name="Shortname")
-
-    allocation2 = Allocation.objects.create(
-        project=project,
-        status=allocation_active_status,
-        end_date=datetime.now().date() - timedelta(days=5),
-    )
-    allocation2.resources.add(rdf_resource)
-
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=shortname_type,
-        allocation=allocation2,
-        value="shorty2",
-    )
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_quota_type,
-        allocation=allocation2,
-        value=20,
-    )
-
-    expired_allocations_gpfs_quota_check()
-
-    # Verify GPFS client was called twice
-    client_instance = gpfs_client_mock.return_value
-    assert client_instance.set_quota.call_count == 2
+    assert storage_quota_attr.value != "0"
