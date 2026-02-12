@@ -347,9 +347,9 @@ def test__create_fileset(settings, mock_requests):
         filesetName="myfileset",
         ownerId="owner",
         groupId="group",
-        absolutePath="/gpfs0/path/to/fileset",
+        path="/gpfs0/path/to/fileset",
         permissions="755",
-        faculty="sci",
+        parent_fileset="parentfileset",
     )
 
     mock_requests.assert_called_once_with(
@@ -360,11 +360,52 @@ def test__create_fileset(settings, mock_requests):
             "filesetName": "myfileset",
             "ownerId": "owner",
             "groupId": "group",
-            "absolutePath": "/gpfs0/path/to/fileset",
+            "path": "/gpfs0/path/to/fileset",
             "permissions": "755",
-            "faculty": "sci",
+            "parent_fileset": "parentfileset",
         },
     )
+
+
+def test_create_fileset(mocker):
+    """Test that create_fileset wrapper works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    client = GPFSClient()
+    _create_fileset_mock = mocker.patch.object(
+        client, "_create_fileset", autospec=True, return_value=None
+    )
+
+    filesystem_name = "gpfs0"
+    fileset_name = "myfileset"
+    owner_id = "owner"
+    group_id = "group"
+    path = "/gpfs0/path/to/fileset"
+    permissions = "755"
+    parent_fileset = "parentfileset"
+
+    response = client.create_fileset(
+        filesystem_name=filesystem_name,
+        fileset_name=fileset_name,
+        owner_id=owner_id,
+        group_id=group_id,
+        path=path,
+        permissions=permissions,
+        parent_fileset=parent_fileset,
+    )
+
+    _create_fileset_mock.assert_called_once_with(
+        filesystemName=filesystem_name,
+        filesetName=fileset_name,
+        owner=f"{owner_id}:{group_id}",
+        path=str(path),
+        permissions=permissions,
+        inodeSpace=parent_fileset,
+        permissionChangeMode="chmodAndSetAcl",
+        iamMode="advisory",
+    )
+
+    assert response is None
 
 
 def test__set_quota(settings, mock_requests):
@@ -395,6 +436,43 @@ def test__set_quota(settings, mock_requests):
             "filesQuota": "654321T",
         },
     )
+
+
+def test_set_quota(mocker):
+    """Test that set_quota wrapper works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    client = GPFSClient()
+    _set_quota_mock = mocker.patch.object(
+        client, "_set_quota", autospec=True, return_value=None
+    )
+
+    filesystem_name = "gpfs0"
+    fileset_name = "myfileset"
+    block_quota = "123456T"
+    files_quota = "654321T"
+
+    response = client.set_quota(
+        filesystem_name=filesystem_name,
+        fileset_name=fileset_name,
+        block_quota=block_quota,
+        files_quota=files_quota,
+    )
+
+    _set_quota_mock.assert_called_once_with(
+        filesystemName=filesystem_name,
+        objectName=fileset_name,
+        operationType="setQuota",
+        quotaType="FILESET",
+        blockSoftLimit=block_quota,
+        blockHardLimit=block_quota,
+        filesSoftLimit=files_quota,
+        filesHardLimit=files_quota,
+        filesGracePeriod="null",
+        blockGracePeriod="null",
+    )
+
+    assert response is None
 
 
 def test__create_fileset_directory(settings, mock_requests):
@@ -432,3 +510,39 @@ def test__create_fileset_directory(settings, mock_requests):
             "allow_existing": False,
         },
     )
+
+
+def test_create_fileset_directory(mocker):
+    """Test that create_fileset_directory wrapper works correctly."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    client = GPFSClient()
+    _create_fileset_directory_mock = mocker.patch.object(
+        client, "_create_fileset_directory", autospec=True, return_value=None
+    )
+
+    filesystem_name = "gpfs0"
+    fileset_name = "myfileset"
+    path = "path/to/directory"
+    permissions = "755"
+    allow_existing = False
+
+    response = client.create_fileset_directory(
+        filesystem_name=filesystem_name,
+        fileset_name=fileset_name,
+        path=path,
+        permissions=permissions,
+        allow_existing=allow_existing,
+    )
+
+    _create_fileset_directory_mock.assert_called_once_with(
+        filesystem_name,
+        fileset_name,
+        str(path),
+        user="root",
+        group="root",
+        permissions=permissions,
+        recursive=True,
+    )
+
+    assert response is None
