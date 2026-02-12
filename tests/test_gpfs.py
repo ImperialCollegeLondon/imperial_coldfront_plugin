@@ -217,6 +217,12 @@ def make_response(data: dict[str, object]) -> Mock:
     return response_mock
 
 
+@pytest.fixture
+def completed_job_status(mocker):
+    """Mock for a completed job status response."""
+    return mocker.Mock(return_value=make_response({"jobs": [{"status": "COMPLETED"}]}))
+
+
 def test_paginate():
     """Test the _paginate method handles multiple pages."""
     first_page = {"paging": {"lastId": 100}, "quotas": [{"id": 1}]}
@@ -342,14 +348,12 @@ def test__get_job_status(settings, request_mock):
     )
 
 
-def test__create_fileset(settings, request_mock):
+def test__create_fileset(settings, completed_job_status, request_mock):
     """Test that _create_fileset method works correctly."""
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
-    client._get_job_status = Mock(
-        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
-    )
+    client._get_job_status = completed_job_status
 
     expected_path = str(
         Path(
@@ -421,14 +425,12 @@ def test_create_fileset(mocker):
     assert response is None
 
 
-def test__set_quota(settings, request_mock):
+def test__set_quota(settings, completed_job_status, request_mock):
     """Test that _set_quota method works correctly."""
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
-    client._get_job_status = Mock(
-        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
-    )
+    client._get_job_status = completed_job_status
 
     client._set_quota(
         filesystemName=FILESYSTEM_NAME,
@@ -479,14 +481,12 @@ def test_set_quota(mocker):
     assert response is None
 
 
-def test__create_fileset_directory(settings, request_mock):
+def test__create_fileset_directory(settings, completed_job_status, request_mock):
     """Test that _create_fileset_directory method works correctly."""
     settings.GPFS_API_URL = "http://example.com/api/v1"
 
     client = GPFSClient()
-    client._get_job_status = Mock(
-        return_value=make_response({"jobs": [{"status": "COMPLETED"}]})
-    )
+    client._get_job_status = completed_job_status
 
     path = str(
         Path(
