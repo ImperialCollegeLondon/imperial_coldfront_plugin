@@ -43,7 +43,7 @@ def patch_request_session(mocker):
 
 @pytest.fixture(autouse=True)
 def gpfs_api_url(settings):
-    """Ensure a default GPFS API URL is available for all tests in this module."""
+    """GPFS API URL for testing."""
     settings.GPFS_API_URL = "http://example.com/api/v1"
     return settings
 
