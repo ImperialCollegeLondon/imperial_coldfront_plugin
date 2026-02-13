@@ -441,41 +441,54 @@ def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
 
     allocation = Allocation.objects.get(pk=allocation_id)
 
-    # Only process expired allocations
-    if allocation.status.name not in ("Expired", "Removed", "Deleted"):
-        logger.info(
-            f"Allocation {allocation_id} has status {allocation.status.name}, "
-            "expected Expired/Removed/Deleted. Skipping."
-        )
-        return
-
     client = GPFSClient()
 
     try:
         shortname = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Shortname"
         ).value
-        logger.info(f"Setting quota to zero for expired allocation {shortname}")
+    except AllocationAttribute.DoesNotExist:
+        logger.error(
+            f"Could not find Shortname attribute for allocation {allocation_id}. "
+            "Quota not updated."
+        )
+        return
+
+    logger.info(f"Setting quota to zero for expired allocation {shortname}")
+
+    try:
         client.set_quota(
             filesystem_name=settings.GPFS_FILESYSTEM_NAME,
             fileset_name=shortname,
             block_quota="0",
             files_quota="0",
         )
+    except Exception as e:
+        logger.error(f"Error setting quota to zero for allocation {shortname}: {e}")
+        return
 
+    try:
         storage_quota_attribute = allocation.allocationattribute_set.get(
             allocation_attribute_type__name="Storage Quota (TB)"
         )
         storage_quota_attribute.value = "0"
         storage_quota_attribute.save()
 
-        logger.info(f"Updated Storage Quota attribute to 0 for allocation {shortname}")
+        files_quota_attribute = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Files Quota"
+        )
+        files_quota_attribute.value = "0"
+        files_quota_attribute.save()
     except AllocationAttribute.DoesNotExist:
         logger.error(
-            f"Could not find required attribute for allocation {allocation_id}"
+            f"Could not find quota attributes for allocation {shortname}. "
+            "Quota not updated."
         )
-    except Exception as e:
-        logger.error(f"Error setting quota to zero for allocation {allocation_id}: {e}")
+        return
+
+    logger.info(
+        f"Updated Storage Quota and Files Quota attributes to 0 for allocation {shortname}"  # noqa:E501
+    )
 
 
 remove_allocation_group_members = log_task_exceptions_to_django_logger(

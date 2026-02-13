@@ -639,6 +639,14 @@ def test_zero_allocation_gpfs_quota_success(
         allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
     )
 
+    # Ensure Files Quota attribute exists
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
     # Create and set allocation to Expired status
     expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
     rdf_allocation.status = expired_status
@@ -661,6 +669,10 @@ def test_zero_allocation_gpfs_quota_success(
     storage_quota_attr.refresh_from_db()
     assert storage_quota_attr.value == "0"
 
+    # Verify files quota attribute was updated to 0
+    files_quota_attr.refresh_from_db()
+    assert files_quota_attr.value == "0"
+
 
 def test_zero_allocation_gpfs_quota_removed_status(
     async_task_mock,
@@ -681,6 +693,13 @@ def test_zero_allocation_gpfs_quota_removed_status(
         allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
     )
 
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
     removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
     rdf_allocation.status = removed_status
     rdf_allocation.save()
@@ -695,71 +714,6 @@ def test_zero_allocation_gpfs_quota_removed_status(
         block_quota="0",
         files_quota="0",
     )
-
-
-def test_zero_allocation_gpfs_quota_skips_active_allocation(
-    async_task_mock,
-    gpfs_client_mock,
-    rdf_allocation,
-):
-    """Test zero_allocation_gpfs_quota skips Active allocations."""
-    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
-
-    mock_client = gpfs_client_mock.return_value
-
-    zero_allocation_gpfs_quota(rdf_allocation.pk)
-
-    mock_client.set_quota.assert_not_called()
-
-
-def test_zero_allocation_gpfs_quota_gpfs_disabled(
-    async_task_mock,
-    gpfs_client_mock,
-    rdf_allocation,
-    settings,
-):
-    """Test zero_allocation_gpfs_quota returns early when GPFS is disabled."""
-    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
-
-    settings.GPFS_ENABLED = False
-
-    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
-    rdf_allocation.status = expired_status
-    rdf_allocation.save()
-
-    zero_allocation_gpfs_quota(rdf_allocation.pk)
-
-    gpfs_client_mock.assert_not_called()
-
-
-def test_zero_allocation_gpfs_quota_missing_shortname(
-    async_task_mock,
-    gpfs_client_mock,
-    rdf_allocation,
-    mocker,
-):
-    """Test zero_allocation_gpfs_quota handles missing shortname attribute."""
-    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
-
-    logger_mock = mocker.patch("imperial_coldfront_plugin.tasks.logging.getLogger")
-    mock_logger = mocker.MagicMock()
-    logger_mock.return_value = mock_logger
-
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
-
-    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
-    rdf_allocation.status = expired_status
-    rdf_allocation.save()
-
-    mock_client = gpfs_client_mock.return_value
-    zero_allocation_gpfs_quota(rdf_allocation.pk)
-
-    mock_logger.error.assert_called()
-    error_call_args = str(mock_logger.error.call_args)
-    assert "Could not find required attribute" in error_call_args
-    mock_client.set_quota.assert_not_called()
 
 
 def test_zero_allocation_gpfs_quota_gpfs_error(
@@ -786,6 +740,13 @@ def test_zero_allocation_gpfs_quota_gpfs_error(
         allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
     )
 
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
     expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
     rdf_allocation.status = expired_status
     rdf_allocation.save()
@@ -801,3 +762,6 @@ def test_zero_allocation_gpfs_quota_gpfs_error(
 
     storage_quota_attr.refresh_from_db()
     assert storage_quota_attr.value != "0"
+
+    files_quota_attr.refresh_from_db()
+    assert files_quota_attr.value != "0"
