@@ -16,6 +16,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('imperial_coldfront_plugin', '0014_schedule_allocation_status_check'),
+        ('django_q', '__latest__'),
     ]
 
     operations = [

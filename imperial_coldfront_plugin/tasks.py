@@ -439,6 +439,9 @@ def _check_quota_consistency() -> None:
     to admins. Also sends a notification if any allocations are found that do not have a
     matching fileset in GPFS.
     """
+    if not settings.GPFS_ENABLED:
+        return
+
     allocations = Allocation.objects.filter(
         resources__name="RDF Active",
         status__name="Active",
