@@ -127,6 +127,14 @@ def send_fileset_not_found_notification_mock(mocker):
     )
 
 
+@pytest.fixture
+def retrieve_all_fileset_usages_mock(mocker):
+    """Mock retrieve_all_fileset_usages."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_usages"
+    )
+
+
 def test_create_rdf_allocation(
     gpfs_create_fileset_mock,
     ldap_create_group_mock,
@@ -722,6 +730,7 @@ def test_check_quota_consistency_issues(
     rdf_allocation,
     send_quota_discrepancy_notification_mock,
     send_fileset_not_found_notification_mock,
+    retrieve_all_fileset_usages_mock,
     alloc_storage_quota,
     alloc_files_quota,
     gpfs_storage_quota,
@@ -730,36 +739,32 @@ def test_check_quota_consistency_issues(
     expected_discrpancy,
 ):
     """Test check_quota_consistency task."""
-    from unittest.mock import patch
-
     from imperial_coldfront_plugin.tasks import check_quota_consistency
 
     # Configure allocation and fileset with specific parameters:
     helper_add_quota_attributes(rdf_allocation, alloc_storage_quota, alloc_files_quota)
-    with patch(
-        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_usages"
-    ) as mock_usage:
-        # Define exactly what the dictionary looks like after processing
-        mock_usage.return_value = {
-            fileset_shortname: {
-                "files_limit": gpfs_files_quota,
-                "block_limit_tb": gpfs_storage_quota,
-            }
+
+    # Define exactly what the dictionary looks like after processing
+    retrieve_all_fileset_usages_mock.return_value = {
+        fileset_shortname: {
+            "files_limit": gpfs_files_quota,
+            "block_limit_tb": gpfs_storage_quota,
         }
+    }
 
-        check_quota_consistency()
+    check_quota_consistency()
 
-        # Checks that the proper discrepancies have been logged (or nonea at all).
-        if expected_discrpancy:
-            send_quota_discrepancy_notification_mock.assert_called_once_with(
-                expected_discrpancy
-            )
-        else:
-            send_quota_discrepancy_notification_mock.assert_not_called()
+    # Checks that the proper discrepancies have been logged (or nonea at all).
+    if expected_discrpancy:
+        send_quota_discrepancy_notification_mock.assert_called_once_with(
+            expected_discrpancy
+        )
+    else:
+        send_quota_discrepancy_notification_mock.assert_not_called()
 
-        # Checks that the fileset not found email is only sent when there is a shortname
-        # mismatch.
-        if fileset_shortname == "shorty":
-            send_fileset_not_found_notification_mock.assert_not_called()
-        else:
-            send_fileset_not_found_notification_mock.assert_called_once_with(["shorty"])
+    # Checks that the fileset not found email is only sent when there is a shortname
+    # mismatch.
+    if fileset_shortname == "shorty":
+        send_fileset_not_found_notification_mock.assert_not_called()
+    else:
+        send_fileset_not_found_notification_mock.assert_called_once_with(["shorty"])
