@@ -1,11 +1,13 @@
 import pytest
 from coldfront.core.allocation.models import (
+    Allocation,
     AllocationAttribute,
     AllocationAttributeType,
     AllocationStatusChoice,
     AllocationUser,
     AllocationUserStatusChoice,
 )
+from coldfront.core.resource.models import Resource, ResourceType
 
 
 @pytest.fixture
@@ -251,7 +253,9 @@ def test_remove_ldap_group_members_ldap_disabled(
 @pytest.fixture
 def async_task_mock(mocker):
     """Mock async_task from django_q.tasks."""
-    return mocker.patch("imperial_coldfront_plugin.signals.async_task")
+    mock = mocker.patch("imperial_coldfront_plugin.signals.async_task")
+    mock.assert_not_called()
+    return mock
 
 
 def test_allocation_expired_handler_triggers_task(
@@ -259,8 +263,6 @@ def test_allocation_expired_handler_triggers_task(
     rdf_allocation,
 ):
     """Test that changing allocation status to Expired spawns the quota zeroing task."""
-    async_task_mock.assert_not_called()
-
     expired_status = AllocationStatusChoice.objects.create(name="Expired")
     rdf_allocation.status = expired_status
     rdf_allocation.save()
@@ -271,28 +273,11 @@ def test_allocation_expired_handler_triggers_task(
     )
 
 
-def test_allocation_expired_handler_does_not_trigger_when_already_expired(
-    async_task_mock,
-    rdf_allocation,
-):
-    """Test that re-saving an already Expired allocation does not trigger the task."""
-    expired_status = AllocationStatusChoice.objects.create(name="Expired")
-    rdf_allocation.status = expired_status
-    rdf_allocation.save()
-
-    async_task_mock.reset_mock()
-    rdf_allocation.save()
-
-    async_task_mock.assert_not_called()
-
-
 def test_allocation_expired_handler_does_not_trigger_for_other_statuses(
     async_task_mock,
     rdf_allocation,
 ):
     """Test that changing to a non-Expired status does not trigger the task."""
-    async_task_mock.assert_not_called()
-
     removed_status = AllocationStatusChoice.objects.create(name="Removed")
     rdf_allocation.status = removed_status
     rdf_allocation.save()
@@ -305,11 +290,6 @@ def test_allocation_expired_handler_skips_new_allocations(
     project,
 ):
     """Test that creating a new allocation does not trigger the task (pk is None)."""
-    from coldfront.core.allocation.models import Allocation
-    from coldfront.core.resource.models import Resource
-
-    async_task_mock.assert_not_called()
-
     expired_status = AllocationStatusChoice.objects.create(name="Expired")
     rdf_resource = Resource.objects.filter(name__icontains="RDF").first()
 
@@ -320,5 +300,28 @@ def test_allocation_expired_handler_skips_new_allocations(
     allocation.save()
     if rdf_resource:
         allocation.resources.add(rdf_resource)
+
+    async_task_mock.assert_not_called()
+
+
+def test_allocation_expired_handler_skips_non_rdf_active_allocation(
+    async_task_mock,
+    project,
+):
+    """Test that expiring an allocation without the 'RDF Active' resource does not trigger the task."""  # noqa E501
+    active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+
+    resource_type = ResourceType.objects.first()
+    other_resource = Resource.objects.create(
+        name="Other Storage",
+        resource_type=resource_type,
+    )
+
+    allocation = Allocation.objects.create(project=project, status=active_status)
+    allocation.resources.add(other_resource)
+
+    allocation.status = expired_status
+    allocation.save()
 
     async_task_mock.assert_not_called()

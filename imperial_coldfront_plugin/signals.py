@@ -199,11 +199,14 @@ def allocation_expired_handler(
     instance: Allocation,
     **kwargs: object,
 ) -> None:
-    """Spawn a background task to zero GPFS quota when an allocation has expired."""
+    """Spawn a background task to zero GPFS quota when an RDF Active allocation has expired."""  # noqa E501
     if instance.pk is None:
         return
 
     if instance.status.name != "Expired":
+        return
+
+    if not instance.resources.filter(name="RDF Active").exists():
         return
 
     try:
