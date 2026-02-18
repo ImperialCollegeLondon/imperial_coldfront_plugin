@@ -431,7 +431,6 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
-<<<<<<< storage-quota
 def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
     """Set the GPFS quota to zero for a single expired RDF allocation.
 
@@ -493,7 +492,8 @@ def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
     logger.info(
         f"Updated Storage Quota and Files Quota attributes to 0 for allocation {shortname}"  # noqa:E501
     )
-=======
+
+
 def _check_quota_consistency() -> None:
     """Check consistency of file and storage quotas between allocations and filesets.
 
@@ -565,7 +565,6 @@ def _check_quota_consistency() -> None:
 
     if missing_filesets:
         send_fileset_not_found_notification(missing_filesets)
->>>>>>> main
 
 
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
@@ -585,10 +584,7 @@ update_allocation_status = log_task_exceptions_to_django_logger(
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
 )
-<<<<<<< storage-quota
 zero_allocation_gpfs_quota = log_task_exceptions_to_django_logger(
     _zero_allocation_gpfs_quota
 )
-=======
 check_quota_consistency = log_task_exceptions_to_django_logger(_check_quota_consistency)
->>>>>>> main
