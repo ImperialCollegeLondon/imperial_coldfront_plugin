@@ -121,6 +121,8 @@ def async_task_mock(mocker):
 def gpfs_client_mock(mocker):
     """Mock the GPFSClient class."""
     return mocker.patch("imperial_coldfront_plugin.tasks.GPFSClient")
+
+
 def send_quota_discrepancy_notification_mock(mocker):
     """Mock send_quota_discrepancy_notification."""
     return mocker.patch(
@@ -786,6 +788,8 @@ def test_zero_allocation_gpfs_quota_gpfs_error(
 
     files_quota_attr.refresh_from_db()
     assert files_quota_attr.value != "0"
+
+
 def helper_add_quota_attributes(allocation, storage_quota, files_quota):
     """Helper function to add quota attributes to an allocation."""
     from coldfront.core.allocation.models import AllocationAttributeType
