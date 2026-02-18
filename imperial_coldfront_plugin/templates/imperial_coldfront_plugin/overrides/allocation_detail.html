@@ -6,6 +6,22 @@
     This is a allocation from an archived group! You cannot make any changes.
   </div>
 {% endif %}
+{% if allocation.status.name == 'Deleted' %}
+  <div class="alert alert-danger" role="alert">
+    <i class="fas fa-trash" aria-hidden="true"></i>
+    <strong>This allocation has been deleted.</strong>
+  </div>
+{% elif allocation.status.name == 'Removed' %}
+  <div class="alert alert-warning" role="alert">
+    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+    <strong>This allocation has been removed and will be deleted in {{ allocation.days_until_deletion }} day{{ allocation.days_until_deletion|pluralize }}.</strong>
+  </div>
+{% elif allocation.status.name == 'Expired' %}
+  <div class="alert alert-info" role="alert">
+    <i class="fas fa-clock" aria-hidden="true"></i>
+    <strong>This allocation has expired and is read-only.</strong> Access will be removed in {{ allocation.days_until_removal }} day{{ allocation.days_until_removal|pluralize }}.
+  </div>
+{% endif %}
 {% allocation_shortname allocation as shortname %}
 <div class="mb-3">
   <h2>
