@@ -455,7 +455,9 @@ class GPFSClient(Consumer):
         return {
             quota["objectName"]: {
                 "files_usage": quota["filesUsage"],
+                "files_limit": quota["filesLimit"],
                 "block_usage_tb": quota["blockUsage"] / 1024**3,
+                "block_limit_tb": quota["blockLimit"] / 1024**3,
             }
             for quota in quotas
         }
