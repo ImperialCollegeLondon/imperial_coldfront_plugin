@@ -9,11 +9,21 @@ def create_expiry_notification_schedule(apps, schema_editor):
 
     Schedule.objects.get_or_create(
         func="imperial_coldfront_plugin.tasks.check_rdf_allocation_expiry_notifications",
-        name="RDF Allocation Expiry Notifications",
-        schedule_type="D",
-        repeats=-1,
+        defaults={
+            "name": "RDF Allocation Expiry Notifications",
+            "schedule_type": "D",  # Daily
+            "repeats": -1,  # Run indefinitely
+        },
     )
 
+
+def delete_expiry_notification_schedule(apps, schema_editor):
+    """Remove scheduled task for RDF allocation expiry notifications."""
+    Schedule = apps.get_model("django_q", "Schedule")
+
+    Schedule.objects.filter(
+        func="imperial_coldfront_plugin.tasks.check_rdf_allocation_expiry_notifications"
+    ).delete()
 
 
 class Migration(migrations.Migration):
@@ -26,5 +36,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(
             create_expiry_notification_schedule,
+            reverse_code=delete_expiry_notification_schedule,
         ),
     ]
