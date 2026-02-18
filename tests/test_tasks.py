@@ -123,6 +123,7 @@ def gpfs_client_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.tasks.GPFSClient")
 
 
+@pytest.fixture
 def send_quota_discrepancy_notification_mock(mocker):
     """Mock send_quota_discrepancy_notification."""
     return mocker.patch(
