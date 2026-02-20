@@ -82,6 +82,7 @@ def client_mock(mocker):
 def mock_requests(mocker):
     """Mock the requests module."""
     mock = mocker.patch("requests.Session.request")
+    mock.return_value.status_code = 200
     return mock
 
 
@@ -274,16 +275,25 @@ def test_pagination_retrieve_quota_usage(settings, mock_requests):
     )
 
 
-def test_unlink_fileset(client_mock, fileset_path_info):
-    """Test unlinking a fileset."""
-    client_mock.unlink_fileset.return_value = None
+@pytest.fixture
+def completed_job_status(mocker):
+    """Mock for a completed job status response."""
+    return mocker.Mock(return_value=make_response({"jobs": [{"status": "COMPLETED"}]}))
 
-    client_mock.unlink_fileset(
-        filesystemName=FILESYSTEM_NAME,
-        filesetName=FILESET_NAME,
-    )
 
-    client_mock.unlink_fileset.assert_called_once_with(
-        filesystemName=FILESYSTEM_NAME,
-        filesetName=FILESET_NAME,
+def test_unlink_fileset(settings, completed_job_status, mock_requests):
+    """Test that unlink_fileset method makes the correct API call."""
+    from imperial_coldfront_plugin.gpfs_client import GPFSClient
+
+    settings.GPFS_API_URL = "http://example.com"
+
+    client = GPFSClient()
+    client._get_job_status = completed_job_status
+    client.unlink_fileset(filesystemName="gpfs0", filesetName="myfileset")
+
+    mock_requests.assert_called_once_with(
+        method="DELETE",
+        url="http://example.com/filesystems/gpfs0/filesets/myfileset/link",
+        params={"force": "False"},
+        headers={"Authorization": "Basic Og=="},
     )
