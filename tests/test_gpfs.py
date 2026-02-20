@@ -272,3 +272,18 @@ def test_pagination_retrieve_quota_usage(settings, mock_requests):
         headers={"Authorization": "Basic Og=="},
         json={},
     )
+
+
+def test_unlink_fileset(client_mock, fileset_path_info):
+    """Test unlinking a fileset."""
+    client_mock.unlink_fileset.return_value = None
+
+    client_mock.unlink_fileset(
+        filesystemName=FILESYSTEM_NAME,
+        filesetName=FILESET_NAME,
+    )
+
+    client_mock.unlink_fileset.assert_called_once_with(
+        filesystemName=FILESYSTEM_NAME,
+        filesetName=FILESET_NAME,
+    )
