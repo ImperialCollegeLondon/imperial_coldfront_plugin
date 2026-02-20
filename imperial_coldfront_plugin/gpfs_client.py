@@ -264,6 +264,7 @@ class GPFSClient(Consumer):
                 f"Error creating fileset '{fileset_name}' - {e.args[0]}"
             ) from e
 
+    @check_job_status
     @delete("filesystems/{filesystemName}/filesets/{filesetName}/link")
     def unlink_fileset(  # type: ignore[empty-body]
         self,
