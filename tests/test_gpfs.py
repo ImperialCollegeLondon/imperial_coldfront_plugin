@@ -44,7 +44,7 @@ def patch_request_session(mocker):
 @pytest.fixture(autouse=True)
 def gpfs_api_url(settings):
     """GPFS API URL for testing."""
-    settings.GPFS_API_URL = "http://example.com/api/v1"
+    settings.GPFS_API_URL = "http://example.com"
     return settings
 
 
@@ -252,14 +252,14 @@ def test_paginate():
     assert "lastId" in second_kwargs and second_kwargs["lastId"] == 100
 
 
-def test__filesystems(gpfs_api_url, request_mock):
+def test__filesystems(request_mock):
     """Test that _filesystems method works correctly."""
     client = GPFSClient()
     client._filesystems(lastId=10)
 
     request_mock.assert_called_once_with(
         method="GET",
-        url="http://example.com/api/filesystems",
+        url="http://example.com/filesystems",
         params={"lastId": "10"},
         headers=HEADERS,
     )
@@ -280,7 +280,7 @@ def test_filesystems(mocker):
     assert response == [{"name": FILESYSTEM_NAME}]
 
 
-def test__retrieve_quota_usage(gpfs_api_url, request_mock):
+def test__retrieve_quota_usage(request_mock):
     """Test that _retrieve_quota_usage method works correctly."""
     client = GPFSClient()
     client._retrieve_quota_usage(
@@ -289,14 +289,14 @@ def test__retrieve_quota_usage(gpfs_api_url, request_mock):
 
     request_mock.assert_called_once_with(
         method="GET",
-        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/quotas",
+        url=f"http://example.com/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/quotas",
         params={"lastId": "30"},
         headers=HEADERS,
         json={},
     )
 
 
-def test__retrieve_all_fileset_quotas(gpfs_api_url, request_mock):
+def test__retrieve_all_fileset_quotas(request_mock):
     """Test that _retrieve_all_fileset_quotas method works correctly."""
     client = GPFSClient()
     client._retrieve_all_fileset_quotas(filesystemName=FILESYSTEM_NAME, lastId=20)
@@ -304,7 +304,7 @@ def test__retrieve_all_fileset_quotas(gpfs_api_url, request_mock):
     request_mock.assert_called_once_with(
         method="GET",
         url=(
-            f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/quotas"
+            f"http://example.com/filesystems/{FILESYSTEM_NAME}/quotas"
             f"?filter=quotaType=FILESET"
         ),
         params={"lastId": "20"},
@@ -313,7 +313,7 @@ def test__retrieve_all_fileset_quotas(gpfs_api_url, request_mock):
     )
 
 
-def test_get_directory_acl(gpfs_api_url, fileset_path_info, request_mock):
+def test_get_directory_acl(fileset_path_info, request_mock):
     """Test that get_directory_acl method works correctly."""
     client = GPFSClient()
     client.get_directory_acl(
@@ -333,19 +333,19 @@ def test_get_directory_acl(gpfs_api_url, fileset_path_info, request_mock):
     )
 
 
-def test__get_job_status(gpfs_api_url, request_mock):
+def test__get_job_status(request_mock):
     """Test that _get_job_status method works correctly."""
     client = GPFSClient()
     client._get_job_status(jobId="12345")
 
     request_mock.assert_called_once_with(
         method="GET",
-        url="http://example.com/api/jobs/12345",
+        url="http://example.com/jobs/12345",
         headers=HEADERS,
     )
 
 
-def test__create_fileset(gpfs_api_url, completed_job_status, request_mock):
+def test__create_fileset(completed_job_status, request_mock):
     """Test that _create_fileset method works correctly."""
     client = GPFSClient()
     client._get_job_status = completed_job_status
@@ -373,7 +373,7 @@ def test__create_fileset(gpfs_api_url, completed_job_status, request_mock):
 
     request_mock.assert_called_once_with(
         method="POST",
-        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/filesets",
+        url=f"http://example.com/filesystems/{FILESYSTEM_NAME}/filesets",
         headers=HEADERS,
         json={
             "filesetName": FILESET_NAME,
@@ -420,7 +420,7 @@ def test_create_fileset(mocker):
     assert response is None
 
 
-def test__set_quota(gpfs_api_url, completed_job_status, request_mock):
+def test__set_quota(completed_job_status, request_mock):
     """Test that _set_quota method works correctly."""
     client = GPFSClient()
     client._get_job_status = completed_job_status
@@ -434,7 +434,7 @@ def test__set_quota(gpfs_api_url, completed_job_status, request_mock):
 
     request_mock.assert_called_once_with(
         method="POST",
-        url=f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/quotas",
+        url=f"http://example.com/filesystems/{FILESYSTEM_NAME}/quotas",
         headers=HEADERS,
         json={
             "filesetName": FILESET_NAME,
@@ -474,7 +474,7 @@ def test_set_quota(mocker):
     assert response is None
 
 
-def test__create_fileset_directory(gpfs_api_url, completed_job_status, request_mock):
+def test__create_fileset_directory(completed_job_status, request_mock):
     """Test that _create_fileset_directory method works correctly."""
     client = GPFSClient()
     client._get_job_status = completed_job_status
@@ -499,7 +499,7 @@ def test__create_fileset_directory(gpfs_api_url, completed_job_status, request_m
     )
 
     expected_url = (
-        f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/directory/"
+        f"http://example.com/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/directory/"
         + urllib.parse.quote(path, safe="")
     )
 
@@ -553,7 +553,7 @@ def test_create_fileset_directory(mocker):
     assert response is None
 
 
-def test__set_directory_acl(settings, gpfs_api_url, completed_job_status, request_mock):
+def test__set_directory_acl(settings, completed_job_status, request_mock):
     """Test that _set_directory_acl method works correctly."""
     client = GPFSClient()
     client._get_job_status = completed_job_status
@@ -576,7 +576,7 @@ def test__set_directory_acl(settings, gpfs_api_url, completed_job_status, reques
     )
 
     expected_url = (
-        f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/acl/"
+        f"http://example.com/filesystems/{FILESYSTEM_NAME}/acl/"
         + urllib.parse.quote(path, safe="")
     )
 
