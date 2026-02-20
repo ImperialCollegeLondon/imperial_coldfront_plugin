@@ -281,7 +281,8 @@ def completed_job_status(mocker):
     return mocker.Mock(return_value=make_response({"jobs": [{"status": "COMPLETED"}]}))
 
 
-def test_unlink_fileset(settings, completed_job_status, mock_requests):
+@pytest.mark.parametrize("force", ["True", "False"])
+def test_unlink_fileset(settings, completed_job_status, mock_requests, force):
     """Test that unlink_fileset method makes the correct API call."""
     from imperial_coldfront_plugin.gpfs_client import GPFSClient
 
@@ -289,11 +290,11 @@ def test_unlink_fileset(settings, completed_job_status, mock_requests):
 
     client = GPFSClient()
     client._get_job_status = completed_job_status
-    client.unlink_fileset(filesystemName="gpfs0", filesetName="myfileset")
+    client.unlink_fileset(filesystemName="gpfs0", filesetName="myfileset", force=force)
 
     mock_requests.assert_called_once_with(
         method="DELETE",
         url="http://example.com/filesystems/gpfs0/filesets/myfileset/link",
-        params={"force": "False"},
+        params={"force": force},
         headers={"Authorization": "Basic Og=="},
     )
