@@ -17,14 +17,18 @@ from coldfront.core.allocation.models import (
 from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from .emails import (
     Discrepancy,
+    QuotaDiscrepancy,
     send_allocation_deletion_notification,
     send_allocation_deletion_warning,
     send_allocation_expiry_warning,
     send_allocation_removal_warning,
     send_discrepancy_notification,
+    send_fileset_not_found_notification,
+    send_quota_discrepancy_notification,
 )
 from .forms import AllocationFormData
 from .gid import get_new_gid
@@ -305,6 +309,36 @@ def _remove_allocation_group_members(allocation_id: int) -> None:
         )
 
 
+def _update_allocation_status() -> None:
+    """Change the status of expired allocations to "removed" or "deleted".
+
+    There are default values in the settings for how long after an allocation's end date
+    it should be marked as removed or deleted. Allocations within the two limits get
+    marked as "Removed", and allocations beyond the window get marked as "Deleted".
+    """
+    remove_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS)
+    delete_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS)
+
+    allocations_to_remove = Allocation.objects.filter(
+        # current time - end date >= remove limit
+        end_date__lte=(timezone.now() - remove_limit),
+        # current time - end date < delete limit
+        end_date__gt=(timezone.now() - delete_limit),
+        resources__name="RDF Active",
+    )
+    removed_status = AllocationStatusChoice.objects.get(name="Removed")
+    allocations_to_remove.update(status=removed_status)
+
+    # Delete Allocations that end beyond deletion limit
+    allocations_to_delete = Allocation.objects.filter(
+        # current time - expiry date > expiry limit
+        end_date__lte=(timezone.now() - delete_limit),
+        resources__name="RDF Active",
+    )
+    deleted_status = AllocationStatusChoice.objects.get(name="Deleted")
+    allocations_to_delete.update(status=deleted_status)
+
+
 def _check_rdf_allocation_expiry_notifications() -> None:
     """Check RDF allocations and send appropriate expiry notifications."""
     logger = logging.getLogger("django-q")
@@ -397,6 +431,79 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
+def _check_quota_consistency() -> None:
+    """Check consistency of file and storage quotas between allocations and filesets.
+
+    Compares the active allocations to ensure the matching filesets have the same
+    storage and file quotas. If discrepancies are found, a notification email is sent
+    to admins. Also sends a notification if any allocations are found that do not have a
+    matching fileset in GPFS.
+    """
+    if not settings.GPFS_ENABLED:
+        return
+
+    allocations = Allocation.objects.filter(
+        resources__name="RDF Active",
+        status__name="Active",
+        allocationattribute__allocation_attribute_type__name="Shortname",
+    ).distinct()
+
+    client = GPFSClient()
+    usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)
+
+    discrepancies: list[QuotaDiscrepancy] = []
+    missing_filesets = []
+
+    for allocation in allocations:
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+        storage_attribute_quota: int = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Storage Quota (TB)"
+        ).typed_value()
+        files_attribute_quota: int = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Files Quota"
+        ).typed_value()
+
+        if shortname in usages:
+            # Check for discrepancies between the allocation and fileset for both
+            # storage and file quotas.
+            storage_quota_discrepancy = (
+                storage_attribute_quota != usages[shortname]["block_limit_tb"]
+            )
+            file_quota_discrepancy = (
+                files_attribute_quota != usages[shortname]["files_limit"]
+            )
+            if storage_quota_discrepancy or file_quota_discrepancy:
+                # If either are not consistent, create a discrepancy record.
+                discrepancies.append(
+                    {
+                        "shortname": shortname,
+                        "attribute_storage_quota": storage_attribute_quota
+                        if storage_quota_discrepancy
+                        else None,
+                        "fileset_storage_quota": usages[shortname]["block_limit_tb"]
+                        if storage_quota_discrepancy
+                        else None,
+                        "attribute_files_quota": files_attribute_quota
+                        if file_quota_discrepancy
+                        else None,
+                        "fileset_files_quota": usages[shortname]["files_limit"]
+                        if file_quota_discrepancy
+                        else None,
+                    }
+                )
+        else:
+            # The allocation was not found in GPFS - notify admins
+            missing_filesets.append(shortname)
+
+    if discrepancies:
+        send_quota_discrepancy_notification(discrepancies)
+
+    if missing_filesets:
+        send_fileset_not_found_notification(missing_filesets)
+
+
 remove_allocation_group_members = log_task_exceptions_to_django_logger(
     _remove_allocation_group_members
 )
@@ -408,6 +515,10 @@ check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consis
 update_quota_usages_task = log_task_exceptions_to_django_logger(
     _update_quota_usages_task
 )
+update_allocation_status = log_task_exceptions_to_django_logger(
+    _update_allocation_status
+)
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
 )
+check_quota_consistency = log_task_exceptions_to_django_logger(_check_quota_consistency)
