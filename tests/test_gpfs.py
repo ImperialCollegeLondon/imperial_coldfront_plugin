@@ -551,3 +551,70 @@ def test_create_fileset_directory(mocker):
     )
 
     assert response is None
+
+
+def test__set_directory_acl(settings, gpfs_api_url, completed_job_status, request_mock):
+    """Test that _set_directory_acl method works correctly."""
+    client = GPFSClient()
+    client._get_job_status = completed_job_status
+
+    path = str(
+        Path(
+            FILESYSTEM_MOUNT_PATH,
+            TOP_LEVEL_DIRECTORIES,
+            FACULTY,
+            DEPARTMENT,
+            GROUP_NAME,
+            FILESET_NAME,
+        )
+    )
+
+    client._set_directory_acl(
+        filesystem_name=FILESYSTEM_NAME,
+        path=path,
+        acl=settings.GPFS_FILESET_ACL,
+    )
+
+    expected_url = (
+        f"http://example.com/api/filesystems/{FILESYSTEM_NAME}/acl/"
+        + urllib.parse.quote(path, safe="")
+    )
+
+    request_mock.assert_called_once_with(
+        method="PUT",
+        url=expected_url,
+        headers=HEADERS,
+        json={"acl": settings.GPFS_FILESET_ACL},
+    )
+
+
+def test_set_directory_acl(settings, mocker):
+    """Test that set_directory_acl wrapper works correctly."""
+    client = GPFSClient()
+    _set_directory_acl_mock = mocker.patch.object(
+        client, "_set_directory_acl", autospec=True, return_value=None
+    )
+
+    path = str(
+        Path(
+            FILESYSTEM_MOUNT_PATH,
+            TOP_LEVEL_DIRECTORIES,
+            FACULTY,
+            DEPARTMENT,
+            GROUP_NAME,
+            FILESET_NAME,
+        )
+    )
+
+    client.set_directory_acl(
+        filesystem_name=FILESYSTEM_NAME,
+        path=path,
+        acl=settings.GPFS_FILESET_ACL,
+    )
+
+    assert _set_directory_acl_mock.call_count == 1
+    called_args, called_kwargs = _set_directory_acl_mock.call_args
+    assert called_args[0] == FILESYSTEM_NAME
+    assert called_args[1] == path
+    entries = called_kwargs.get("entries")
+    assert isinstance(entries, list)
