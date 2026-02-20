@@ -265,7 +265,7 @@ class GPFSClient(Consumer):
             ) from e
 
     @delete("filesystems/{filesystemName}/filesets/{filesetName}/link")
-    def unlink_filesets(  # type: ignore[empty-body]
+    def unlink_fileset(  # type: ignore[empty-body]
         self,
         filesystemName: str,
         filesetName: str,
