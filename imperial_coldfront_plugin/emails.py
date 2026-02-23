@@ -151,3 +151,82 @@ All associated data has been permanently removed.
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[project_owner_email],
     )
+
+
+class QuotaDiscrepancy(TypedDict):
+    """Structure for holding discrepancies found during quota consistency check."""
+
+    shortname: str
+    attribute_storage_quota: int | None
+    fileset_storage_quota: float | None
+    attribute_files_quota: int | None
+    fileset_files_quota: float | None
+
+
+def send_quota_discrepancy_notification(discrepancies: list[QuotaDiscrepancy]) -> None:
+    """Send quota discrepancy notification to project owner.
+
+    Args:
+        discrepancies: List of discrepancies.
+    """
+    if not settings.ADMINS:
+        return
+
+    message = (
+        "During a regularly scheduled automated check, a discrepancy was found between "
+        "the data held in Coldfront and fileset quotas in GPFS. These should be in "
+        "agreement so that Coldfront is reporting accurate information to end users. "
+        "Please investigate and reconcile the two.\n\n"
+        "The following discrepancies were detected between Coldfront and GPFS:\n\n"
+    )
+
+    for discrepancy in discrepancies:
+        shortname = discrepancy["shortname"]
+        message += f"\t- Allocation shortname: {shortname}\n"
+
+        if discrepancy["attribute_storage_quota"]:
+            attribute_storage_quota = discrepancy["attribute_storage_quota"]
+            fileset_storage_quota = discrepancy["fileset_storage_quota"]
+            message += (
+                f"\t\tAllocation storage quota of {attribute_storage_quota}, "
+                f"GPFS storage quota of {fileset_storage_quota}.\n"
+            )
+
+        if discrepancy["attribute_files_quota"]:
+            attribute_files_quota = discrepancy["attribute_files_quota"]
+            fileset_files_quota = discrepancy["fileset_files_quota"]
+            message += (
+                f"\t\tAllocation files quota of {attribute_files_quota}, "
+                f"GPFS files quota of {fileset_files_quota}.\n"
+            )
+
+    mail_admins(
+        subject="Coldfront Quota Consistency Check - Discrepancies Found",
+        message=message,
+    )
+
+
+def send_fileset_not_found_notification(shortnames: list[str]) -> None:
+    """Send notification to admins that fileset was not found.
+
+    Args:
+        shortnames: The allocation shortnames.
+    """
+    if not settings.ADMINS:
+        return
+
+    subject = "Coldfront Quota Consistency Check - GPFS Filesets Not Found"
+    message = (
+        "During a regularly scheduled automated check, an allocation in Coldfront was "
+        "found to have no corresponding fileset in GPFS. These systems should be "
+        "in agreement to ensure that Coldfront is reporting accurate information to "
+        "end users. Please investigate and reconcile the two.\n\n"
+        "The following allocation(s) in Coldfront had no corresponding fileset in GPFS:"
+        "\n"
+    )
+    for shortname in shortnames:
+        message += f"\t- {shortname}\n"
+    mail_admins(
+        subject=subject,
+        message=message,
+    )
