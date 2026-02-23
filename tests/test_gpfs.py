@@ -296,6 +296,27 @@ def test__retrieve_quota_usage(request_mock):
     )
 
 
+def test_retrieve_quota_usage(mocker):
+    """Test that retrieve_quota_usage wrapper works correctly."""
+    client = GPFSClient()
+    _retrieve_quota_usage_mock = mocker.patch.object(
+        client,
+        "_retrieve_quota_usage",
+        autospec=True,
+        return_value=make_response(
+            {"quotas": [{"block_usage_tb": 0.0, "files_usage": 0}]}
+        ),
+    )
+
+    response = client.retrieve_quota_usage(
+        filesystem_name=FILESYSTEM_NAME, fileset_name=FILESET_NAME
+    )
+    _retrieve_quota_usage_mock.assert_called_once_with(
+        filesystemName=FILESYSTEM_NAME, filesetName=FILESET_NAME
+    )
+    assert response == {"block_usage_tb": 0.0, "files_usage": 0}
+
+
 def test__retrieve_all_fileset_quotas(request_mock):
     """Test that _retrieve_all_fileset_quotas method works correctly."""
     client = GPFSClient()
