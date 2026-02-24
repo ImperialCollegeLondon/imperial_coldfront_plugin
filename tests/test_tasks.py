@@ -140,10 +140,10 @@ def send_fileset_not_found_notification_mock(mocker):
 
 
 @pytest.fixture
-def retrieve_all_fileset_usages_mock(mocker):
-    """Mock retrieve_all_fileset_usages."""
+def retrieve_all_fileset_quotas_mock(mocker):
+    """Mock retrieve_all_fileset_quotas."""
     return mocker.patch(
-        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_usages"
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_quotas"
     )
 
 
