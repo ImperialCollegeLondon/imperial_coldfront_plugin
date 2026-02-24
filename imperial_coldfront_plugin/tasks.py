@@ -431,6 +431,69 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
+def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
+    """Set the GPFS quota to zero for a single expired RDF allocation.
+
+    Args:
+        allocation_id: The primary key of the allocation.
+    """
+    logger = logging.getLogger("django-q")
+
+    if not settings.GPFS_ENABLED:
+        return
+
+    allocation = Allocation.objects.get(pk=allocation_id)
+
+    client = GPFSClient()
+
+    try:
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+    except AllocationAttribute.DoesNotExist:
+        logger.error(
+            f"Could not find Shortname attribute for allocation {allocation_id}. "
+            "Quota not updated."
+        )
+        return
+
+    logger.info(f"Setting quota to zero for expired allocation {shortname}")
+
+    try:
+        client.set_quota(
+            filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+            fileset_name=shortname,
+            block_quota="0",
+            files_quota="0",
+        )
+    except Exception as e:
+        logger.error(f"Error setting quota to zero for allocation {shortname}: {e}")
+        return
+
+    try:
+        storage_quota_attribute = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Storage Quota (TB)"
+        )
+        storage_quota_attribute.value = "0"
+        storage_quota_attribute.save()
+
+        files_quota_attribute = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Files Quota"
+        )
+        files_quota_attribute.value = "0"
+        files_quota_attribute.save()
+    except AllocationAttribute.DoesNotExist:
+        logger.error(
+            f"Could not find quota attributes for allocation {shortname}. "
+            "Quota not updated."
+        )
+        return
+
+    logger.info(
+        f"Updated Storage Quota and Files Quota attributes to 0 for allocation {shortname}"  # noqa:E501
+    )
+
+
 def _check_quota_consistency() -> None:
     """Check consistency of file and storage quotas between allocations and filesets.
 
@@ -520,5 +583,8 @@ update_allocation_status = log_task_exceptions_to_django_logger(
 )
 check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
     _check_rdf_allocation_expiry_notifications
+)
+zero_allocation_gpfs_quota = log_task_exceptions_to_django_logger(
+    _zero_allocation_gpfs_quota
 )
 check_quota_consistency = log_task_exceptions_to_django_logger(_check_quota_consistency)
