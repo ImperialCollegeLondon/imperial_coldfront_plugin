@@ -334,6 +334,42 @@ def test__retrieve_all_fileset_quotas(request_mock):
     )
 
 
+def test_retrieve_all_fileset_quotas(mocker):
+    """Test that retrieve_all_fileset_quotas wrapper works correctly."""
+    client = GPFSClient()
+    _retrieve_all_fileset_quotas_mock = mocker.patch.object(
+        client,
+        "_retrieve_all_fileset_quotas",
+        autospec=True,
+        return_value=make_response(
+            {
+                "quotas": [
+                    {
+                        "objectName": FILESET_NAME,
+                        "blockUsage": 123456 * 1024**3,
+                        "blockLimit": 654321 * 1024**3,
+                        "filesUsage": 100,
+                        "filesLimit": 200,
+                    }
+                ]
+            }
+        ),
+    )
+
+    response = client.retrieve_all_fileset_quotas(filesystem_name=FILESYSTEM_NAME)
+    _retrieve_all_fileset_quotas_mock.assert_called_once_with(
+        filesystemName=FILESYSTEM_NAME
+    )
+    assert response == {
+        FILESET_NAME: {
+            "block_usage_tb": 123456.0,
+            "block_limit_tb": 654321.0,
+            "files_usage": 100,
+            "files_limit": 200,
+        }
+    }
+
+
 def test_get_directory_acl(fileset_path_info, request_mock):
     """Test that get_directory_acl method works correctly."""
     client = GPFSClient()
