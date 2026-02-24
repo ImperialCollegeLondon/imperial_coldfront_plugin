@@ -112,6 +112,18 @@ def send_deletion_notification_mock(mocker):
 
 
 @pytest.fixture
+def async_task_mock(mocker):
+    """Mock async_task from django_q.tasks."""
+    return mocker.patch("imperial_coldfront_plugin.signals.async_task")
+
+
+@pytest.fixture
+def gpfs_client_mock(mocker):
+    """Mock the GPFSClient class."""
+    return mocker.patch("imperial_coldfront_plugin.tasks.GPFSClient")
+
+
+@pytest.fixture
 def send_quota_discrepancy_notification_mock(mocker):
     """Mock send_quota_discrepancy_notification."""
     return mocker.patch(
@@ -629,6 +641,154 @@ def test_check_expiry_notifications_multiple_allocations(
     send_removal_warning_mock.assert_called_once_with(
         allocation2.pk, project.pi.email, -days_after_expiry
     )
+
+
+def test_zero_allocation_gpfs_quota_success(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+):
+    """Test zero_allocation_gpfs_quota successfully sets quota to zero."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    # Ensure Storage Quota attribute exists
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
+    )
+
+    # Ensure Files Quota attribute exists
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
+    # Create and set allocation to Expired status
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
+
+    # Mock the GPFSClient
+    mock_client = gpfs_client_mock.return_value
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    # Verify GPFS client was called correctly
+    mock_client.set_quota.assert_called_once_with(
+        filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+        fileset_name=rdf_allocation_shortname,
+        block_quota="0",
+        files_quota="0",
+    )
+
+    # Verify storage quota attribute was updated to 0
+    storage_quota_attr.refresh_from_db()
+    assert storage_quota_attr.value == "0"
+
+    # Verify files quota attribute was updated to 0
+    files_quota_attr.refresh_from_db()
+    assert files_quota_attr.value == "0"
+
+
+def test_zero_allocation_gpfs_quota_removed_status(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+):
+    """Test zero_allocation_gpfs_quota works with Removed status."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
+    )
+
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
+    removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
+    rdf_allocation.status = removed_status
+    rdf_allocation.save()
+
+    mock_client = gpfs_client_mock.return_value
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_client.set_quota.assert_called_once_with(
+        filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+        fileset_name=rdf_allocation_shortname,
+        block_quota="0",
+        files_quota="0",
+    )
+
+
+def test_zero_allocation_gpfs_quota_gpfs_error(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+    mocker,
+):
+    """Test zero_allocation_gpfs_quota handles GPFS client exceptions."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    logger_mock = mocker.patch("imperial_coldfront_plugin.tasks.logging.getLogger")
+    mock_logger = mocker.MagicMock()
+    logger_mock.return_value = mock_logger
+
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
+    )
+
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
+
+    mock_client = gpfs_client_mock.return_value
+    mock_client.set_quota.side_effect = RuntimeError("GPFS connection failed")
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_logger.error.assert_called()
+    error_call_args = str(mock_logger.error.call_args)
+    assert "Error setting quota to zero" in error_call_args
+
+    storage_quota_attr.refresh_from_db()
+    assert storage_quota_attr.value != "0"
+
+    files_quota_attr.refresh_from_db()
+    assert files_quota_attr.value != "0"
 
 
 def helper_add_quota_attributes(allocation, storage_quota, files_quota):
