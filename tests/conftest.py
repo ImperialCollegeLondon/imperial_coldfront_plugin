@@ -1,5 +1,6 @@
 """Pytest configuration."""
 
+import pkgutil
 from random import choices
 from string import ascii_lowercase
 
@@ -418,6 +419,8 @@ def signals_async_task_mock(mocker):
     """Mock the async_task function used in signals to run tasks synchronously."""
 
     def f(func, *args, **kwargs):
+        if isinstance(func, str):
+            func = pkgutil.resolve_name(func)
         return func(*args, **kwargs)
 
     return mocker.patch("imperial_coldfront_plugin.signals.async_task", f)
