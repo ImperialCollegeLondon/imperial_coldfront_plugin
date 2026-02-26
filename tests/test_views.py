@@ -823,7 +823,7 @@ class TestAllocationDetailBanners:
 
         response = self._render_allocation_detail(request_, rdf_allocation, settings)
         soup = BeautifulSoup(response.content, "html.parser")
-        banner = soup.find("div", id="expired-allocation")
+        banner = soup.find("div", id="expired-allocation", class_="alert-info")
 
         assert banner
         assert "This allocation has expired and is read-only" in banner.text
@@ -839,7 +839,7 @@ class TestAllocationDetailBanners:
 
         response = self._render_allocation_detail(request_, rdf_allocation, settings)
         soup = BeautifulSoup(response.content, "html.parser")
-        banner = soup.find("div", id="deleted-allocation")
+        banner = soup.find("div", id="deleted-allocation", class_="alert-danger")
 
         assert banner
         assert "This allocation has been deleted" in banner.text
