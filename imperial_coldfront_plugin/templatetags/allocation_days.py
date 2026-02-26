@@ -9,9 +9,9 @@ register = template.Library()
 
 
 @register.filter
-def days_until(date_value: date) -> int | None:
+def days_until(date_value: date) -> int:
     """Calculate days until the given date from today."""
     if date_value:
         days = (date_value - timezone.now().date()).days
         return max(0, days)
-    return None
+    return 0
