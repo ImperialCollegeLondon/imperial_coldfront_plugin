@@ -253,7 +253,7 @@ def _check_ldap_consistency() -> list[Discrepancy]:
 def _update_quota_usages_task() -> None:
     """Update the usages of all quota related allocation attributes."""
     client = GPFSClient()
-    usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)
+    usages = client.retrieve_all_fileset_quotas(settings.GPFS_FILESYSTEM_NAME)
 
     # use prefetch_related to reduce number of database operations
     allocations = Allocation.objects.filter(
@@ -512,7 +512,7 @@ def _check_quota_consistency() -> None:
     ).distinct()
 
     client = GPFSClient()
-    usages = client.retrieve_all_fileset_usages(settings.GPFS_FILESYSTEM_NAME)
+    usages = client.retrieve_all_fileset_quotas(settings.GPFS_FILESYSTEM_NAME)
 
     discrepancies: list[QuotaDiscrepancy] = []
     missing_filesets = []
@@ -542,18 +542,24 @@ def _check_quota_consistency() -> None:
                 discrepancies.append(
                     {
                         "shortname": shortname,
-                        "attribute_storage_quota": storage_attribute_quota
-                        if storage_quota_discrepancy
-                        else None,
-                        "fileset_storage_quota": usages[shortname]["block_limit_tb"]
-                        if storage_quota_discrepancy
-                        else None,
-                        "attribute_files_quota": files_attribute_quota
-                        if file_quota_discrepancy
-                        else None,
-                        "fileset_files_quota": usages[shortname]["files_limit"]
-                        if file_quota_discrepancy
-                        else None,
+                        "attribute_storage_quota": (
+                            storage_attribute_quota
+                            if storage_quota_discrepancy
+                            else None
+                        ),
+                        "fileset_storage_quota": (
+                            usages[shortname]["block_limit_tb"]
+                            if storage_quota_discrepancy
+                            else None
+                        ),
+                        "attribute_files_quota": (
+                            files_attribute_quota if file_quota_discrepancy else None
+                        ),
+                        "fileset_files_quota": (
+                            usages[shortname]["files_limit"]
+                            if file_quota_discrepancy
+                            else None
+                        ),
                     }
                 )
         else:
