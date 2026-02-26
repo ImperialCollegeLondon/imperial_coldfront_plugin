@@ -815,10 +815,14 @@ class TestAllocationDetailBanners:
     def test_banner_displayed_for_expired_allocations(
         self, request_, rdf_allocation, settings
     ):
-        """Test that the expired allocation banner is displayed."""
+        """Test that the expired allocation banner is displayed.
+
+        For Expired status, the deadline is end_date + REMOVAL_DAYS.
+        """
         expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
         rdf_allocation.status = expired_status
-        rdf_allocation.end_date = timezone.now().date() + timedelta(days=5)
+        removal_days = settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS
+        rdf_allocation.end_date = timezone.now().date() - timedelta(days=2)
         rdf_allocation.save()
 
         response = self._render_allocation_detail(request_, rdf_allocation, settings)
@@ -827,7 +831,8 @@ class TestAllocationDetailBanners:
 
         assert banner
         assert "This allocation has expired and is read-only" in banner.text
-        assert "5 day" in banner.text
+        expected_days = removal_days - 2
+        assert f"{expected_days} day" in banner.text
 
     def test_banner_displayed_for_deleted_allocations(
         self, request_, rdf_allocation, settings
@@ -847,19 +852,24 @@ class TestAllocationDetailBanners:
     def test_banner_displayed_for_removed_allocations(
         self, request_, rdf_allocation, settings
     ):
-        """Test that the removed allocation banner is displayed."""
+        """Test that the removed allocation banner is displayed.
+
+        For Removed status, the deadline is end_date + DELETION_DAYS.
+        """
         removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
         rdf_allocation.status = removed_status
-        rdf_allocation.end_date = timezone.now().date() + timedelta(days=7)
+        deletion_days = settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS
+        rdf_allocation.end_date = timezone.now().date() - timedelta(days=5)
         rdf_allocation.save()
 
         response = self._render_allocation_detail(request_, rdf_allocation, settings)
         soup = BeautifulSoup(response.content, "html.parser")
-        banner = soup.find("div", id="removed-allocation")
+        banner = soup.find("div", id="removed-allocation", class_="alert-warning")
 
         assert banner
         assert "This allocation has been removed and will be deleted" in banner.text
-        assert "7 day" in banner.text
+        expected_days = deletion_days - 5
+        assert f"{expected_days} day" in banner.text
 
     def test_no_banner_for_active_allocation(self, request_, rdf_allocation, settings):
         """Test that no banner is displayed for active allocations."""
