@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
+from coldfront.core.allocation.models import AllocationStatusChoice
+from coldfront.core.project.models import ProjectStatusChoice
 from django.conf import settings
 from django.shortcuts import render
 from django.urls import reverse
@@ -263,7 +265,6 @@ def test_get_or_create_project(user):
     from coldfront.core.field_of_science.models import FieldOfScience
     from coldfront.core.project.models import (
         Project,
-        ProjectStatusChoice,
         ProjectUser,
         ProjectUserRoleChoice,
         ProjectUserStatusChoice,
@@ -362,7 +363,6 @@ class TestProjectCreation(LoginRequiredMixin):
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
             Project,
-            ProjectStatusChoice,
             ProjectUserRoleChoice,
             ProjectUserStatusChoice,
         )
@@ -789,140 +789,87 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert rows[1].find("span", class_="text-danger")
 
 
-def test_banner_displayed_for_expired_allocations(
-    rf, project, rdf_allocation, mocker, settings
-):
-    """Test that the expired allocation banner is displayed when there are expired allocations."""  # noqa: E501
-    from coldfront.core.allocation.models import AllocationStatusChoice
+class TestAllocationDetailBanners:
+    """Tests for allocation detail banners."""
 
     tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
 
-    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
-    rdf_allocation.status = expired_status
-    rdf_allocation.end_date = timezone.now().date() - timedelta(days=1)
-    rdf_allocation.save()
+    @pytest.fixture
+    def request_(self, rf, project):
+        """A request object with the project PI as the user."""
+        request = rf.get("/")
+        request.user = project.pi
+        return request
 
-    request = rf.get("/")
-    request.user = project.pi
-    response = render(
-        request,
-        tmpl,
-        context={
-            "settings": settings,
-            "allocation": rdf_allocation,
-        },
-    )
-    soup = BeautifulSoup(response.content, "html.parser")
-    banner = soup.find("div", id="expired-allocation")
-    assert banner
-    assert "has expired" in banner.text
+    def _render_allocation_detail(self, request_, rdf_allocation, settings):
+        """Helper to render the allocation detail template."""
+        return render(
+            request_,
+            self.tmpl,
+            context={
+                "settings": settings,
+                "allocation": rdf_allocation,
+            },
+        )
 
+    def test_banner_displayed_for_expired_allocations(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the expired allocation banner is displayed."""
+        expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+        rdf_allocation.status = expired_status
+        rdf_allocation.end_date = timezone.now().date() + timedelta(days=5)
+        rdf_allocation.save()
 
-def test_banner_displayed_for_archived_allocations(
-    rf, project, rdf_allocation, mocker, settings
-):
-    """Test that the archived project banner is displayed when project is archived."""
-    from coldfront.core.project.models import ProjectStatusChoice
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="expired-allocation")
 
-    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+        assert banner
+        assert "This allocation has expired and is read-only" in banner.text
+        assert "5 day" in banner.text
 
-    archived_status, _ = ProjectStatusChoice.objects.get_or_create(name="Archived")
-    project.status = archived_status
-    project.save()
+    def test_banner_displayed_for_deleted_allocations(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the deleted allocation banner is displayed."""
+        deleted_status, _ = AllocationStatusChoice.objects.get_or_create(name="Deleted")
+        rdf_allocation.status = deleted_status
+        rdf_allocation.save()
 
-    request = rf.get("/")
-    request.user = project.pi
-    response = render(
-        request,
-        tmpl,
-        context={
-            "settings": settings,
-            "allocation": rdf_allocation,
-        },
-    )
-    soup = BeautifulSoup(response.content, "html.parser")
-    banner = soup.find("div", id="archived-allocation")
-    assert banner
-    assert "This is a allocation from an archived group" in banner.text
-    assert "You cannot make any changes" in banner.text
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="deleted-allocation")
 
+        assert banner
+        assert "This allocation has been deleted" in banner.text
 
-def test_banner_displayed_for_deleted_allocations(
-    rf, project, rdf_allocation, mocker, settings
-):
-    """Test that the deleted allocation banner is displayed when there are deleted allocations."""  # noqa: E501
-    from coldfront.core.allocation.models import AllocationStatusChoice
+    def test_banner_displayed_for_removed_allocations(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the removed allocation banner is displayed."""
+        removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
+        rdf_allocation.status = removed_status
+        rdf_allocation.end_date = timezone.now().date() + timedelta(days=7)
+        rdf_allocation.save()
 
-    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="removed-allocation")
 
-    deleted_status, _ = AllocationStatusChoice.objects.get_or_create(name="Deleted")
-    rdf_allocation.status = deleted_status
-    rdf_allocation.save()
+        assert banner
+        assert "This allocation has been removed and will be deleted" in banner.text
+        assert "7 day" in banner.text
 
-    request = rf.get("/")
-    request.user = project.pi
-    response = render(
-        request,
-        tmpl,
-        context={
-            "settings": settings,
-            "allocation": rdf_allocation,
-        },
-    )
-    soup = BeautifulSoup(response.content, "html.parser")
-    banner = soup.find("div", id="deleted-allocation")
-    assert banner
-    assert "This allocation has been deleted" in banner.text
+    def test_no_banner_for_active_allocation(self, request_, rdf_allocation, settings):
+        """Test that no banner is displayed for active allocations."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        rdf_allocation.status = active_status
+        rdf_allocation.save()
 
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
 
-def test_no_banner_for_active_allocation(rf, project, rdf_allocation, settings):
-    """Test that no banner is displayed for active allocations."""
-    from coldfront.core.allocation.models import AllocationStatusChoice
-
-    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
-
-    active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
-    rdf_allocation.status = active_status
-    rdf_allocation.save()
-
-    request = rf.get("/")
-    request.user = project.pi
-    response = render(
-        request,
-        tmpl,
-        context={
-            "settings": settings,
-            "allocation": rdf_allocation,
-        },
-    )
-    soup = BeautifulSoup(response.content, "html.parser")
-    # Check that no alert banners exist
-    assert not soup.find("div", id="archived-allocation")
-    assert not soup.find("div", id="expired-allocation")
-    assert not soup.find("div", id="deleted-allocation")
-
-
-def test_banner_for_removed_allocations(rf, project, rdf_allocation, mocker, settings):
-    """Test that the removed allocation banner is displayed when there are removed allocations."""  # noqa: E501
-    from coldfront.core.allocation.models import AllocationStatusChoice
-
-    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
-
-    removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
-    rdf_allocation.status = removed_status
-    rdf_allocation.save()
-
-    request = rf.get("/")
-    request.user = project.pi
-    response = render(
-        request,
-        tmpl,
-        context={
-            "settings": settings,
-            "allocation": rdf_allocation,
-        },
-    )
-    soup = BeautifulSoup(response.content, "html.parser")
-    banner = soup.find("div", id="removed-allocation")
-    assert banner
-    assert "This allocation has been removed" in banner.text
+        assert not soup.find("div", id="expired-allocation")
+        assert not soup.find("div", id="deleted-allocation")
+        assert not soup.find("div", id="removed-allocation")
