@@ -1,7 +1,7 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load shortname %}
-{% load allocation-days %}
+{% load allocation_days %}
 {% if allocation.project.status.name == 'Archived' %}
   <div class="alert alert-warning" role="alert" id="archived-allocation">
     This is a allocation from an archived group! You cannot make any changes.
