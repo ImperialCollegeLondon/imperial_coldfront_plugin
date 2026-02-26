@@ -10,6 +10,8 @@ from coldfront.core.allocation.models import (
     AllocationUser,
 )
 from coldfront.core.resource.models import Resource
+from django.conf import settings
+from django.utils import timezone
 
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
@@ -106,6 +108,42 @@ def send_deletion_notification_mock(mocker):
     """Mock send_allocation_deletion_notification."""
     return mocker.patch(
         "imperial_coldfront_plugin.tasks.send_allocation_deletion_notification"
+    )
+
+
+@pytest.fixture
+def async_task_mock(mocker):
+    """Mock async_task from django_q.tasks."""
+    return mocker.patch("imperial_coldfront_plugin.signals.async_task")
+
+
+@pytest.fixture
+def gpfs_client_mock(mocker):
+    """Mock the GPFSClient class."""
+    return mocker.patch("imperial_coldfront_plugin.tasks.GPFSClient")
+
+
+@pytest.fixture
+def send_quota_discrepancy_notification_mock(mocker):
+    """Mock send_quota_discrepancy_notification."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_quota_discrepancy_notification"
+    )
+
+
+@pytest.fixture
+def send_fileset_not_found_notification_mock(mocker):
+    """Mock send_fileset_not_found_notification."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_fileset_not_found_notification"
+    )
+
+
+@pytest.fixture
+def retrieve_all_fileset_quotas_mock(mocker):
+    """Mock retrieve_all_fileset_quotas."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_quotas"
     )
 
 
@@ -431,6 +469,35 @@ def test_remove_allocation_group_members_no_shortname(
     ldap_remove_member_mock.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "days_offset, expected_status_name",
+    [
+        # Expired past deletion threshold
+        (-(settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS + 1), "Deleted"),
+        # Expired past removal threshold
+        (-(settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS + 1), "Removed"),
+        # Not expired
+        (0, "Active"),
+    ],
+)
+def test_update_allocation_status(
+    rdf_allocation,
+    enable_ldap,
+    days_offset,
+    expected_status_name,
+):
+    """Test update_allocation_status task."""
+    from imperial_coldfront_plugin.tasks import update_allocation_status
+
+    expected_status = AllocationStatusChoice.objects.get(name=expected_status_name)
+    rdf_allocation.end_date = timezone.now() + timedelta(days=days_offset)
+    rdf_allocation.save()
+
+    update_allocation_status()
+    rdf_allocation.refresh_from_db()
+    assert rdf_allocation.status == expected_status
+
+
 def test_check_expiry_notifications_expiry_warning(
     rdf_allocation,
     send_expiry_warning_mock,
@@ -574,3 +641,290 @@ def test_check_expiry_notifications_multiple_allocations(
     send_removal_warning_mock.assert_called_once_with(
         allocation2.pk, project.pi.email, -days_after_expiry
     )
+
+
+def test_zero_allocation_gpfs_quota_success(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+):
+    """Test zero_allocation_gpfs_quota successfully sets quota to zero."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    # Ensure Storage Quota attribute exists
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
+    )
+
+    # Ensure Files Quota attribute exists
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
+    # Create and set allocation to Expired status
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
+
+    # Mock the GPFSClient
+    mock_client = gpfs_client_mock.return_value
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    # Verify GPFS client was called correctly
+    mock_client.set_quota.assert_called_once_with(
+        filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+        fileset_name=rdf_allocation_shortname,
+        block_quota="0",
+        files_quota="0",
+    )
+
+    # Verify storage quota attribute was updated to 0
+    storage_quota_attr.refresh_from_db()
+    assert storage_quota_attr.value == "0"
+
+    # Verify files quota attribute was updated to 0
+    files_quota_attr.refresh_from_db()
+    assert files_quota_attr.value == "0"
+
+
+def test_zero_allocation_gpfs_quota_removed_status(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+):
+    """Test zero_allocation_gpfs_quota works with Removed status."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
+    )
+
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
+    removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
+    rdf_allocation.status = removed_status
+    rdf_allocation.save()
+
+    mock_client = gpfs_client_mock.return_value
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_client.set_quota.assert_called_once_with(
+        filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+        fileset_name=rdf_allocation_shortname,
+        block_quota="0",
+        files_quota="0",
+    )
+
+
+def test_zero_allocation_gpfs_quota_gpfs_error(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+    mocker,
+):
+    """Test zero_allocation_gpfs_quota handles GPFS client exceptions."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    logger_mock = mocker.patch("imperial_coldfront_plugin.tasks.logging.getLogger")
+    mock_logger = mocker.MagicMock()
+    logger_mock.return_value = mock_logger
+
+    storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
+    )
+    storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
+    )
+
+    files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
+        name="Files Quota", defaults={"attribute_type": "Integer"}
+    )
+    files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
+        allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
+    )
+
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.save()
+
+    mock_client = gpfs_client_mock.return_value
+    mock_client.set_quota.side_effect = RuntimeError("GPFS connection failed")
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    mock_logger.error.assert_called()
+    error_call_args = str(mock_logger.error.call_args)
+    assert "Error setting quota to zero" in error_call_args
+
+    storage_quota_attr.refresh_from_db()
+    assert storage_quota_attr.value != "0"
+
+    files_quota_attr.refresh_from_db()
+    assert files_quota_attr.value != "0"
+
+
+def helper_add_quota_attributes(allocation, storage_quota, files_quota):
+    """Helper function to add quota attributes to an allocation."""
+    from coldfront.core.allocation.models import AllocationAttributeType
+
+    storage_quota_attribute_type = AllocationAttributeType.objects.get(
+        name="Storage Quota (TB)"
+    )
+    files_quota_attribute_type = AllocationAttributeType.objects.get(name="Files Quota")
+    AllocationAttribute.objects.create(
+        allocation_attribute_type=storage_quota_attribute_type,
+        allocation=allocation,
+        value=storage_quota,
+    )
+    AllocationAttribute.objects.create(
+        allocation_attribute_type=files_quota_attribute_type,
+        allocation=allocation,
+        value=files_quota,
+    )
+
+
+@pytest.mark.parametrize(
+    "alloc_storage_quota, alloc_files_quota, gpfs_storage_quota, gpfs_files_quota,"
+    "fileset_shortname, expected_discrpancy",
+    [
+        # Case 1: No discrepancies
+        (
+            1,
+            500,
+            1.0,
+            500.0,
+            "shorty",
+            [],
+        ),
+        # Case 2: Storage quota discrepancy only
+        (
+            1,
+            500,
+            2.0,
+            500.0,
+            "shorty",
+            [
+                {
+                    "shortname": "shorty",
+                    "attribute_storage_quota": 1,
+                    "fileset_storage_quota": 2.0,
+                    "attribute_files_quota": None,
+                    "fileset_files_quota": None,
+                }
+            ],
+        ),
+        # Case 3: Files quota discrepancy only
+        (
+            1,
+            500,
+            1.0,
+            600.0,
+            "shorty",
+            [
+                {
+                    "shortname": "shorty",
+                    "attribute_storage_quota": None,
+                    "fileset_storage_quota": None,
+                    "attribute_files_quota": 500,
+                    "fileset_files_quota": 600.0,
+                }
+            ],
+        ),
+        # Case 4: Both storage and files quota discrepancies
+        (
+            1,
+            500,
+            2.0,
+            600.0,
+            "shorty",
+            [
+                {
+                    "shortname": "shorty",
+                    "attribute_storage_quota": 1,
+                    "fileset_storage_quota": 2.0,
+                    "attribute_files_quota": 500,
+                    "fileset_files_quota": 600.0,
+                }
+            ],
+        ),
+        # Case 5: Allocation not found in GPFS
+        (
+            1,
+            500,
+            1.0,
+            500.0,
+            "diff_shortname",
+            [],
+        ),
+    ],
+)
+def test_check_quota_consistency_issues(
+    rdf_allocation,
+    send_quota_discrepancy_notification_mock,
+    send_fileset_not_found_notification_mock,
+    retrieve_all_fileset_quotas_mock,
+    alloc_storage_quota,
+    alloc_files_quota,
+    gpfs_storage_quota,
+    gpfs_files_quota,
+    fileset_shortname,
+    expected_discrpancy,
+):
+    """Test check_quota_consistency task."""
+    from imperial_coldfront_plugin.tasks import check_quota_consistency
+
+    # Configure allocation and fileset with specific parameters:
+    helper_add_quota_attributes(rdf_allocation, alloc_storage_quota, alloc_files_quota)
+
+    # Define exactly what the dictionary looks like after processing
+    retrieve_all_fileset_quotas_mock.return_value = {
+        fileset_shortname: {
+            "files_limit": gpfs_files_quota,
+            "block_limit_tb": gpfs_storage_quota,
+        }
+    }
+
+    check_quota_consistency()
+
+    # Checks that the proper discrepancies have been logged (or nonea at all).
+    if expected_discrpancy:
+        send_quota_discrepancy_notification_mock.assert_called_once_with(
+            expected_discrpancy
+        )
+    else:
+        send_quota_discrepancy_notification_mock.assert_not_called()
+
+    # Checks that the fileset not found email is only sent when there is a shortname
+    # mismatch.
+    if fileset_shortname == "shorty":
+        send_fileset_not_found_notification_mock.assert_not_called()
+    else:
+        send_fileset_not_found_notification_mock.assert_called_once_with(["shorty"])
