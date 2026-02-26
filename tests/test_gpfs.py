@@ -678,19 +678,17 @@ def test_set_directory_acl(settings, mocker):
 
 
 @pytest.mark.parametrize("force", ["True", "False"])
-def test_unlink_fileset(settings, completed_job_status, mock_requests, force):
+def test_unlink_fileset(settings, completed_job_status, request_mock, force):
     """Test that unlink_fileset method makes the correct API call."""
-    from imperial_coldfront_plugin.gpfs_client import GPFSClient
-
-    settings.GPFS_API_URL = "http://example.com"
-
     client = GPFSClient()
     client._get_job_status = completed_job_status
-    client.unlink_fileset(filesystemName="gpfs0", filesetName="myfileset", force=force)
+    client.unlink_fileset(
+        filesystemName=FILESYSTEM_NAME, filesetName=FILESET_NAME, force=force
+    )
 
-    mock_requests.assert_called_once_with(
+    request_mock.assert_called_once_with(
         method="DELETE",
-        url="http://example.com/filesystems/gpfs0/filesets/myfileset/link",
+        url=f"http://example.com/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/link",
         params={"force": force},
-        headers={"Authorization": "Basic Og=="},
+        headers=HEADERS,
     )
