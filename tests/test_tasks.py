@@ -140,10 +140,10 @@ def send_fileset_not_found_notification_mock(mocker):
 
 
 @pytest.fixture
-def retrieve_all_fileset_usages_mock(mocker):
-    """Mock retrieve_all_fileset_usages."""
+def retrieve_all_fileset_quotas_mock(mocker):
+    """Mock retrieve_all_fileset_quotas."""
     return mocker.patch(
-        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_usages"
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient.retrieve_all_fileset_quotas"
     )
 
 
@@ -890,7 +890,7 @@ def test_check_quota_consistency_issues(
     rdf_allocation,
     send_quota_discrepancy_notification_mock,
     send_fileset_not_found_notification_mock,
-    retrieve_all_fileset_usages_mock,
+    retrieve_all_fileset_quotas_mock,
     alloc_storage_quota,
     alloc_files_quota,
     gpfs_storage_quota,
@@ -905,7 +905,7 @@ def test_check_quota_consistency_issues(
     helper_add_quota_attributes(rdf_allocation, alloc_storage_quota, alloc_files_quota)
 
     # Define exactly what the dictionary looks like after processing
-    retrieve_all_fileset_usages_mock.return_value = {
+    retrieve_all_fileset_quotas_mock.return_value = {
         fileset_shortname: {
             "files_limit": gpfs_files_quota,
             "block_limit_tb": gpfs_storage_quota,
