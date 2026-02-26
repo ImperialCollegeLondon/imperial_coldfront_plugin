@@ -813,6 +813,116 @@ def test_banner_displayed_for_expired_allocations(
         },
     )
     soup = BeautifulSoup(response.content, "html.parser")
-    banner = soup.find("div", class_="alert-info")
+    banner = soup.find("div", id="expired-allocation")
     assert banner
     assert "has expired" in banner.text
+
+
+def test_banner_displayed_for_archived_allocations(
+    rf, project, rdf_allocation, mocker, settings
+):
+    """Test that the archived project banner is displayed when project is archived."""
+    from coldfront.core.project.models import ProjectStatusChoice
+
+    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+
+    archived_status, _ = ProjectStatusChoice.objects.get_or_create(name="Archived")
+    project.status = archived_status
+    project.save()
+
+    request = rf.get("/")
+    request.user = project.pi
+    response = render(
+        request,
+        tmpl,
+        context={
+            "settings": settings,
+            "allocation": rdf_allocation,
+        },
+    )
+    soup = BeautifulSoup(response.content, "html.parser")
+    banner = soup.find("div", id="archived-allocation")
+    assert banner
+    assert "This is a allocation from an archived group" in banner.text
+    assert "You cannot make any changes" in banner.text
+
+
+def test_banner_displayed_for_deleted_allocations(
+    rf, project, rdf_allocation, mocker, settings
+):
+    """Test that the deleted allocation banner is displayed when there are deleted allocations."""  # noqa: E501
+    from coldfront.core.allocation.models import AllocationStatusChoice
+
+    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+
+    deleted_status, _ = AllocationStatusChoice.objects.get_or_create(name="Deleted")
+    rdf_allocation.status = deleted_status
+    rdf_allocation.save()
+
+    request = rf.get("/")
+    request.user = project.pi
+    response = render(
+        request,
+        tmpl,
+        context={
+            "settings": settings,
+            "allocation": rdf_allocation,
+        },
+    )
+    soup = BeautifulSoup(response.content, "html.parser")
+    banner = soup.find("div", id="deleted-allocation")
+    assert banner
+    assert "This allocation has been deleted" in banner.text
+
+
+def test_no_banner_for_active_allocation(rf, project, rdf_allocation, settings):
+    """Test that no banner is displayed for active allocations."""
+    from coldfront.core.allocation.models import AllocationStatusChoice
+
+    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+
+    active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+    rdf_allocation.status = active_status
+    rdf_allocation.save()
+
+    request = rf.get("/")
+    request.user = project.pi
+    response = render(
+        request,
+        tmpl,
+        context={
+            "settings": settings,
+            "allocation": rdf_allocation,
+        },
+    )
+    soup = BeautifulSoup(response.content, "html.parser")
+    # Check that no alert banners exist
+    assert not soup.find("div", id="archived-allocation")
+    assert not soup.find("div", id="expired-allocation")
+    assert not soup.find("div", id="deleted-allocation")
+
+
+def test_banner_for_removed_allocations(rf, project, rdf_allocation, mocker, settings):
+    """Test that the removed allocation banner is displayed when there are removed allocations."""  # noqa: E501
+    from coldfront.core.allocation.models import AllocationStatusChoice
+
+    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+
+    removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
+    rdf_allocation.status = removed_status
+    rdf_allocation.save()
+
+    request = rf.get("/")
+    request.user = project.pi
+    response = render(
+        request,
+        tmpl,
+        context={
+            "settings": settings,
+            "allocation": rdf_allocation,
+        },
+    )
+    soup = BeautifulSoup(response.content, "html.parser")
+    banner = soup.find("div", id="removed-allocation")
+    assert banner
+    assert "This allocation has been removed" in banner.text
