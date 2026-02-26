@@ -26,6 +26,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r dev-requirements.txt && pip install -e .
 
+      - name: Check makemigrations file
+        run: python makemigrations.py --help
       - name: Run tests
         run: pytest
 
