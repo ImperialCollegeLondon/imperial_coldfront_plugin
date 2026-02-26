@@ -31,4 +31,5 @@ urlpatterns = [
         dummy_view,
         name="project-note-add",
     ),
+    path("resource/<int:resource_pk>", dummy_view, name="resource-detail"),
 ]

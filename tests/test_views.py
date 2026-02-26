@@ -787,3 +787,32 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert len(rows) == 2
         assert rows[0].find("span", class_="text-success")
         assert rows[1].find("span", class_="text-danger")
+
+
+def test_banner_displayed_for_expired_allocations(
+    rf, project, rdf_allocation, mocker, settings
+):
+    """Test that the expired allocation banner is displayed when there are expired allocations."""  # noqa: E501
+    from coldfront.core.allocation.models import AllocationStatusChoice
+
+    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+
+    expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+    rdf_allocation.status = expired_status
+    rdf_allocation.end_date = timezone.now().date() - timedelta(days=1)
+    rdf_allocation.save()
+
+    request = rf.get("/")
+    request.user = project.pi
+    response = render(
+        request,
+        tmpl,
+        context={
+            "settings": settings,
+            "allocation": rdf_allocation,
+        },
+    )
+    soup = BeautifulSoup(response.content, "html.parser")
+    banner = soup.find("div", class_="alert-info")
+    assert banner
+    assert "has expired" in banner.text
