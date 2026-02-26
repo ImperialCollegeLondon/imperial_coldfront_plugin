@@ -675,3 +675,20 @@ def test_set_directory_acl(settings, mocker):
     assert called_args[1] == path
     entries = called_kwargs.get("entries")
     assert isinstance(entries, list)
+
+
+@pytest.mark.parametrize("force", ["True", "False"])
+def test_unlink_fileset(settings, completed_job_status, request_mock, force):
+    """Test that unlink_fileset method makes the correct API call."""
+    client = GPFSClient()
+    client._get_job_status = completed_job_status
+    client.unlink_fileset(
+        filesystemName=FILESYSTEM_NAME, filesetName=FILESET_NAME, force=force
+    )
+
+    request_mock.assert_called_once_with(
+        method="DELETE",
+        url=f"http://example.com/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}/link",
+        params={"force": force},
+        headers=HEADERS,
+    )

@@ -12,6 +12,7 @@ from uplink import (
     Body,
     Consumer,
     Query,
+    delete,
     get,
     json,
     post,
@@ -277,6 +278,25 @@ class GPFSClient(Consumer):
             raise FilesetCreationError(
                 f"Error creating fileset '{fileset_name}' - {e.args[0]}"
             ) from e
+
+    @check_job_status
+    @delete("filesystems/{filesystemName}/filesets/{filesetName}/link")
+    def unlink_fileset(  # type: ignore[empty-body]
+        self,
+        filesystemName: str,
+        filesetName: str,
+        force: Query = False,
+    ) -> requests.Response:
+        """Method to unlink (delete) a fileset from the filesystem.
+
+        Args:
+            filesystemName: Name of the filesystem where the fileset exists.
+            filesetName: Name of the fileset to unlink.
+            force: Whether to force unlinking the fileset.
+
+        Returns:
+            The response from the GPFS API.
+        """
 
     @check_job_status
     @status_success
