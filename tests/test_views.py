@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
+from coldfront.core.allocation.models import AllocationStatusChoice
+from coldfront.core.project.models import ProjectStatusChoice
 from django.conf import settings
 from django.shortcuts import render
 from django.urls import reverse
@@ -263,7 +265,6 @@ def test_get_or_create_project(user):
     from coldfront.core.field_of_science.models import FieldOfScience
     from coldfront.core.project.models import (
         Project,
-        ProjectStatusChoice,
         ProjectUser,
         ProjectUserRoleChoice,
         ProjectUserStatusChoice,
@@ -362,7 +363,6 @@ class TestProjectCreation(LoginRequiredMixin):
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
             Project,
-            ProjectStatusChoice,
             ProjectUserRoleChoice,
             ProjectUserStatusChoice,
         )
@@ -787,3 +787,99 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert len(rows) == 2
         assert rows[0].find("span", class_="text-success")
         assert rows[1].find("span", class_="text-danger")
+
+
+class TestAllocationDetailBanners:
+    """Tests for allocation detail banners."""
+
+    tmpl = "imperial_coldfront_plugin/overrides/allocation_detail.html"
+
+    @pytest.fixture
+    def request_(self, rf, project):
+        """A request object with the project PI as the user."""
+        request = rf.get("/")
+        request.user = project.pi
+        return request
+
+    def _render_allocation_detail(self, request_, rdf_allocation, settings):
+        """Helper to render the allocation detail template."""
+        return render(
+            request_,
+            self.tmpl,
+            context={
+                "settings": settings,
+                "allocation": rdf_allocation,
+            },
+        )
+
+    def test_banner_displayed_for_expired_allocations(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the expired allocation banner is displayed.
+
+        For Expired status, the deadline is end_date + REMOVAL_DAYS.
+        """
+        expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+        rdf_allocation.status = expired_status
+        removal_days = settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS
+        rdf_allocation.end_date = timezone.now().date() - timedelta(days=2)
+        rdf_allocation.save()
+
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="expired-allocation", class_="alert-info")
+
+        assert banner
+        assert "This allocation has expired and is read-only" in banner.text
+        expected_days = removal_days - 2
+        assert f"{expected_days} day" in banner.text
+
+    def test_banner_displayed_for_deleted_allocations(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the deleted allocation banner is displayed."""
+        deleted_status, _ = AllocationStatusChoice.objects.get_or_create(name="Deleted")
+        rdf_allocation.status = deleted_status
+        rdf_allocation.save()
+
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="deleted-allocation", class_="alert-danger")
+
+        assert banner
+        assert "This allocation has been deleted" in banner.text
+
+    def test_banner_displayed_for_removed_allocations(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the removed allocation banner is displayed.
+
+        For Removed status, the deadline is end_date + DELETION_DAYS.
+        """
+        removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
+        rdf_allocation.status = removed_status
+        deletion_days = settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS
+        rdf_allocation.end_date = timezone.now().date() - timedelta(days=5)
+        rdf_allocation.save()
+
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="removed-allocation", class_="alert-warning")
+
+        assert banner
+        assert "This allocation has been removed and will be deleted" in banner.text
+        expected_days = deletion_days - 5
+        assert f"{expected_days} day" in banner.text
+
+    def test_no_banner_for_active_allocation(self, request_, rdf_allocation, settings):
+        """Test that no banner is displayed for active allocations."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        rdf_allocation.status = active_status
+        rdf_allocation.save()
+
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        assert not soup.find("div", id="expired-allocation")
+        assert not soup.find("div", id="deleted-allocation")
+        assert not soup.find("div", id="removed-allocation")

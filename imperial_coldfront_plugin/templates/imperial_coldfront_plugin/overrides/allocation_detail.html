@@ -1,9 +1,21 @@
 {% load crispy_forms_tags %}
 {% load static %}
 {% load shortname %}
-{% if allocation.project.status.name == 'Archived' %}
-  <div class="alert alert-warning" role="alert">
-    This is a allocation from an archived group! You cannot make any changes.
+{% load allocation_days %}
+{% if allocation.status.name == 'Deleted' %}
+  <div class="alert alert-danger" role="alert" id="deleted-allocation">
+    <i class="fas fa-trash" aria-hidden="true"></i>
+    <strong>This allocation has been deleted.</strong>
+  </div>
+{% elif allocation.status.name == 'Removed' %}
+  <div class="alert alert-warning" role="alert" id="removed-allocation">
+    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+    <strong>{% with days=allocation|days_until %}This allocation has been removed and will be deleted in {{ days }} day{{ days|pluralize }}.{% endwith %}</strong>
+  </div>
+{% elif allocation.status.name == 'Expired' %}
+  <div class="alert alert-info" role="alert" id="expired-allocation">
+    <i class="fas fa-clock" aria-hidden="true"></i>
+    <strong>This allocation has expired and is read-only.</strong> {% with days=allocation|days_until %}Access will be removed in {{ days }} day{{ days|pluralize }}.{% endwith %}
   </div>
 {% endif %}
 {% allocation_shortname allocation as shortname %}
