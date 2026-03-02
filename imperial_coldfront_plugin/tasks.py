@@ -2,6 +2,7 @@
 
 import functools
 import logging
+import time
 from collections.abc import Callable
 from datetime import date, timedelta
 
@@ -177,6 +178,8 @@ def _create_rdf_allocation(form_data: AllocationFormData) -> int:
             value=fileset_path_info.fileset_absolute_path,
         )
         if settings.GPFS_ENABLED:
+            # Wait to make sure that GFPS server has picked up changes in AD
+            time.sleep(settings.GPFS_ALLOCATION_CREATION_SLEEP)
             try:
                 logger.info(
                     "Creating GPFS fileset and setting quota for "
