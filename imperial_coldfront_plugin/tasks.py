@@ -287,6 +287,9 @@ def _remove_allocation_group_members(allocation_id: int) -> None:
     """
     from .ldap import ldap_remove_member_from_group
 
+    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
+        return
+
     allocation = Allocation.objects.get(pk=allocation_id)
 
     # Get the shortname/group_id from the allocation
@@ -319,6 +322,9 @@ def _update_allocation_status() -> None:
     it should be marked as removed or deleted. Allocations within the two limits get
     marked as "Removed", and allocations beyond the window get marked as "Deleted".
     """
+    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
+        return
+
     remove_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS)
     delete_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS)
 
@@ -344,6 +350,8 @@ def _update_allocation_status() -> None:
 
 def _check_rdf_allocation_expiry_notifications() -> None:
     """Check RDF allocations and send appropriate expiry notifications."""
+    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
+        return
     logger = logging.getLogger("django-q")
 
     rdf_resource = Resource.objects.get(name="RDF Active")
@@ -440,6 +448,8 @@ def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
     Args:
         allocation_id: The primary key of the allocation.
     """
+    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
+        return
     logger = logging.getLogger("django-q")
 
     if not settings.GPFS_ENABLED:
