@@ -383,6 +383,19 @@ def test_check_ldap_consistency_extra_members(
     notify_mock.assert_called_once()
 
 
+def test_remove_allocation_group_members_feature_flag(
+    settings, rdf_allocation, ldap_remove_member_mock
+):
+    """Test task does nothing when feature flag is disabled."""
+    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+
+    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
+
+    remove_allocation_group_members(rdf_allocation.pk)
+
+    ldap_remove_member_mock.assert_not_called()
+
+
 def test_remove_allocation_group_members(
     ldap_remove_member_mock,
     rdf_allocation,
@@ -469,6 +482,22 @@ def test_remove_allocation_group_members_no_shortname(
     ldap_remove_member_mock.assert_not_called()
 
 
+def test_update_allocation_status_feature_flag(settings, rdf_allocation):
+    """Test update_allocation_status does nothing when feature flag is disabled."""
+    from imperial_coldfront_plugin.tasks import update_allocation_status
+
+    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
+    rdf_allocation.end_date = timezone.now() - timedelta(
+        days=settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS + 1
+    )
+    rdf_allocation.save()
+
+    update_allocation_status()
+
+    # not updated
+    assert Allocation.objects.get(pk=rdf_allocation.pk, status__name="Active")
+
+
 @pytest.mark.parametrize(
     "days_offset, expected_status_name",
     [
@@ -496,6 +525,29 @@ def test_update_allocation_status(
     update_allocation_status()
     rdf_allocation.refresh_from_db()
     assert rdf_allocation.status == expected_status
+
+
+def test_check_expiry_notifications_feature_flag(
+    rdf_allocation,
+    send_expiry_warning_mock,
+    send_removal_warning_mock,
+    send_deletion_warning_mock,
+    send_deletion_notification_mock,
+    settings,
+):
+    """Test task does nothing when feature flag is disabled."""
+    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
+    rdf_allocation.end_date = datetime.now().date() + timedelta(
+        days=settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE[0]
+    )
+    rdf_allocation.save()
+
+    check_rdf_allocation_expiry_notifications()
+
+    send_expiry_warning_mock.assert_not_called()
+    send_removal_warning_mock.assert_not_called()
+    send_deletion_warning_mock.assert_not_called()
+    send_deletion_notification_mock.assert_not_called()
 
 
 def test_check_expiry_notifications_expiry_warning(
@@ -641,6 +693,23 @@ def test_check_expiry_notifications_multiple_allocations(
     send_removal_warning_mock.assert_called_once_with(
         allocation2.pk, project.pi.email, -days_after_expiry
     )
+
+
+def test_zero_allocation_gpfs_quota_feature_flag(
+    async_task_mock,
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+):
+    """Test zero_allocation_gpfs_quota does nothing when feature flag is disabled."""
+    from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
+
+    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
+
+    zero_allocation_gpfs_quota(rdf_allocation.pk)
+
+    gpfs_client_mock.assert_not_called()
 
 
 def test_zero_allocation_gpfs_quota_success(
