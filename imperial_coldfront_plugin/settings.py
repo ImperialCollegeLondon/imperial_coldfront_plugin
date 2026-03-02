@@ -160,3 +160,6 @@ DEPARTMENTS_IN_FACULTY = {
     "foe": ["dsde", "aero"],
     "fons": ["physics", "chemistry"],
 }
+
+GPFS_ALLOCATION_CREATION_SLEEP = ENV.int("GPFS_ALLOCATION_CREATION_SLEEP", default=30)
+"""Number of seconds to sleep before creating a GPFS fileset."""
