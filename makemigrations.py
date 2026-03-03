@@ -34,7 +34,6 @@ settings.configure(
         "timeout": 300,
         "retry": 600,
     },
-    GID_RANGES=[range(1031386, 1031435)],
 )
 
 django.setup()
