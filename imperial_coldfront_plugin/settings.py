@@ -140,6 +140,11 @@ RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS = 7
 RDF_ALLOCATION_EXPIRY_DELETION_DAYS = 14
 """Number of days after an allocation expiry to mark as deleted."""
 
+ENABLE_RDF_ALLOCATION_LIFECYCLE = ENV.bool(
+    "ENABLE_RDF_ALLOCATION_LIFECYCLE", default=False
+)
+"""Feature flag to enable or disable the allocation lifecycle management."""
+
 # Mappings for faculty and department names and shortnames for development purposes.
 # These should be overridden in prod via prod_settings.py.
 DEPARTMENTS = {
@@ -160,3 +165,6 @@ DEPARTMENTS_IN_FACULTY = {
     "foe": ["dsde", "aero"],
     "fons": ["physics", "chemistry"],
 }
+
+GPFS_ALLOCATION_CREATION_SLEEP = ENV.int("GPFS_ALLOCATION_CREATION_SLEEP", default=30)
+"""Number of seconds to sleep before creating a GPFS fileset."""

@@ -94,6 +94,8 @@ def pytest_configure():
             GPFS_API_USERNAME="",
             GPFS_API_PASSWORD="",
             GID_RANGES=[range(1031386, 1031435)],
+            GPFS_ALLOCATION_CREATION_SLEEP=0,
+            ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
         ),  # override settings loaded by env var for tests
     )
 
