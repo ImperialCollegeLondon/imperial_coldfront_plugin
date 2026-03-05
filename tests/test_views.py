@@ -872,21 +872,22 @@ class TestAllocationDetailBanners:
         assert f"{expected_days} day" in banner.text
 
     def test_banner_displayed_for_archived_allocations(
-        self, request_, rdf_allocation, settings
+        self, request_, rdf_allocation, settings, project
     ):
         """Test that the archived allocation banner is displayed."""
-        archived_status, _ = AllocationStatusChoice.objects.get_or_create(
-            name="Archived"
-        )
-        rdf_allocation.status = archived_status
-        rdf_allocation.save()
+        archived_status, _ = ProjectStatusChoice.objects.get_or_create(name="Archived")
+        rdf_allocation.project.status = archived_status
+        rdf_allocation.project.save()
 
         response = self._render_allocation_detail(request_, rdf_allocation, settings)
         soup = BeautifulSoup(response.content, "html.parser")
         banner = soup.find("div", id="archived-allocation", class_="alert-warning")
 
         assert banner
-        assert "This allocation has been archived and is read-only" in banner.text
+        assert (
+            "This is a allocation from an archived group! You cannot make any changes."
+            in banner.text
+        )
 
     def test_no_banner_for_active_allocation(self, request_, rdf_allocation, settings):
         """Test that no banner is displayed for active allocations."""
