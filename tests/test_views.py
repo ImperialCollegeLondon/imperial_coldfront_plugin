@@ -871,6 +871,23 @@ class TestAllocationDetailBanners:
         expected_days = deletion_days - 5
         assert f"{expected_days} day" in banner.text
 
+    def test_banner_displayed_for_archived_allocations(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the archived allocation banner is displayed."""
+        archived_status, _ = AllocationStatusChoice.objects.get_or_create(
+            name="Archived"
+        )
+        rdf_allocation.status = archived_status
+        rdf_allocation.save()
+
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="archived-allocation", class_="alert-warning")
+
+        assert banner
+        assert "This allocation has been archived and is read-only" in banner.text
+
     def test_no_banner_for_active_allocation(self, request_, rdf_allocation, settings):
         """Test that no banner is displayed for active allocations."""
         active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
@@ -883,3 +900,4 @@ class TestAllocationDetailBanners:
         assert not soup.find("div", id="expired-allocation")
         assert not soup.find("div", id="deleted-allocation")
         assert not soup.find("div", id="removed-allocation")
+        assert not soup.find("div", id="archived-allocation")
