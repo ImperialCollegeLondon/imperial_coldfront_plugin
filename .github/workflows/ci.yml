@@ -26,6 +26,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r dev-requirements.txt && pip install -e .
 
+      # simple check that the makemigrations script doesn't encounter errors
+      # when loading and validating its internal settings
+      - name: Check makemigrations file
+        run: python makemigrations.py --help
       - name: Run tests
         run: pytest
 
