@@ -1,9 +1,7 @@
 """Plugin tasks."""
 
-import functools
 import logging
 import time
-from collections.abc import Callable
 from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
@@ -37,34 +35,7 @@ from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
 
 
-class log_task_exceptions_to_django_logger:
-    """Decorator to log exceptions raised in a background task to the django logger.
-
-    This is useful when using django-q as the task runner, as exceptions raised in tasks
-    will not trigger email notifications to admins. In production, the django logger
-    will send emails on errors. This decorator ensures this happens on task failures.
-    """
-
-    def __init__(self, func: Callable[..., object]) -> None:  # type: ignore[misc]
-        """Initialize the decorator with the function to wrap.
-
-        Args:
-            func: The function to wrap.
-        """
-        self.func = func
-        self.logger = logging.getLogger("django")
-        functools.update_wrapper(self, func)
-
-    def __call__(self, *args: object, **kwargs: object) -> object:
-        """Call the wrapped function, logging any exceptions raised."""
-        try:
-            return self.func(*args, **kwargs)
-        except Exception:
-            self.logger.exception("Error during background task")
-            raise
-
-
-def _create_rdf_allocation(form_data: AllocationFormData) -> int:
+def create_rdf_allocation(form_data: AllocationFormData) -> int:
     """Create an RDF allocation from a validated RDFAllocationForm.
 
     Note that this function interacts with external systems.
@@ -207,7 +178,7 @@ def _create_rdf_allocation(form_data: AllocationFormData) -> int:
     return rdf_allocation.pk
 
 
-def _check_ldap_consistency() -> list[Discrepancy]:
+def check_ldap_consistency() -> list[Discrepancy]:
     """Check the consistency of LDAP groups with the database."""
     if not settings.LDAP_ENABLED:
         return []
@@ -253,7 +224,7 @@ def _check_ldap_consistency() -> list[Discrepancy]:
     return discrepancies
 
 
-def _update_quota_usages_task() -> None:
+def update_quota_usages_task() -> None:
     """Update the usages of all quota related allocation attributes."""
     client = GPFSClient()
     usages = client.retrieve_all_fileset_quotas(settings.GPFS_FILESYSTEM_NAME)
@@ -279,7 +250,7 @@ def _update_quota_usages_task() -> None:
         files_attribute_usage.save()
 
 
-def _remove_allocation_group_members(allocation_id: int) -> None:
+def remove_allocation_group_members(allocation_id: int) -> None:
     """Background task: remove all active members from an LDAP group.
 
     Args:
@@ -315,7 +286,7 @@ def _remove_allocation_group_members(allocation_id: int) -> None:
         )
 
 
-def _update_allocation_status() -> None:
+def update_allocation_status() -> None:
     """Change the status of expired allocations to "removed" or "deleted".
 
     There are default values in the settings for how long after an allocation's end date
@@ -348,7 +319,7 @@ def _update_allocation_status() -> None:
     allocations_to_delete.update(status=deleted_status)
 
 
-def _check_rdf_allocation_expiry_notifications() -> None:
+def check_rdf_allocation_expiry_notifications() -> None:
     """Check RDF allocations and send appropriate expiry notifications."""
     if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
         return
@@ -442,7 +413,7 @@ def _check_rdf_allocation_expiry_notifications() -> None:
     )
 
 
-def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
+def zero_allocation_gpfs_quota(allocation_id: int) -> None:
     """Set the GPFS quota to zero for a single expired RDF allocation.
 
     Args:
@@ -507,7 +478,7 @@ def _zero_allocation_gpfs_quota(allocation_id: int) -> None:
     )
 
 
-def _check_quota_consistency() -> None:
+def check_quota_consistency() -> None:
     """Check consistency of file and storage quotas between allocations and filesets.
 
     Compares the active allocations to ensure the matching filesets have the same
@@ -584,26 +555,3 @@ def _check_quota_consistency() -> None:
 
     if missing_filesets:
         send_fileset_not_found_notification(missing_filesets)
-
-
-remove_allocation_group_members = log_task_exceptions_to_django_logger(
-    _remove_allocation_group_members
-)
-
-# note that we can't use log_task_exceptions_to_django_logger as a decorator
-# here as django-q needs to be able to serialize the function for use as a task
-create_rdf_allocation = log_task_exceptions_to_django_logger(_create_rdf_allocation)
-check_ldap_consistency = log_task_exceptions_to_django_logger(_check_ldap_consistency)
-update_quota_usages_task = log_task_exceptions_to_django_logger(
-    _update_quota_usages_task
-)
-update_allocation_status = log_task_exceptions_to_django_logger(
-    _update_allocation_status
-)
-check_rdf_allocation_expiry_notifications = log_task_exceptions_to_django_logger(
-    _check_rdf_allocation_expiry_notifications
-)
-zero_allocation_gpfs_quota = log_task_exceptions_to_django_logger(
-    _zero_allocation_gpfs_quota
-)
-check_quota_consistency = log_task_exceptions_to_django_logger(_check_quota_consistency)
