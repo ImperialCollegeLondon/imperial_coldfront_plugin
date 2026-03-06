@@ -8,7 +8,7 @@ register = template.Library()
 
 
 @register.simple_tag
-def allocation_shortname(allocation: RDFAllocation) -> str:
+def allocation_shortname(allocation: RDFAllocation) -> str | None:
     """Render the shortname of an allocation.
 
     Args:
