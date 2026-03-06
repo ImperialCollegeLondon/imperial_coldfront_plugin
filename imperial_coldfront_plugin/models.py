@@ -1,7 +1,5 @@
 """Plugin Django models."""
 
-from typing import Any
-
 from coldfront.core.allocation.models import Allocation, AllocationAttribute
 from coldfront.core.project.models import Project
 from django.db import models
@@ -28,7 +26,7 @@ class RDFAllocation(Allocation):
 
         proxy = True
 
-    def clean(self):
+    def clean(self) -> None:
         """Clean and validate RDFAllocation."""
         super().clean()
         resource = self.get_parent_resource
@@ -49,36 +47,32 @@ class RDFAllocation(Allocation):
         except (AllocationAttribute.DoesNotExist, AttributeError):
             return None
 
-    def _get_attribute_value(self, attribute_name: str) -> Any:
-        attr = self._get_attribute(attribute_name)
-        return attr.typed_value() if attr else None
-
     @property
-    def shortname(self) -> str:
-        """Get the shortname of the allocation."""
-        return self._get_attribute_value("Shortname")
-
-    @property
-    def shortname_attr(self) -> AllocationAttribute:
+    def shortname_attr(self) -> AllocationAttribute | None:
         """Get the shortname attribute of the allocation."""
         return self._get_attribute("Shortname")
 
     @property
-    def storage_quota_tb(self) -> str:
+    def shortname(self) -> str | None:
         """Get the shortname of the allocation."""
-        return self._get_attribute_value("Storage Quota (TB)")
+        return self.shortname_attr.typed_value()
 
     @property
-    def storage_quota_tb_attr(self) -> AllocationAttribute:
+    def storage_quota_tb_attr(self) -> AllocationAttribute | None:
         """Get the shortname attribute of the allocation."""
         return self._get_attribute("Storage Quota (TB)")
 
     @property
-    def files_quota(self) -> str:
+    def storage_quota_tb(self) -> int | None:
         """Get the shortname of the allocation."""
-        return self._get_attribute_value("Files Quota")
+        return self.storage_quota_tb_attr.typed_value()
 
     @property
-    def files_quota_attr(self) -> AllocationAttribute:
+    def files_quota_attr(self) -> AllocationAttribute | None:
         """Get the shortname attribute of the allocation."""
         return self._get_attribute("Files Quota")
+
+    @property
+    def files_quota(self) -> int | None:
+        """Get the shortname of the allocation."""
+        return self.files_quota_attr.typed_value()
