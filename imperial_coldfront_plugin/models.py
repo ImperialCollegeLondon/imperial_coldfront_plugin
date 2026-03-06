@@ -55,7 +55,9 @@ class RDFAllocation(Allocation):
     @property
     def shortname(self) -> str | None:
         """Get the shortname of the allocation."""
-        return self.shortname_attr.typed_value()
+        if (attr := self.shortname_attr) is None:
+            return None
+        return attr.typed_value()
 
     @property
     def storage_quota_tb_attr(self) -> AllocationAttribute | None:
@@ -65,7 +67,9 @@ class RDFAllocation(Allocation):
     @property
     def storage_quota_tb(self) -> int | None:
         """Get the shortname of the allocation."""
-        return self.storage_quota_tb_attr.typed_value()
+        if (attr := self.storage_quota_tb_attr) is None:
+            return None
+        return attr.typed_value()
 
     @property
     def files_quota_attr(self) -> AllocationAttribute | None:
@@ -75,4 +79,6 @@ class RDFAllocation(Allocation):
     @property
     def files_quota(self) -> int | None:
         """Get the shortname of the allocation."""
-        return self.files_quota_attr.typed_value()
+        if (attr := self.files_quota_attr) is None:
+            return None
+        return attr.typed_value()
