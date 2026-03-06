@@ -1,15 +1,14 @@
 """Template tags for allocation shortnames."""
 
-from coldfront.core.allocation.models import Allocation
 from django import template
 
-from ..utils import get_allocation_shortname
+from imperial_coldfront_plugin.models import RDFAllocation
 
 register = template.Library()
 
 
 @register.simple_tag
-def allocation_shortname(allocation: Allocation) -> str:
+def allocation_shortname(allocation: RDFAllocation) -> str:
     """Render the shortname of an allocation.
 
     Args:
@@ -18,4 +17,4 @@ def allocation_shortname(allocation: Allocation) -> str:
     Returns:
       The shortname of the allocation, or an empty string if unable.
     """
-    return get_allocation_shortname(allocation)
+    return allocation.shortname

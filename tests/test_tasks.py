@@ -473,9 +473,7 @@ def test_remove_allocation_group_members_no_shortname(
     from imperial_coldfront_plugin.tasks import remove_allocation_group_members
 
     # Remove the shortname attribute
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
 
     remove_allocation_group_members(rdf_allocation.pk)
 

@@ -327,19 +327,20 @@ def rdf_allocation(
 ):
     """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.allocation.models import (
-        Allocation,
         AllocationAttribute,
         AllocationAttributeType,
         AllocationStatusChoice,
     )
     from coldfront.core.resource.models import Resource
 
+    from imperial_coldfront_plugin.models import RDFAllocation
+
     rdf_resource = Resource.objects.get(name="RDF Active")
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-    allocation = Allocation.objects.create(
+    allocation = RDFAllocation.objects.create(
         project=project, status=allocation_active_status
     )
     allocation.resources.add(rdf_resource)

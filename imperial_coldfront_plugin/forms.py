@@ -22,7 +22,6 @@ from django.utils import timezone
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
 from .models import CreditTransaction
-from .utils import get_allocation_shortname
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User as UserType
@@ -328,7 +327,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
                 allocation.id,
                 f"{allocation.get_parent_resource.name} "
                 f"({allocation.get_parent_resource.resource_type.name}) "
-                f"{get_allocation_shortname(allocation)}",
+                f"{allocation.shortname}",
             )
             for allocation in allocation_query_set
         ]
