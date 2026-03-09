@@ -44,13 +44,12 @@ class TestCreditTransaction:
 
     def test_project_foreign_key(self):
         """Test the project foreign key configuration."""
-        from coldfront.core.project.models import Project
-
         from imperial_coldfront_plugin import models
+        from imperial_coldfront_plugin.models import RDFProject
 
         field = models.CreditTransaction._meta.get_field("project")
         assert field.remote_field is not None
-        assert field.remote_field.model is Project
+        assert field.remote_field.model is RDFProject
         assert field.remote_field.on_delete.__name__ == "CASCADE"
 
     @pytest.mark.parametrize(

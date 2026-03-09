@@ -166,11 +166,9 @@ def test_create_rdf_allocation(
     settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
 
     # get some metadata from the project level
-    faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
-    department = project.projectattribute_set.get(
-        proj_attr_type__name="Department"
-    ).value
-    group_id = project.projectattribute_set.get(proj_attr_type__name="Group ID").value
+    faculty = project.faculty
+    department = project.department
+    group_id = project.group_id
     fileset_path_info = FilesetPathInfo(
         settings.GPFS_FILESYSTEM_MOUNT_PATH,
         settings.GPFS_FILESYSTEM_NAME,

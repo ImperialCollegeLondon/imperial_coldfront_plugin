@@ -99,11 +99,9 @@ def _create_rdf_allocation(form_data: AllocationFormData) -> int:
         name="Active"
     )
 
-    faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
-    department = project.projectattribute_set.get(
-        proj_attr_type__name="Department"
-    ).value
-    group_id = project.projectattribute_set.get(proj_attr_type__name="Group ID").value
+    faculty = project.faculty
+    department = project.department
+    group_id = project.group_id
 
     logger.info("Creating initial database entries for RDF allocation.")
     with transaction.atomic():

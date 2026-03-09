@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
-from coldfront.core.project.models import Project
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -18,6 +17,8 @@ from django.core.validators import MinValueValidator
 from django.http.request import QueryDict
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+
+from imperial_coldfront_plugin.models import RDFProject
 
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
@@ -120,7 +121,7 @@ def _js_select_widget() -> forms.Select:
 class AllocationFormData(TypedDict):
     """Structure for holding cleaned RDF allocation form data with types."""
 
-    project: Project
+    project: RDFProject
     description: str
     start_date: date
     end_date: date
@@ -132,8 +133,8 @@ class AllocationFormData(TypedDict):
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project: forms.ModelChoiceField[Project] = forms.ModelChoiceField(
-        queryset=Project.objects.filter(status__name="Active"),
+    project: forms.ModelChoiceField[RDFProject] = forms.ModelChoiceField(
+        queryset=RDFProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
     description = forms.CharField(widget=forms.Textarea())
@@ -206,13 +207,13 @@ class DartIDForm(forms.Form):
         return dart_id
 
 
-class ProjectCreationForm(forms.ModelForm[Project]):
+class ProjectCreationForm(forms.ModelForm[RDFProject]):
     """Form for creating a new research group (project)."""
 
     class Meta:
         """Meta class for the form."""
 
-        model = Project
+        model = RDFProject
         fields = ("title", "description", "field_of_science")
 
     username = forms.CharField(
@@ -308,7 +309,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
     ) -> None:
         """Initialize the form."""
         super().__init__(request_user, project_pk, *args, **kwargs)
-        project_obj = get_object_or_404(Project, pk=project_pk)
+        project_obj = get_object_or_404(RDFProject, pk=project_pk)
 
         allocation_query_set = project_obj.allocation_set.filter(
             resources__is_allocatable=True,
@@ -354,8 +355,8 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         model = CreditTransaction
         fields = ("project", "amount", "description")
 
-    project: forms.ModelChoiceField[Project] = forms.ModelChoiceField(
-        queryset=Project.objects.filter(status__name="Active"),
+    project: forms.ModelChoiceField[RDFProject] = forms.ModelChoiceField(
+        queryset=RDFProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
     amount = forms.IntegerField(

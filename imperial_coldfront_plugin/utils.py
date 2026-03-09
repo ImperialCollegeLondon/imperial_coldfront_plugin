@@ -1,12 +1,11 @@
 """Utility functions for the Imperial Coldfront plugin."""
 
-from coldfront.core.project.models import Project
 from django.db.models import Sum
 
-from imperial_coldfront_plugin.models import CreditTransaction
+from imperial_coldfront_plugin.models import CreditTransaction, RDFProject
 
 
-def calculate_credit_balance(project: Project) -> int:
+def calculate_credit_balance(project: RDFProject) -> int:
     """Return the summed credit balance for a project.
 
     Args:

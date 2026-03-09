@@ -412,13 +412,9 @@ class TestProjectCreation(LoginRequiredMixin):
         assert project_user.status == project_user_status
         assert project_user.role == project_user_role
         project.projectattribute_set.get
-        project.projectattribute_set.get(proj_attr_type__name="Faculty", value=faculty)
-        project.projectattribute_set.get(
-            proj_attr_type__name="Department", value=department
-        )
-        group_id = project.projectattribute_set.get(
-            proj_attr_type__name="Group ID", value=project.pi.username
-        ).value
+        project.faculty
+        project.department
+        group_id = project.group_id
         project.projectattribute_set.get(
             proj_attr_type__name="Filesystem location",
             value=str(
@@ -432,9 +428,7 @@ class TestProjectCreation(LoginRequiredMixin):
                 )
             ),
         )
-        project.projectattribute_set.get(
-            proj_attr_type__name="ASK Ticket Reference", value=ticket_id
-        )
+        project.ask_ticket_reference_attr
 
     def test_post_existing_username_group_id(self, superuser_client, user, project):
         """Test project creation is blocked if there is already a group with that id."""

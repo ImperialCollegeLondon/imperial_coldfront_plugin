@@ -1,21 +1,8 @@
 """Plugin Django models."""
 
 from coldfront.core.allocation.models import Allocation, AllocationAttribute
-from coldfront.core.project.models import Project
+from coldfront.core.project.models import Project, ProjectAttribute
 from django.db import models
-
-
-class CreditTransaction(models.Model):
-    """Model representing a credit transaction."""
-
-    timestamp = models.DateTimeField(auto_now_add=True)
-    amount = models.IntegerField()
-    description = models.CharField(max_length=255)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE)
-
-    def __str__(self) -> str:
-        """String representation of the CreditTransaction."""
-        return f"CreditTransaction(id={self.id}, project={self.project.title})"
 
 
 class RDFAllocation(Allocation):
@@ -82,3 +69,61 @@ class RDFAllocation(Allocation):
         if (attr := self.files_quota_attr) is None:
             return None
         return attr.typed_value()
+
+
+class RDFProject(Project):
+    """Proxy model for RDF Projects."""
+
+    class Meta:
+        """Meta class for RDFProject."""
+
+        proxy = True
+
+    def _get_attribute(self, attribute_name: str) -> ProjectAttribute:
+        try:
+            return self.projectattribute_set.get(proj_attr_type__name=attribute_name)
+        except ProjectAttribute.MultipleObjectsReturned:
+            raise ValueError(
+                f"Multiple {attribute_name} attributes found for project - {self}"
+            )
+        except (ProjectAttribute.DoesNotExist, AttributeError):
+            return None
+
+    @property
+    def group_id(self) -> ProjectAttribute | None:
+        """Get the group ID attribute of the project."""
+        if (attr := self._get_attribute("Group ID")) is None:
+            return None
+        return attr.value
+
+    @property
+    def faculty(self) -> str | None:
+        """Get the faculty of the project."""
+        if (attr := self._get_attribute("Faculty")) is None:
+            return None
+        return attr.value
+
+    @property
+    def department(self) -> str | None:
+        """Get the department of the project."""
+        if (attr := self._get_attribute("Department")) is None:
+            return None
+        return attr.value
+
+    @property
+    def ask_ticket_reference_attr(self) -> ProjectAttribute | None:
+        """Get the Ask Ticket Reference attribute of the project."""
+        return self._get_attribute("Ask Ticket Reference")
+
+
+class CreditTransaction(models.Model):
+    """Model representing a credit transaction."""
+
+    timestamp = models.DateTimeField(auto_now_add=True)
+    amount = models.IntegerField()
+    description = models.CharField(max_length=255)
+    project = models.ForeignKey(RDFProject, on_delete=models.CASCADE)
+
+    def __str__(self) -> str:
+        """String representation of the CreditTransaction."""
+        return f"CreditTransaction(id={self.id}, project={self.project.title})"
