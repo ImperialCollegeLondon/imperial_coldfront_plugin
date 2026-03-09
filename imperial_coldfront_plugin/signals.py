@@ -186,7 +186,9 @@ def remove_ldap_group_members_if_allocation_inactive(
     if instance.status.name == "Active":
         return
 
-    if instance.shortname is None:
+    try:
+        instance.shortname
+    except ValueError:
         return
 
     async_task(remove_allocation_group_members, instance.pk)

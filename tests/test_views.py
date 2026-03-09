@@ -361,11 +361,12 @@ class TestProjectCreation(LoginRequiredMixin):
         """Test posting with valid data."""
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
-            Project,
             ProjectStatusChoice,
             ProjectUserRoleChoice,
             ProjectUserStatusChoice,
         )
+
+        from imperial_coldfront_plugin.models import RDFProject
 
         ProjectStatusChoice.objects.create(name="Active")
         project_user_status = ProjectUserStatusChoice.objects.create(name="Active")
@@ -394,7 +395,7 @@ class TestProjectCreation(LoginRequiredMixin):
             ),
         )
 
-        project = Project.objects.get()
+        project = RDFProject.objects.get()
         assertRedirects(
             response,
             reverse(

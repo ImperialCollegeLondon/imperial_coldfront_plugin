@@ -285,9 +285,10 @@ def _remove_allocation_group_members(allocation_id: int) -> None:
         return
 
     allocation = RDFAllocation.objects.get(pk=allocation_id)
-    shortname = allocation.shortname
 
-    if not shortname:
+    try:
+        shortname = allocation.shortname
+    except ValueError:
         return
 
     # Get the shortname/group_id from the allocation

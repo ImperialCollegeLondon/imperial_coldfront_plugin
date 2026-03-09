@@ -32,43 +32,39 @@ class RDFAllocation(Allocation):
                 f"Multiple {attribute_name} attributes found for allocation - {self}"
             )
         except (AllocationAttribute.DoesNotExist, AttributeError):
-            return None
+            raise ValueError(
+                f"{attribute_name} attribute not found for allocation - {self}"
+            )
 
     @property
-    def shortname_attr(self) -> AllocationAttribute | None:
+    def shortname_attr(self) -> AllocationAttribute:
         """Get the shortname attribute of the allocation."""
         return self._get_attribute("Shortname")
 
     @property
-    def shortname(self) -> str | None:
+    def shortname(self) -> str:
         """Get the shortname of the allocation."""
-        if (attr := self.shortname_attr) is None:
-            return None
-        return attr.typed_value()
+        return self.shortname_attr.typed_value()
 
     @property
-    def storage_quota_tb_attr(self) -> AllocationAttribute | None:
+    def storage_quota_tb_attr(self) -> AllocationAttribute:
         """Get the shortname attribute of the allocation."""
         return self._get_attribute("Storage Quota (TB)")
 
     @property
-    def storage_quota_tb(self) -> int | None:
+    def storage_quota_tb(self) -> int:
         """Get the shortname of the allocation."""
-        if (attr := self.storage_quota_tb_attr) is None:
-            return None
-        return attr.typed_value()
+        return self.storage_quota_tb_attr.typed_value()
 
     @property
-    def files_quota_attr(self) -> AllocationAttribute | None:
+    def files_quota_attr(self) -> AllocationAttribute:
         """Get the shortname attribute of the allocation."""
         return self._get_attribute("Files Quota")
 
     @property
-    def files_quota(self) -> int | None:
+    def files_quota(self) -> int:
         """Get the shortname of the allocation."""
-        if (attr := self.files_quota_attr) is None:
-            return None
-        return attr.typed_value()
+        return self.files_quota_attr.typed_value()
 
 
 class RDFProject(Project):
@@ -87,28 +83,24 @@ class RDFProject(Project):
                 f"Multiple {attribute_name} attributes found for project - {self}"
             )
         except (ProjectAttribute.DoesNotExist, AttributeError):
-            return None
+            raise ValueError(
+                f"{attribute_name} attribute not found for project - {self}"
+            )
 
     @property
-    def group_id(self) -> ProjectAttribute | None:
+    def group_id(self) -> ProjectAttribute:
         """Get the group ID attribute of the project."""
-        if (attr := self._get_attribute("Group ID")) is None:
-            return None
-        return attr.value
+        return self._get_attribute("Group ID").value
 
     @property
     def faculty(self) -> str | None:
         """Get the faculty of the project."""
-        if (attr := self._get_attribute("Faculty")) is None:
-            return None
-        return attr.value
+        return self._get_attribute("Faculty").value
 
     @property
     def department(self) -> str | None:
         """Get the department of the project."""
-        if (attr := self._get_attribute("Department")) is None:
-            return None
-        return attr.value
+        return self._get_attribute("Department").value
 
     @property
     def ask_ticket_reference_attr(self) -> ProjectAttribute | None:
