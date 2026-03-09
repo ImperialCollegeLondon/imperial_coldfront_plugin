@@ -105,7 +105,7 @@ class RDFProject(Project):
     @property
     def ask_ticket_reference_attr(self) -> ProjectAttribute:
         """Get the Ask Ticket Reference attribute of the project."""
-        return self._get_attribute("Ask Ticket Reference")
+        return self._get_attribute("ASK Ticket Reference")
 
 
 class CreditTransaction(models.Model):
