@@ -262,7 +262,6 @@ def _update_quota_usages_task() -> None:
     # below could use some more error handling but is a reasonable first pass
     for allocation in allocations:
         rdf_id = allocation.shortname
-        # Unsure about this one? TODO
         storage_attribute_usage = (
             allocation.storage_quota_tb_attr.allocationattributeusage
         )
