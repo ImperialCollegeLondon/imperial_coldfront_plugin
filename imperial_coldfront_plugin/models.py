@@ -88,22 +88,22 @@ class RDFProject(Project):
             )
 
     @property
-    def group_id(self) -> ProjectAttribute:
+    def group_id(self) -> str:
         """Get the group ID attribute of the project."""
         return self._get_attribute("Group ID").value
 
     @property
-    def faculty(self) -> str | None:
+    def faculty(self) -> str:
         """Get the faculty of the project."""
         return self._get_attribute("Faculty").value
 
     @property
-    def department(self) -> str | None:
+    def department(self) -> str:
         """Get the department of the project."""
         return self._get_attribute("Department").value
 
     @property
-    def ask_ticket_reference_attr(self) -> ProjectAttribute | None:
+    def ask_ticket_reference_attr(self) -> ProjectAttribute:
         """Get the Ask Ticket Reference attribute of the project."""
         return self._get_attribute("Ask Ticket Reference")
 
