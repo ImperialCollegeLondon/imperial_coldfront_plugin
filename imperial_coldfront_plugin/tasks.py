@@ -555,3 +555,45 @@ def check_quota_consistency() -> None:
 
     if missing_filesets:
         send_fileset_not_found_notification(missing_filesets)
+
+
+def unlink_expired_allocation_filesets() -> None:
+    """Unlink GPFS filesets for RDF allocations that reached unlink threshold."""
+    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
+        return
+    if not settings.GPFS_ENABLED:
+        return
+
+    logger = logging.getLogger("django-q")
+    threshold_date = date.today() - timedelta(
+        days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
+    )
+
+    allocations = Allocation.objects.filter(
+        resources__name="RDF Active",
+        end_date__lte=threshold_date,  # run once when it hits the configured day
+    ).prefetch_related("allocationattribute_set")
+
+    client = GPFSClient()
+
+    for allocation in allocations:
+        try:
+            shortname = allocation.allocationattribute_set.get(
+                allocation_attribute_type__name="Shortname"
+            ).value
+        except AllocationAttribute.DoesNotExist:
+            logger.error(
+                f"Could not find Shortname attribute for allocation {allocation.pk}. "
+                "Fileset unlink skipped."
+            )
+            continue
+
+        try:
+            logger.info(f"Unlinking GPFS fileset for expired allocation {shortname}")
+            client.unlink_fileset(
+                filesystemName=settings.GPFS_FILESYSTEM_NAME,
+                filesetName=shortname,
+                force=True,
+            )
+        except Exception as e:
+            logger.error(f"Error unlinking fileset for allocation {shortname}: {e}")
