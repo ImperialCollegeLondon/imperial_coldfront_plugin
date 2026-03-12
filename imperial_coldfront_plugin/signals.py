@@ -16,6 +16,8 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django_q.tasks import async_task
 
+from imperial_coldfront_plugin.models import RDFAllocation
+
 from .ldap import (
     ldap_add_member_to_group,
     ldap_gid_in_use,
@@ -120,20 +122,23 @@ def sync_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
+    allocation = instance.allocation
+    shortname = _get_shortname_from_allocation(allocation)
+
+    if not shortname:
         return
 
     if instance.status.name == "Active":
         async_task(
             ldap_add_member_to_group,
-            group_id,
+            shortname,
             instance.user.username,
             allow_already_present=True,
         )
     else:
         async_task(
             ldap_remove_member_from_group,
-            group_id,
+            shortname,
             instance.user.username,
             allow_missing=True,
         )
@@ -160,20 +165,24 @@ def remove_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
+    allocation = instance.allocation
+    shortname = _get_shortname_from_allocation(allocation)
+
+    if not shortname:
         return
 
     async_task(
         ldap_remove_member_from_group,
-        group_id,
+        shortname,
         instance.user.username,
         allow_missing=True,
     )
 
 
 @receiver(post_save, sender=Allocation)
+@receiver(post_save, sender=RDFAllocation)
 def remove_ldap_group_members_if_allocation_inactive(
-    sender: object, instance: Allocation, **kwargs: object
+    sender: object, instance: Allocation | RDFAllocation, **kwargs: object
 ) -> None:
     """Remove all LDAP group members if allocation is not Active.
 
@@ -193,10 +202,11 @@ def remove_ldap_group_members_if_allocation_inactive(
     async_task(remove_allocation_group_members, instance.pk)
 
 
+@receiver(pre_save, sender=RDFAllocation)
 @receiver(pre_save, sender=Allocation)
 def allocation_expired_handler(
-    sender: type[Allocation],
-    instance: Allocation,
+    sender: type[RDFAllocation],
+    instance: Allocation | RDFAllocation,
     **kwargs: object,
 ) -> None:
     """Spawn a background task to zero GPFS quota when an RDF Active allocation has expired."""  # noqa E501
@@ -210,8 +220,8 @@ def allocation_expired_handler(
         return
 
     try:
-        old_instance = Allocation.objects.get(pk=instance.pk)
-    except Allocation.DoesNotExist:
+        old_instance = RDFAllocation.objects.get(pk=instance.pk)
+    except RDFAllocation.DoesNotExist:
         return
 
     if old_instance.status == instance.status:
