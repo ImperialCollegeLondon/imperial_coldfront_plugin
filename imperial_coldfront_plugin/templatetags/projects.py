@@ -6,7 +6,7 @@ from coldfront.core.project.models import ProjectUser
 from django import template
 from django.db.models.query import QuerySet
 
-from imperial_coldfront_plugin.models import RDFProject
+from imperial_coldfront_plugin.models import ICLProject
 from imperial_coldfront_plugin.utils import calculate_credit_balance
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ register = template.Library()
 
 
 @register.simple_tag
-def get_user_projects(user: "User") -> QuerySet[RDFProject]:
+def get_user_projects(user: "User") -> QuerySet[ICLProject]:
     """Return a queryset with a user's projects.
 
     Args:
@@ -31,7 +31,7 @@ def get_user_projects(user: "User") -> QuerySet[RDFProject]:
 
 
 @register.simple_tag
-def get_project_credit_balance(project: RDFProject) -> int:
+def get_project_credit_balance(project: ICLProject) -> int:
     """Calculate the total credit balance for a project.
 
     Args:

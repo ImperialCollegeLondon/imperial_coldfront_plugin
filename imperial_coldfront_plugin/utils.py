@@ -1,11 +1,32 @@
 """Utility functions for the Imperial Coldfront plugin."""
 
+from coldfront.core.allocation.models import Allocation, AllocationAttribute
 from django.db.models import Sum
 
-from imperial_coldfront_plugin.models import CreditTransaction, RDFProject
+from imperial_coldfront_plugin.models import CreditTransaction, ICLProject
 
 
-def calculate_credit_balance(project: RDFProject) -> int:
+def get_allocation_shortname(allocation: Allocation) -> str:
+    """Get the shortname attribute for an allocation.
+
+    Args:
+      allocation: The allocation whose shortname is to be retrieved.
+
+    Returns:
+        The shortname of the allocation, or an empty string if unable
+    """
+    try:
+        return allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+    except (
+        AllocationAttribute.MultipleObjectsReturned,
+        AllocationAttribute.DoesNotExist,
+    ):
+        return ""
+
+
+def calculate_credit_balance(project: ICLProject) -> int:
     """Return the summed credit balance for a project.
 
     Args:

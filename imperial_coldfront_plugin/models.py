@@ -22,6 +22,22 @@ class RDFAllocation(Allocation):
                 "RDFAllocation must be associated with the 'RDF Active' resource"
             )
 
+    @classmethod
+    def from_allocation(cls, allocation: Allocation) -> "RDFAllocation":
+        """Create an RDFAllocation instance from a base Allocation instance."""
+        return cls(
+            pk=allocation.pk,
+            project=allocation.project,
+            status=allocation.status,
+            quantity=allocation.quantity,
+            start_date=allocation.start_date,
+            end_date=allocation.end_date,
+            justification=allocation.justification,
+            description=allocation.description,
+            is_locked=allocation.is_locked,
+            is_changeable=allocation.is_changeable,
+        )
+
     def _get_attribute(self, attribute_name: str) -> AllocationAttribute:
         try:
             return self.allocationattribute_set.get(
@@ -44,7 +60,10 @@ class RDFAllocation(Allocation):
     @property
     def shortname(self) -> str:
         """Get the shortname of the allocation."""
-        return self.shortname_attr.typed_value()
+        value = self.shortname_attr.typed_value()
+        if not isinstance(value, str):
+            raise ValueError(f"Expected shortname to be a string, got {type(value)}")
+        return value
 
     @property
     def storage_quota_tb_attr(self) -> AllocationAttribute:
@@ -54,7 +73,12 @@ class RDFAllocation(Allocation):
     @property
     def storage_quota_tb(self) -> int:
         """Get the shortname of the allocation."""
-        return self.storage_quota_tb_attr.typed_value()
+        value = self.storage_quota_tb_attr.typed_value()
+        if not isinstance(value, int):
+            raise ValueError(
+                f"Expected storage quota to be an integer, got {type(value)}"
+            )
+        return value
 
     @property
     def files_quota_attr(self) -> AllocationAttribute:
@@ -64,14 +88,19 @@ class RDFAllocation(Allocation):
     @property
     def files_quota(self) -> int:
         """Get the shortname of the allocation."""
-        return self.files_quota_attr.typed_value()
+        value = self.files_quota_attr.typed_value()
+        if not isinstance(value, int):
+            raise ValueError(
+                f"Expected files quota to be an integer, got {type(value)}"
+            )
+        return value
 
 
-class RDFProject(Project):
+class ICLProject(Project):
     """Proxy model for RDF Projects."""
 
     class Meta:
-        """Meta class for RDFProject."""
+        """Meta class for ICLProject."""
 
         proxy = True
 
@@ -114,7 +143,7 @@ class CreditTransaction(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     amount = models.IntegerField()
     description = models.CharField(max_length=255)
-    project = models.ForeignKey(RDFProject, on_delete=models.CASCADE)
+    project = models.ForeignKey(ICLProject, on_delete=models.CASCADE)
 
     def __str__(self) -> str:
         """String representation of the CreditTransaction."""

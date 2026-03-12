@@ -6,6 +6,7 @@ attributes and to manage LDAP group membership.
 """
 
 from coldfront.core.allocation.models import (
+    Allocation,
     AllocationAttribute,
     AllocationUser,
 )
@@ -22,6 +23,18 @@ from .ldap import (
     ldap_gid_in_use,
     ldap_remove_member_from_group,
 )
+
+
+def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
+    try:
+        shortname = allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="Shortname"
+        ).value
+        return f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
+    except AllocationAttribute.MultipleObjectsReturned:
+        raise ValueError(f"Multiple shortnames found for allocation - {allocation}")
+    except AllocationAttribute.DoesNotExist:
+        return None
 
 
 @receiver(pre_save, sender=AllocationAttribute)
@@ -110,24 +123,22 @@ def sync_ldap_group_membership(
         return
 
     allocation = instance.allocation
-    shortname = allocation.shortname
+    shortname = _get_shortname_from_allocation(allocation)
 
     if not shortname:
         return
 
-    group_id = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-
     if instance.status.name == "Active":
         async_task(
             ldap_add_member_to_group,
-            group_id,
+            shortname,
             instance.user.username,
             allow_already_present=True,
         )
     else:
         async_task(
             ldap_remove_member_from_group,
-            group_id,
+            shortname,
             instance.user.username,
             allow_missing=True,
         )
@@ -155,24 +166,23 @@ def remove_ldap_group_membership(
         return
 
     allocation = instance.allocation
-    shortname = allocation.shortname
+    shortname = _get_shortname_from_allocation(allocation)
 
     if not shortname:
         return
 
-    group_id = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-
     async_task(
         ldap_remove_member_from_group,
-        group_id,
+        shortname,
         instance.user.username,
         allow_missing=True,
     )
 
 
+@receiver(post_save, sender=Allocation)
 @receiver(post_save, sender=RDFAllocation)
 def remove_ldap_group_members_if_allocation_inactive(
-    sender: object, instance: RDFAllocation, **kwargs: object
+    sender: object, instance: Allocation | RDFAllocation, **kwargs: object
 ) -> None:
     """Remove all LDAP group members if allocation is not Active.
 
@@ -186,18 +196,17 @@ def remove_ldap_group_members_if_allocation_inactive(
     if instance.status.name == "Active":
         return
 
-    try:
-        instance.shortname
-    except ValueError:
+    if _get_shortname_from_allocation(instance) is None:
         return
 
     async_task(remove_allocation_group_members, instance.pk)
 
 
 @receiver(pre_save, sender=RDFAllocation)
+@receiver(pre_save, sender=Allocation)
 def allocation_expired_handler(
     sender: type[RDFAllocation],
-    instance: RDFAllocation,
+    instance: Allocation | RDFAllocation,
     **kwargs: object,
 ) -> None:
     """Spawn a background task to zero GPFS quota when an RDF Active allocation has expired."""  # noqa E501

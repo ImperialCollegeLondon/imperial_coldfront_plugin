@@ -18,7 +18,10 @@ from django.http.request import QueryDict
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from imperial_coldfront_plugin.models import RDFProject
+from imperial_coldfront_plugin.models import ICLProject
+from imperial_coldfront_plugin.utils import (
+    get_allocation_shortname,
+)
 
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
@@ -121,7 +124,7 @@ def _js_select_widget() -> forms.Select:
 class AllocationFormData(TypedDict):
     """Structure for holding cleaned RDF allocation form data with types."""
 
-    project: RDFProject
+    project: ICLProject
     description: str
     start_date: date
     end_date: date
@@ -133,8 +136,8 @@ class AllocationFormData(TypedDict):
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project: forms.ModelChoiceField[RDFProject] = forms.ModelChoiceField(
-        queryset=RDFProject.objects.filter(status__name="Active"),
+    project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
+        queryset=ICLProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
     description = forms.CharField(widget=forms.Textarea())
@@ -207,13 +210,13 @@ class DartIDForm(forms.Form):
         return dart_id
 
 
-class ProjectCreationForm(forms.ModelForm[RDFProject]):
+class ProjectCreationForm(forms.ModelForm[ICLProject]):
     """Form for creating a new research group (project)."""
 
     class Meta:
         """Meta class for the form."""
 
-        model = RDFProject
+        model = ICLProject
         fields = ("title", "description", "field_of_science")
 
     username = forms.CharField(
@@ -309,7 +312,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
     ) -> None:
         """Initialize the form."""
         super().__init__(request_user, project_pk, *args, **kwargs)
-        project_obj = get_object_or_404(RDFProject, pk=project_pk)
+        project_obj = get_object_or_404(ICLProject, pk=project_pk)
 
         allocation_query_set = project_obj.allocation_set.filter(
             resources__is_allocatable=True,
@@ -328,7 +331,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
                 allocation.id,
                 f"{allocation.get_parent_resource.name} "
                 f"({allocation.get_parent_resource.resource_type.name}) "
-                f"{allocation.shortname}",
+                f"{get_allocation_shortname(allocation)}",
             )
             for allocation in allocation_query_set
         ]
@@ -355,8 +358,8 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         model = CreditTransaction
         fields = ("project", "amount", "description")
 
-    project: forms.ModelChoiceField[RDFProject] = forms.ModelChoiceField(
-        queryset=RDFProject.objects.filter(status__name="Active"),
+    project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
+        queryset=ICLProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
     amount = forms.IntegerField(

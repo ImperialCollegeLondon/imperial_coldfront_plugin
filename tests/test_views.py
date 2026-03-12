@@ -366,7 +366,7 @@ class TestProjectCreation(LoginRequiredMixin):
             ProjectUserStatusChoice,
         )
 
-        from imperial_coldfront_plugin.models import RDFProject
+        from imperial_coldfront_plugin.models import ICLProject
 
         ProjectStatusChoice.objects.create(name="Active")
         project_user_status = ProjectUserStatusChoice.objects.create(name="Active")
@@ -395,7 +395,7 @@ class TestProjectCreation(LoginRequiredMixin):
             ),
         )
 
-        project = RDFProject.objects.get()
+        project = ICLProject.objects.get()
         assertRedirects(
             response,
             reverse(

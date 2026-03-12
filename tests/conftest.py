@@ -252,14 +252,14 @@ def project(user):
         ProjectUserStatusChoice,
     )
 
-    from imperial_coldfront_plugin.models import RDFProject
+    from imperial_coldfront_plugin.models import ICLProject
 
     project_active_status = ProjectStatusChoice.objects.create(name="Active")
     field_of_science_other = FieldOfScience.objects.create(description="Other")
     project_user_active_status = ProjectUserStatusChoice.objects.create(name="Active")
     project_user_role_manager = ProjectUserRoleChoice.objects.create(name="Manager")
 
-    project = RDFProject.objects.create(
+    project = ICLProject.objects.create(
         pi=user,
         title=f"{user.get_full_name()}'s Research Group",
         status=project_active_status,

@@ -45,11 +45,11 @@ class TestCreditTransaction:
     def test_project_foreign_key(self):
         """Test the project foreign key configuration."""
         from imperial_coldfront_plugin import models
-        from imperial_coldfront_plugin.models import RDFProject
+        from imperial_coldfront_plugin.models import ICLProject
 
         field = models.CreditTransaction._meta.get_field("project")
         assert field.remote_field is not None
-        assert field.remote_field.model is RDFProject
+        assert field.remote_field.model is ICLProject
         assert field.remote_field.on_delete.__name__ == "CASCADE"
 
     @pytest.mark.parametrize(
@@ -131,9 +131,25 @@ class TestRDFAllocation:
         with pytest.raises(ValueError, match="Files Quota attribute not found"):
             rdf_allocation.files_quota
 
+    def test_storage_quota_tb_bad_value(self, rdf_allocation):
+        """Test that error is thrown when Storage Quota (TB) has a non-integer value."""
+        from coldfront.core.allocation.models import (
+            AllocationAttribute,
+            AllocationAttributeType,
+        )
 
-class TestRDFProject:
-    """Tests for the RDFProject model."""
+        attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=attr_type,
+            allocation=rdf_allocation,
+            value="not_an_int",
+        )
+        with pytest.raises(ValueError):
+            rdf_allocation.storage_quota_tb
+
+
+class TestICLProject:
+    """Tests for the ICLProject model."""
 
     def test_group_id(self, project):
         """Test that group_id returns the correct value."""
