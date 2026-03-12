@@ -363,7 +363,6 @@ class TestProjectCreation(LoginRequiredMixin):
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
             ProjectStatusChoice,
-            Project,
             ProjectUserRoleChoice,
             ProjectUserStatusChoice,
         )
