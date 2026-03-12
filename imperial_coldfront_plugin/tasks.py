@@ -571,7 +571,7 @@ def unlink_expired_allocation_filesets() -> None:
 
     allocations = Allocation.objects.filter(
         resources__name="RDF Active",
-        end_date__lte=threshold_date,  # run once when it hits the configured day
+        end_date=threshold_date,  # run once when it hits the configured day
     ).prefetch_related("allocationattribute_set")
 
     client = GPFSClient()
