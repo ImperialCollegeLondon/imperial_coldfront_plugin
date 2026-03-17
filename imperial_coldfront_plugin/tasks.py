@@ -596,4 +596,4 @@ def unlink_expired_allocation_filesets() -> None:
                 force=True,
             )
         except Exception as e:
-            logger.error(f"Error unlinking fileset for allocation {shortname}: {e}")
+            logger.exception(f"Error unlinking fileset for allocation {shortname}")
