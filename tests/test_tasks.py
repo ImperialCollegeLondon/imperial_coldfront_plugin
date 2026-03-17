@@ -1007,7 +1007,6 @@ def test_unlink_expired_allocation_filesets_feature_flag(
 ):
     """Test unlink task does nothing when lifecycle feature flag is disabled."""
     settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
-    settings.GPFS_ENABLED = True
 
     rdf_allocation.end_date = datetime.now().date() - timedelta(
         days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
@@ -1025,7 +1024,6 @@ def test_unlink_expired_allocation_filesets_gpfs_disabled(
     settings,
 ):
     """Test unlink task does nothing when GPFS is disabled."""
-    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = True
     settings.GPFS_ENABLED = False
 
     rdf_allocation.end_date = datetime.now().date() - timedelta(
@@ -1045,8 +1043,6 @@ def test_unlink_expired_allocation_filesets_success(
     settings,
 ):
     """Test unlink task unlinks fileset when allocation is at unlink threshold."""
-    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = True
-    settings.GPFS_ENABLED = True
     rdf_allocation.end_date = datetime.now().date() - timedelta(
         days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
     )
@@ -1070,9 +1066,6 @@ def test_unlink_expired_allocation_filesets_missing_shortname(
     settings,
 ):
     """Test unlink task skips allocation when Shortname attribute is missing."""
-    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = True
-    settings.GPFS_ENABLED = True
-
     rdf_allocation.end_date = datetime.now().date() - timedelta(
         days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
     )
