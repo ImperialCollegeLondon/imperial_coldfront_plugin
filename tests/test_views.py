@@ -430,7 +430,7 @@ class TestProjectCreation(LoginRequiredMixin):
                 )
             ),
         )
-        project.ask_ticket_reference_attr
+        assert project.ask_ticket_reference_attr == ticket_id
 
     def test_post_existing_username_group_id(self, superuser_client, user, project):
         """Test project creation is blocked if there is already a group with that id."""

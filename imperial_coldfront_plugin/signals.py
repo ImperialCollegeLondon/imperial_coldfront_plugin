@@ -122,10 +122,15 @@ def sync_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    allocation = instance.allocation
-    shortname = _get_shortname_from_allocation(allocation)
+    try:
+        rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
+    except (ValueError, RDFAllocation.DoesNotExist):
+        # Instantiating a RDFAllocation checks it's actually a RDFAllocation
+        return
 
-    if not shortname:
+    try:
+        shortname = rdf_allocation.ldap_shortname
+    except (ValueError, RDFAllocation.DoesNotExist):
         return
 
     if instance.status.name == "Active":
@@ -165,10 +170,15 @@ def remove_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    allocation = instance.allocation
-    shortname = _get_shortname_from_allocation(allocation)
+    try:
+        rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
+    except (ValueError, RDFAllocation.DoesNotExist):
+        # Instantiating a RDFAllocation checks it's actually a RDFAllocation
+        return
 
-    if not shortname:
+    try:
+        shortname = rdf_allocation.ldap_shortname
+    except (ValueError, RDFAllocation.DoesNotExist):
         return
 
     async_task(
@@ -192,11 +202,18 @@ def remove_ldap_group_members_if_allocation_inactive(
 
     if not settings.LDAP_ENABLED:
         return
-
-    if instance.status.name == "Active":
+    try:
+        rdf_allocation = RDFAllocation.from_allocation(instance)
+    except (ValueError, RDFAllocation.DoesNotExist):
+        # Signal applies only to RDFAllocations
         return
 
-    if _get_shortname_from_allocation(instance) is None:
+    if rdf_allocation.status.name == "Active":
+        return
+
+    try:
+        rdf_allocation.ldap_shortname
+    except (ValueError, RDFAllocation.DoesNotExist):
         return
 
     async_task(remove_allocation_group_members, instance.pk)
@@ -217,6 +234,11 @@ def allocation_expired_handler(
         return
 
     if not instance.resources.filter(name="RDF Active").exists():
+        return
+
+    try:
+        RDFAllocation.from_allocation(instance)
+    except (ValueError, RDFAllocation.DoesNotExist):
         return
 
     try:

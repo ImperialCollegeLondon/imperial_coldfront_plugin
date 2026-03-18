@@ -1,7 +1,10 @@
 """Plugin Django models."""
 
+import typing
+
 from coldfront.core.allocation.models import Allocation, AllocationAttribute
 from coldfront.core.project.models import Project, ProjectAttribute
+from django.conf import settings
 from django.db import models
 
 
@@ -23,7 +26,7 @@ class RDFAllocation(Allocation):
             )
 
     @classmethod
-    def from_allocation(cls, allocation: Allocation) -> "RDFAllocation":
+    def from_allocation(cls, allocation: Allocation) -> typing.Self:
         """Create an RDFAllocation instance from a base Allocation instance."""
         return cls(
             pk=allocation.pk,
@@ -64,6 +67,14 @@ class RDFAllocation(Allocation):
         if not isinstance(value, str):
             raise ValueError(f"Expected shortname to be a string, got {type(value)}")
         return value
+
+    @property
+    def ldap_shortname(self) -> str:
+        """Get the shortname of the allocation, with the LDAP prefix appended."""
+        value = self.shortname_attr.typed_value()
+        if not isinstance(value, str):
+            raise ValueError(f"Expected shortname to be a string, got {type(value)}")
+        return f"{settings.LDAP_SHORTNAME_PREFIX}{value}"
 
     @property
     def storage_quota_tb_attr(self) -> AllocationAttribute:
