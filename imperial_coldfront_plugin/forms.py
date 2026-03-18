@@ -348,7 +348,8 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
 
 class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
     """Form for creating a new credit transaction."""
-    def __init__(self, user:"UserType", *args: Any, **kwargs: Any) -> None:
+
+    def __init__(self, user: "UserType", *args: Any, **kwargs: Any) -> None:
         """Initialise new form instance."""
         super().__init__(*args, **kwargs)
         self.fields["authoriser"].initial = user.username
