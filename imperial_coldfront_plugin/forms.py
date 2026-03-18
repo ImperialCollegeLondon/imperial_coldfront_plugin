@@ -348,12 +348,16 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
 
 class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
     """Form for creating a new credit transaction."""
+    def __init__(self, user:"UserType", *args: Any, **kwargs: Any) -> None:
+        """Initialise new form instance."""
+        super().__init__(*args, **kwargs)
+        self.fields["authoriser"].initial = user.username
 
     class Meta:
         """Meta class for the form."""
 
         model = CreditTransaction
-        fields = ("project", "amount", "description")
+        fields = ("project", "amount", "description", "authoriser")
 
     project: forms.ModelChoiceField[Project] = forms.ModelChoiceField(
         queryset=Project.objects.filter(status__name="Active"),
@@ -366,3 +370,4 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Description of the transaction",
     )
+    authoriser = forms.CharField(disabled=True)
