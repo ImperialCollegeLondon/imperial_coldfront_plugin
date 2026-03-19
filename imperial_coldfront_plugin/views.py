@@ -379,12 +379,12 @@ def create_credit_transaction(request: HttpRequest) -> HttpResponse:
         return HttpResponseForbidden()
 
     if request.method == "POST":
-        form = CreditTransactionForm(request.POST)
+        form = CreditTransactionForm(request.user, request.POST)
         if form.is_valid():
             transaction = form.save()
             return redirect("project-detail", pk=transaction.project.pk)
     else:
-        form = CreditTransactionForm()
+        form = CreditTransactionForm(request.user)
     return render(
         request,
         "imperial_coldfront_plugin/credit_transaction_form.html",

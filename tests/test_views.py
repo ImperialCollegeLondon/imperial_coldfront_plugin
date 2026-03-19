@@ -493,7 +493,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
             response, "imperial_coldfront_plugin/credit_transaction_form.html"
         )
 
-    def test_post_valid(self, superuser_client, project):
+    def test_post_valid(self, superuser_client, project, superuser):
         """Test successful credit transaction creation."""
         amount = 100
         description = "Test credit transaction"
@@ -518,6 +518,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
         assert transaction.amount == amount
         assert transaction.description == description
         assert transaction.timestamp is not None
+        assert transaction.authoriser == superuser.username
 
     def test_post_missing_project(self, superuser_client):
         """Test form validation failure when project is missing."""

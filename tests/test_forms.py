@@ -299,58 +299,59 @@ def test_project_form_group_id_without_username(project_form_data):
     assert "group_id" not in form.errors
 
 
-def test_credit_transaction_form_valid(project):
+def test_credit_transaction_form_valid(project, superuser):
     """Test CreditTransactionForm with valid data."""
     form_data = {
         "project": project.pk,
         "amount": 100,
         "description": "Test credit transaction",
     }
-    form = CreditTransactionForm(data=form_data)
+    form = CreditTransactionForm(data=form_data, user=superuser)
     assert form.is_valid()
     assert form.cleaned_data["amount"] == 100
     assert form.cleaned_data["description"] == "Test credit transaction"
+    assert form.cleaned_data["authoriser"] == superuser.username
 
 
-def test_credit_transaction_form_zero_amount(project):
+def test_credit_transaction_form_zero_amount(project, superuser):
     """Test CreditTransactionForm with zero amount."""
     form_data = {
         "project": project.pk,
         "amount": 0,
         "description": "Zero amount transaction",
     }
-    form = CreditTransactionForm(data=form_data)
+    form = CreditTransactionForm(data=form_data, user=superuser)
     assert form.is_valid()
 
 
-def test_credit_transaction_form_missing_project():
+def test_credit_transaction_form_missing_project(superuser):
     """Test CreditTransactionForm with missing project."""
     form_data = {
         "amount": 100,
         "description": "Test credit transaction",
     }
-    form = CreditTransactionForm(data=form_data)
+    form = CreditTransactionForm(data=form_data, user=superuser)
     assert not form.is_valid()
     assert "project" in form.errors
 
 
-def test_credit_transaction_form_missing_amount(project):
+def test_credit_transaction_form_missing_amount(project, superuser):
     """Test CreditTransactionForm with missing amount."""
     form_data = {
         "project": project.pk,
         "description": "Test credit transaction",
     }
-    form = CreditTransactionForm(data=form_data)
+    form = CreditTransactionForm(data=form_data, user=superuser)
     assert not form.is_valid()
     assert "amount" in form.errors
 
 
-def test_credit_transaction_form_missing_description(project):
+def test_credit_transaction_form_missing_description(project, superuser):
     """Test CreditTransactionForm with missing description."""
     form_data = {
         "project": project.pk,
         "amount": 100,
     }
-    form = CreditTransactionForm(data=form_data)
+    form = CreditTransactionForm(data=form_data, user=superuser)
     assert not form.is_valid()
     assert "description" in form.errors

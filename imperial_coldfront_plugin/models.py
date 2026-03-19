@@ -11,6 +11,7 @@ class CreditTransaction(models.Model):
     amount = models.IntegerField()
     description = models.CharField(max_length=255)
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    authoriser = models.CharField(max_length=255, default="")
 
     def __str__(self) -> str:
         """String representation of the CreditTransaction."""
