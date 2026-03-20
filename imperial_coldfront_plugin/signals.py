@@ -25,18 +25,6 @@ from .ldap import (
 )
 
 
-def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
-    try:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        return f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-    except AllocationAttribute.MultipleObjectsReturned:
-        raise ValueError(f"Multiple shortnames found for allocation - {allocation}")
-    except AllocationAttribute.DoesNotExist:
-        return None
-
-
 @receiver(pre_save, sender=AllocationAttribute)
 def ensure_no_existing_gid(
     sender: object, instance: AllocationAttribute, **kwargs: object
@@ -130,7 +118,7 @@ def sync_ldap_group_membership(
 
     try:
         shortname = rdf_allocation.ldap_shortname
-    except (ValueError, RDFAllocation.DoesNotExist):
+    except ValueError:
         return
 
     if instance.status.name == "Active":
@@ -178,7 +166,7 @@ def remove_ldap_group_membership(
 
     try:
         shortname = rdf_allocation.ldap_shortname
-    except (ValueError, RDFAllocation.DoesNotExist):
+    except ValueError:
         return
 
     async_task(
@@ -213,7 +201,7 @@ def remove_ldap_group_members_if_allocation_inactive(
 
     try:
         rdf_allocation.ldap_shortname
-    except (ValueError, RDFAllocation.DoesNotExist):
+    except ValueError:
         return
 
     async_task(remove_allocation_group_members, instance.pk)
@@ -238,7 +226,7 @@ def allocation_expired_handler(
 
     try:
         RDFAllocation.from_allocation(instance)
-    except (ValueError, RDFAllocation.DoesNotExist):
+    except ValueError:
         return
 
     try:

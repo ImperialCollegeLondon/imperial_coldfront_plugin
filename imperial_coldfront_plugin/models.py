@@ -71,10 +71,7 @@ class RDFAllocation(Allocation):
     @property
     def ldap_shortname(self) -> str:
         """Get the shortname of the allocation, with the LDAP prefix appended."""
-        value = self.shortname_attr.typed_value()
-        if not isinstance(value, str):
-            raise ValueError(f"Expected shortname to be a string, got {type(value)}")
-        return f"{settings.LDAP_SHORTNAME_PREFIX}{value}"
+        return f"{settings.LDAP_SHORTNAME_PREFIX}{self.shortname}"
 
     @property
     def storage_quota_tb_attr(self) -> AllocationAttribute:
