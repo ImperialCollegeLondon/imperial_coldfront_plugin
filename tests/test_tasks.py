@@ -167,11 +167,9 @@ def test_create_rdf_allocation(
     settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
 
     # get some metadata from the project level
-    faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
-    department = project.projectattribute_set.get(
-        proj_attr_type__name="Department"
-    ).value
-    group_id = project.projectattribute_set.get(proj_attr_type__name="Group ID").value
+    faculty = project.faculty
+    department = project.department
+    group_id = project.group_id
     fileset_path_info = FilesetPathInfo(
         settings.GPFS_FILESYSTEM_MOUNT_PATH,
         settings.GPFS_FILESYSTEM_NAME,
@@ -474,9 +472,7 @@ def test_remove_allocation_group_members_no_shortname(
     from imperial_coldfront_plugin.tasks import remove_allocation_group_members
 
     # Remove the shortname attribute
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
 
     remove_allocation_group_members(rdf_allocation.pk)
 
@@ -1071,9 +1067,7 @@ def test_unlink_expired_allocation_filesets_missing_shortname(
     )
     rdf_allocation.save()
 
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
 
     mock_client = gpfs_client_mock.return_value
 

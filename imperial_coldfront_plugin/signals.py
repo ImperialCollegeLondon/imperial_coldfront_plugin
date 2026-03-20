@@ -16,23 +16,13 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django_q.tasks import async_task
 
+from imperial_coldfront_plugin.models import RDFAllocation
+
 from .ldap import (
     ldap_add_member_to_group,
     ldap_gid_in_use,
     ldap_remove_member_from_group,
 )
-
-
-def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
-    try:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        return f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-    except AllocationAttribute.MultipleObjectsReturned:
-        raise ValueError(f"Multiple shortnames found for allocation - {allocation}")
-    except AllocationAttribute.DoesNotExist:
-        return None
 
 
 @receiver(pre_save, sender=AllocationAttribute)
@@ -120,20 +110,28 @@ def sync_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
+    try:
+        rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
+    except (ValueError, RDFAllocation.DoesNotExist):
+        # Instantiating a RDFAllocation checks it's actually a RDFAllocation
+        return
+
+    try:
+        shortname = rdf_allocation.ldap_shortname
+    except ValueError:
         return
 
     if instance.status.name == "Active":
         async_task(
             ldap_add_member_to_group,
-            group_id,
+            shortname,
             instance.user.username,
             allow_already_present=True,
         )
     else:
         async_task(
             ldap_remove_member_from_group,
-            group_id,
+            shortname,
             instance.user.username,
             allow_missing=True,
         )
@@ -160,20 +158,29 @@ def remove_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
+    try:
+        rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
+    except (ValueError, RDFAllocation.DoesNotExist):
+        # Instantiating a RDFAllocation checks it's actually a RDFAllocation
+        return
+
+    try:
+        shortname = rdf_allocation.ldap_shortname
+    except ValueError:
         return
 
     async_task(
         ldap_remove_member_from_group,
-        group_id,
+        shortname,
         instance.user.username,
         allow_missing=True,
     )
 
 
 @receiver(post_save, sender=Allocation)
+@receiver(post_save, sender=RDFAllocation)
 def remove_ldap_group_members_if_allocation_inactive(
-    sender: object, instance: Allocation, **kwargs: object
+    sender: object, instance: Allocation | RDFAllocation, **kwargs: object
 ) -> None:
     """Remove all LDAP group members if allocation is not Active.
 
@@ -183,20 +190,28 @@ def remove_ldap_group_members_if_allocation_inactive(
 
     if not settings.LDAP_ENABLED:
         return
-
-    if instance.status.name == "Active":
+    try:
+        rdf_allocation = RDFAllocation.from_allocation(instance)
+    except (ValueError, RDFAllocation.DoesNotExist):
+        # Signal applies only to RDFAllocations
         return
 
-    if _get_shortname_from_allocation(instance) is None:
+    if rdf_allocation.status.name == "Active":
+        return
+
+    try:
+        rdf_allocation.ldap_shortname
+    except ValueError:
         return
 
     async_task(remove_allocation_group_members, instance.pk)
 
 
+@receiver(pre_save, sender=RDFAllocation)
 @receiver(pre_save, sender=Allocation)
 def allocation_expired_handler(
-    sender: type[Allocation],
-    instance: Allocation,
+    sender: type[RDFAllocation],
+    instance: Allocation | RDFAllocation,
     **kwargs: object,
 ) -> None:
     """Spawn a background task to zero GPFS quota when an RDF Active allocation has expired."""  # noqa E501
@@ -210,8 +225,13 @@ def allocation_expired_handler(
         return
 
     try:
-        old_instance = Allocation.objects.get(pk=instance.pk)
-    except Allocation.DoesNotExist:
+        RDFAllocation.from_allocation(instance)
+    except ValueError:
+        return
+
+    try:
+        old_instance = RDFAllocation.objects.get(pk=instance.pk)
+    except RDFAllocation.DoesNotExist:
         return
 
     if old_instance.status == instance.status:

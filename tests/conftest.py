@@ -245,7 +245,6 @@ def project(user):
     """Provides a Coldfront project owned by a user."""
     from coldfront.core.field_of_science.models import FieldOfScience
     from coldfront.core.project.models import (
-        Project,
         ProjectAttribute,
         ProjectAttributeType,
         ProjectStatusChoice,
@@ -254,12 +253,14 @@ def project(user):
         ProjectUserStatusChoice,
     )
 
+    from imperial_coldfront_plugin.models import ICLProject
+
     project_active_status = ProjectStatusChoice.objects.create(name="Active")
     field_of_science_other = FieldOfScience.objects.create(description="Other")
     project_user_active_status = ProjectUserStatusChoice.objects.create(name="Active")
     project_user_role_manager = ProjectUserRoleChoice.objects.create(name="Manager")
 
-    project = Project.objects.create(
+    project = ICLProject.objects.create(
         pi=user,
         title=f"{user.get_full_name()}'s Research Group",
         status=project_active_status,
@@ -328,19 +329,20 @@ def rdf_allocation(
 ):
     """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.allocation.models import (
-        Allocation,
         AllocationAttribute,
         AllocationAttributeType,
         AllocationStatusChoice,
     )
     from coldfront.core.resource.models import Resource
 
+    from imperial_coldfront_plugin.models import RDFAllocation
+
     rdf_resource = Resource.objects.get(name="RDF Active")
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-    allocation = Allocation.objects.create(
+    allocation = RDFAllocation.objects.create(
         project=project, status=allocation_active_status
     )
     allocation.resources.add(rdf_resource)
