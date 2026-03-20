@@ -148,6 +148,14 @@ def retrieve_all_fileset_quotas_mock(mocker):
     )
 
 
+@pytest.fixture
+def notify_platforms_to_manually_delete_allocation_mock(mocker):
+    """Mock notify_platforms_to_manually_delete_allocation."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.notify_platforms_to_manually_delete_allocation"
+    )
+
+
 def test_create_rdf_allocation(
     gpfs_create_fileset_mock,
     ldap_create_group_mock,
@@ -526,6 +534,16 @@ def test_update_allocation_status(
     update_allocation_status()
     rdf_allocation.refresh_from_db()
     assert rdf_allocation.status == expected_status
+
+    if expected_status_name == "Deleted":
+        notify_platforms_to_manually_delete_allocation_mock.assert_called_once_with(
+            rdf_allocation.pk,
+            rdf_allocation.allocationattribute_set.get(
+                allocation_attribute_type__name="Shortname"
+            ).value,
+        )
+    else:
+        notify_platforms_to_manually_delete_allocation_mock.assert_not_called()
 
 
 def test_check_expiry_notifications_feature_flag(

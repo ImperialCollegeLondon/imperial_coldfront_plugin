@@ -171,3 +171,6 @@ GPFS_ALLOCATION_CREATION_SLEEP = ENV.int("GPFS_ALLOCATION_CREATION_SLEEP", defau
 
 RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = 7
 """Number of days after an allocation expires to unlink from project."""
+
+RCS_NOTIFICATION_EMAILS = ENV.str("RCS_NOTIFICATION_EMAILS", default="")
+"""Email addresses to send RCS notifications to."""
