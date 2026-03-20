@@ -1067,9 +1067,7 @@ def test_unlink_expired_allocation_filesets_missing_shortname(
     )
     rdf_allocation.save()
 
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
 
     mock_client = gpfs_client_mock.return_value
 

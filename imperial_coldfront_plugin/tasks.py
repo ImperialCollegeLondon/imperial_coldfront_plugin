@@ -549,7 +549,7 @@ def unlink_expired_allocation_filesets() -> None:
         days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
     )
 
-    allocations = Allocation.objects.filter(
+    allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active",
         end_date=threshold_date,  # run once when it hits the configured day
     ).prefetch_related("allocationattribute_set")
@@ -558,10 +558,8 @@ def unlink_expired_allocation_filesets() -> None:
 
     for allocation in allocations:
         try:
-            shortname = allocation.allocationattribute_set.get(
-                allocation_attribute_type__name="Shortname"
-            ).value
-        except AllocationAttribute.DoesNotExist:
+            shortname = allocation.shortname
+        except ValueError:
             logger.error(
                 f"Could not find Shortname attribute for allocation {allocation.pk}. "
                 "Fileset unlink skipped."
