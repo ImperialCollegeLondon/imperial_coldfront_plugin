@@ -8,13 +8,13 @@ def add_hx2_hx3_resources(apps, schema_editor):
     ResourceType = apps.get_model("resource", "ResourceType")
 
     storage_resource_type, _ = ResourceType.objects.get_or_create(
-        name="Storage",
-        defaults=dict(description="NAS storage"),
+        name="Cluster",
+        defaults=dict(description="Cluster servers"),
     )
     Resource.objects.get_or_create(
         name="HX2",
         defaults=dict(
-            description="Storage space associated with a research group on HX2.",
+            description="Computer cluster associated with a research group on HX2.",
             is_allocatable=True,
             is_available=True,
             is_public=True,
@@ -25,7 +25,7 @@ def add_hx2_hx3_resources(apps, schema_editor):
     Resource.objects.get_or_create(
         name="HX3",
         defaults=dict(
-            description="Storage space associated with a research group on HX3.",
+            description="Compute cluster associated with a research group on HX3.",
             is_allocatable=True,
             is_available=True,
             is_public=True,
