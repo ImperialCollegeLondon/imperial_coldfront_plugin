@@ -116,10 +116,7 @@ def sync_ldap_group_membership(
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
 
-    try:
-        shortname = rdf_allocation.ldap_shortname
-    except ValueError:
-        return
+    shortname = rdf_allocation.ldap_shortname
 
     if instance.status.name == "Active":
         async_task(
@@ -164,10 +161,7 @@ def remove_ldap_group_membership(
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
 
-    try:
-        shortname = rdf_allocation.ldap_shortname
-    except ValueError:
-        return
+    shortname = rdf_allocation.ldap_shortname
 
     async_task(
         ldap_remove_member_from_group,
