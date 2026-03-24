@@ -74,9 +74,7 @@ def test_sync_ldap_group_membership_no_project_id(
     allocation_user_active_status,
 ):
     """Test sync_ldap_group_membership signal for non-rdf allocations."""
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
     allocation_user = AllocationUser.objects.create(
         allocation=rdf_allocation,
         user=user,
@@ -113,9 +111,7 @@ def test_remove_ldap_group_membership_no_shortname(
     ldap_remove_member_mock, rdf_allocation, allocation_user
 ):
     """Test remove_ldap_group_membership_signal for non-rdf allocation."""
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
     allocation_user.delete()
     ldap_remove_member_mock.assert_not_called()
 
@@ -227,9 +223,7 @@ def test_remove_ldap_group_members_no_shortname(
     enable_ldap,
 ):
     """Test that task is not called when allocation has no shortname."""
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
 
     allocation_inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
     rdf_allocation.status = allocation_inactive_status
