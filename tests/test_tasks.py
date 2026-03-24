@@ -20,6 +20,7 @@ from imperial_coldfront_plugin.tasks import (
     check_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
     create_rdf_allocation,
+    unlink_expired_allocation_filesets,
 )
 
 
@@ -166,11 +167,9 @@ def test_create_rdf_allocation(
     settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
 
     # get some metadata from the project level
-    faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
-    department = project.projectattribute_set.get(
-        proj_attr_type__name="Department"
-    ).value
-    group_id = project.projectattribute_set.get(proj_attr_type__name="Group ID").value
+    faculty = project.faculty
+    department = project.department
+    group_id = project.group_id
     fileset_path_info = FilesetPathInfo(
         settings.GPFS_FILESYSTEM_MOUNT_PATH,
         settings.GPFS_FILESYSTEM_NAME,
@@ -473,9 +472,7 @@ def test_remove_allocation_group_members_no_shortname(
     from imperial_coldfront_plugin.tasks import remove_allocation_group_members
 
     # Remove the shortname attribute
-    rdf_allocation.allocationattribute_set.get(
-        allocation_attribute_type__name="Shortname"
-    ).delete()
+    rdf_allocation.shortname_attr.delete()
 
     remove_allocation_group_members(rdf_allocation.pk)
 
@@ -997,3 +994,83 @@ def test_check_quota_consistency_issues(
         send_fileset_not_found_notification_mock.assert_not_called()
     else:
         send_fileset_not_found_notification_mock.assert_called_once_with(["shorty"])
+
+
+def test_unlink_expired_allocation_filesets_feature_flag(
+    gpfs_client_mock,
+    rdf_allocation,
+    settings,
+):
+    """Test unlink task does nothing when lifecycle feature flag is disabled."""
+    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
+
+    rdf_allocation.end_date = datetime.now().date() - timedelta(
+        days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
+    )
+    rdf_allocation.save()
+
+    unlink_expired_allocation_filesets()
+
+    gpfs_client_mock.assert_not_called()
+
+
+def test_unlink_expired_allocation_filesets_gpfs_disabled(
+    gpfs_client_mock,
+    rdf_allocation,
+    settings,
+):
+    """Test unlink task does nothing when GPFS is disabled."""
+    settings.GPFS_ENABLED = False
+
+    rdf_allocation.end_date = datetime.now().date() - timedelta(
+        days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
+    )
+    rdf_allocation.save()
+
+    unlink_expired_allocation_filesets()
+
+    gpfs_client_mock.assert_not_called()
+
+
+def test_unlink_expired_allocation_filesets_success(
+    gpfs_client_mock,
+    rdf_allocation,
+    rdf_allocation_shortname,
+    settings,
+):
+    """Test unlink task unlinks fileset when allocation is at unlink threshold."""
+    rdf_allocation.end_date = datetime.now().date() - timedelta(
+        days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
+    )
+
+    rdf_allocation.save()
+
+    mock_client = gpfs_client_mock.return_value
+
+    unlink_expired_allocation_filesets()
+
+    mock_client.unlink_fileset.assert_called_once_with(
+        filesystemName=settings.GPFS_FILESYSTEM_NAME,
+        filesetName=rdf_allocation_shortname,
+        force=True,
+    )
+
+
+def test_unlink_expired_allocation_filesets_missing_shortname(
+    gpfs_client_mock,
+    rdf_allocation,
+    settings,
+):
+    """Test unlink task skips allocation when Shortname attribute is missing."""
+    rdf_allocation.end_date = datetime.now().date() - timedelta(
+        days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
+    )
+    rdf_allocation.save()
+
+    rdf_allocation.shortname_attr.delete()
+
+    mock_client = gpfs_client_mock.return_value
+
+    unlink_expired_allocation_filesets()
+
+    mock_client.unlink_fileset.assert_not_called()

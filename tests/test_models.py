@@ -44,13 +44,12 @@ class TestCreditTransaction:
 
     def test_project_foreign_key(self):
         """Test the project foreign key configuration."""
-        from coldfront.core.project.models import Project
-
         from imperial_coldfront_plugin import models
+        from imperial_coldfront_plugin.models import ICLProject
 
         field = models.CreditTransaction._meta.get_field("project")
         assert field.remote_field is not None
-        assert field.remote_field.model is Project
+        assert field.remote_field.model is ICLProject
         assert field.remote_field.on_delete.__name__ == "CASCADE"
 
     @pytest.mark.parametrize(
@@ -73,3 +72,132 @@ class TestCreditTransaction:
         assert transaction.amount == amount
         assert transaction.description == description
         assert transaction.project == project
+
+
+class TestRDFAllocation:
+    """Tests for the RDFAllocation model."""
+
+    def test_shortname(self, rdf_allocation):
+        """Test that shortname_attr returns the correct attribute."""
+        assert rdf_allocation.shortname_attr.value == "shorty"
+        assert rdf_allocation.shortname == "shorty"
+
+    def test_storage_quota_tb_attr(self, rdf_allocation):
+        """Test that storage_quota_tb_attr returns the correct attribute."""
+        from coldfront.core.allocation.models import (
+            AllocationAttribute,
+            AllocationAttributeType,
+        )
+
+        attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=attr_type, allocation=rdf_allocation, value=10
+        )
+
+        assert rdf_allocation.storage_quota_tb_attr.value == "10"
+        assert rdf_allocation.storage_quota_tb == 10
+
+    def test_files_quota_attr(self, rdf_allocation):
+        """Test that files_quota_attr returns the correct attribute."""
+        from coldfront.core.allocation.models import (
+            AllocationAttribute,
+            AllocationAttributeType,
+        )
+
+        attr_type = AllocationAttributeType.objects.get(name="Files Quota")
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=attr_type, allocation=rdf_allocation, value=1000
+        )
+
+        assert rdf_allocation.files_quota_attr.value == "1000"
+        assert rdf_allocation.files_quota == 1000
+
+    def test_shortname_missing(self, rdf_allocation):
+        """Test that ValueError is raised when Shortname attribute is missing."""
+        rdf_allocation.shortname_attr.delete()
+
+        with pytest.raises(ValueError, match="Shortname attribute not found"):
+            rdf_allocation.shortname
+
+    def test_storage_quota_tb_missing(self, rdf_allocation):
+        """Test that error is raised when Storage Quota (TB) attribute is missing."""
+        with pytest.raises(
+            ValueError, match="Storage Quota \(TB\) attribute not found"
+        ):
+            rdf_allocation.storage_quota_tb
+
+    def test_files_quota_missing(self, rdf_allocation):
+        """Test that ValueError is raised when Files Quota attribute is missing."""
+        with pytest.raises(ValueError, match="Files Quota attribute not found"):
+            rdf_allocation.files_quota
+
+    def test_storage_quota_tb_bad_value(self, rdf_allocation):
+        """Test that error is thrown when Storage Quota (TB) has a non-integer value."""
+        from coldfront.core.allocation.models import (
+            AllocationAttribute,
+            AllocationAttributeType,
+        )
+
+        attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=attr_type,
+            allocation=rdf_allocation,
+            value="not_an_int",
+        )
+        with pytest.raises(ValueError):
+            rdf_allocation.storage_quota_tb
+
+
+class TestICLProject:
+    """Tests for the ICLProject model."""
+
+    def test_group_id(self, project):
+        """Test that group_id returns the correct value."""
+        assert project.group_id == "testuser"
+
+    def test_faculty(self, project):
+        """Test that faculty returns the correct value."""
+        assert project.faculty == "foe"
+
+    def test_department(self, project):
+        """Test that department returns the correct value."""
+        assert project.department == "dsde"
+
+    def test_ask_ticket_reference_attr(self, project):
+        """Test that ask_ticket_reference_attr returns the correct attribute."""
+        from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
+
+        attr_type = ProjectAttributeType.objects.get(name="ASK Ticket Reference")
+        ProjectAttribute.objects.create(
+            proj_attr_type=attr_type, project=project, value="Ref123"
+        )
+
+        assert project.ask_ticket_reference_attr.value == "Ref123"
+
+    def test_group_id_missing(self, project):
+        """Test that ValueError is raised when Group ID attribute is missing."""
+        project.projectattribute_set.filter(proj_attr_type__name="Group ID").delete()
+
+        with pytest.raises(ValueError, match="Group ID attribute not found"):
+            project.group_id
+
+    def test_faculty_missing(self, project):
+        """Test that ValueError is raised when Faculty attribute is missing."""
+        project.projectattribute_set.filter(proj_attr_type__name="Faculty").delete()
+
+        with pytest.raises(ValueError, match="Faculty attribute not found"):
+            project.faculty
+
+    def test_department_missing(self, project):
+        """Test that ValueError is raised when Department attribute is missing."""
+        project.projectattribute_set.filter(proj_attr_type__name="Department").delete()
+
+        with pytest.raises(ValueError, match="Department attribute not found"):
+            project.department
+
+    def test_ask_ticket_reference_attr_missing(self, project):
+        """Test that error is raised when ASK Ticket Reference attribute is missing."""
+        with pytest.raises(
+            ValueError, match="ASK Ticket Reference attribute not found"
+        ):
+            project.ask_ticket_reference_attr

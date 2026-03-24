@@ -362,10 +362,12 @@ class TestProjectCreation(LoginRequiredMixin):
         """Test posting with valid data."""
         from coldfront.core.field_of_science.models import FieldOfScience
         from coldfront.core.project.models import (
-            Project,
+            ProjectStatusChoice,
             ProjectUserRoleChoice,
             ProjectUserStatusChoice,
         )
+
+        from imperial_coldfront_plugin.models import ICLProject
 
         ProjectStatusChoice.objects.create(name="Active")
         project_user_status = ProjectUserStatusChoice.objects.create(name="Active")
@@ -394,7 +396,7 @@ class TestProjectCreation(LoginRequiredMixin):
             ),
         )
 
-        project = Project.objects.get()
+        project = ICLProject.objects.get()
         assertRedirects(
             response,
             reverse(
@@ -412,13 +414,9 @@ class TestProjectCreation(LoginRequiredMixin):
         assert project_user.status == project_user_status
         assert project_user.role == project_user_role
         project.projectattribute_set.get
-        project.projectattribute_set.get(proj_attr_type__name="Faculty", value=faculty)
-        project.projectattribute_set.get(
-            proj_attr_type__name="Department", value=department
-        )
-        group_id = project.projectattribute_set.get(
-            proj_attr_type__name="Group ID", value=project.pi.username
-        ).value
+        project.faculty
+        project.department
+        group_id = project.group_id
         project.projectattribute_set.get(
             proj_attr_type__name="Filesystem location",
             value=str(
@@ -432,9 +430,7 @@ class TestProjectCreation(LoginRequiredMixin):
                 )
             ),
         )
-        project.projectattribute_set.get(
-            proj_attr_type__name="ASK Ticket Reference", value=ticket_id
-        )
+        assert project.ask_ticket_reference_attr.value == ticket_id
 
     def test_post_existing_username_group_id(self, superuser_client, user, project):
         """Test project creation is blocked if there is already a group with that id."""

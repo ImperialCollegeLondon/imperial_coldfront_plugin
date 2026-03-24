@@ -1,10 +1,9 @@
 """Utility functions for the Imperial Coldfront plugin."""
 
 from coldfront.core.allocation.models import Allocation, AllocationAttribute
-from coldfront.core.project.models import Project
 from django.db.models import Sum
 
-from imperial_coldfront_plugin.models import CreditTransaction
+from imperial_coldfront_plugin.models import CreditTransaction, ICLProject
 
 
 def get_allocation_shortname(allocation: Allocation) -> str:
@@ -27,7 +26,7 @@ def get_allocation_shortname(allocation: Allocation) -> str:
         return ""
 
 
-def calculate_credit_balance(project: Project) -> int:
+def calculate_credit_balance(project: ICLProject) -> int:
     """Return the summed credit balance for a project.
 
     Args:
