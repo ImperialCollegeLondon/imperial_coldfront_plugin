@@ -157,7 +157,7 @@ def remove_ldap_group_membership(
 
     try:
         rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
-    except (ValueError, RDFAllocation.DoesNotExist):
+    except ValueError:
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
 
@@ -186,7 +186,7 @@ def remove_ldap_group_members_if_allocation_inactive(
         return
     try:
         rdf_allocation = RDFAllocation.from_allocation(instance)
-    except (ValueError, RDFAllocation.DoesNotExist):
+    except ValueError:
         # Signal applies only to RDFAllocations
         return
 
