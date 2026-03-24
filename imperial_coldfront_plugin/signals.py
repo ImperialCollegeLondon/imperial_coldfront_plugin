@@ -112,7 +112,7 @@ def sync_ldap_group_membership(
 
     try:
         rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
-    except (ValueError, RDFAllocation.DoesNotExist):
+    except ValueError:
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
 
