@@ -37,7 +37,7 @@ def add_hx2_hx3_resources(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('imperial_coldfront_plugin', '0017_iclproject_rdfallocation_and_more.py'),
+        ('imperial_coldfront_plugin', '0017_iclproject_rdfallocation_and_more'),
     ]
 
     operations = [
