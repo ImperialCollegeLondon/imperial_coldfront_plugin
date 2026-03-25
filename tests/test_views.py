@@ -59,6 +59,23 @@ class TestHomeView:
     that we override from the plugin.
     """
 
+    @pytest.fixture(autouse=True)
+    def get_graph_api_client_mock(self, mocker, parsed_profile):
+        """Mock out get_graph_api_client."""
+        mock = mocker.patch(
+            "imperial_coldfront_plugin.templatetags.projects.get_graph_api_client"
+        )
+        mock().user_profile.return_value = parsed_profile
+        return mock
+
+    @pytest.fixture(autouse=True)
+    def user_eligible_to_be_pi_mock(self, mocker):
+        """Mock out user_eligible_to_be_pi to return True by default."""
+        return mocker.patch(
+            "imperial_coldfront_plugin.templatetags.projects.user_eligible_to_be_pi",
+            return_value=True,
+        )
+
     @pytest.fixture
     def request_(self, rf, user):
         """A request object with a user."""
@@ -66,25 +83,65 @@ class TestHomeView:
         request.user = user
         return request
 
-    def test_get_standard_user(self, request_):
+    def test_get_standard_user(self, request_, mocker, user_eligible_to_be_pi_mock):
         """Test that the home view renders correctly for a standard user."""
+        user_eligible_to_be_pi_mock.return_value = False
+
         response = render(
             request_, "imperial_coldfront_plugin/overrides/authorized_home.html"
         )
 
         assert response.status_code == 200
+        user_eligible_to_be_pi_mock.assert_called_once()
+
         soup = BeautifulSoup(response.content, "html.parser")
         assert not soup.find("a", href=reverse("project-list"))
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
 
-    def test_group_member(self, request_, project):
+    def test_group_member(
+        self,
+        request_,
+        project,
+        mocker,
+        get_graph_api_client_mock,
+        user_eligible_to_be_pi_mock,
+    ):
         """Test that the home view renders correctly for a group member/owner."""
+        user_eligible_to_be_pi_mock.return_value = False
         response = render(
             request_,
             "imperial_coldfront_plugin/overrides/authorized_home.html",
         )
         assert response.status_code == 200
+        get_graph_api_client_mock.user_profile.assert_not_called()
+
         soup = BeautifulSoup(response.content, "html.parser")
         assert soup.find("a", href=reverse("project-list"))
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
+    def test_standard_user_without_projects_and_pi_eligible(
+        self, request_, mocker, get_graph_api_client_mock
+    ):
+        """Test that PI-eligible users without projects see the self-service link."""
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_called_once_with(
+            request_.user.username
+        )
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("a", href=reverse("project-list"))
+        assert soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
 
 
 @pytest.fixture

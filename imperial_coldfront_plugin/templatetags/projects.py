@@ -6,7 +6,9 @@ from coldfront.core.project.models import ProjectUser
 from django import template
 from django.db.models.query import QuerySet
 
+from imperial_coldfront_plugin.microsoft_graph_client import get_graph_api_client
 from imperial_coldfront_plugin.models import ICLProject
+from imperial_coldfront_plugin.policy import user_eligible_to_be_pi
 from imperial_coldfront_plugin.utils import calculate_credit_balance
 
 if TYPE_CHECKING:
@@ -28,6 +30,20 @@ def get_user_projects(user: "User") -> QuerySet[ICLProject]:
     return ProjectUser.objects.filter(user=user, status__name="Active").values(
         "project"
     )
+
+
+@register.simple_tag
+def user_can_self_create_project(user: "User") -> bool:
+    """Return whether a user is eligible to self-create a project.
+
+    Args:
+      user: The user to check.
+
+    Returns:
+        True if the user passes the PI eligibility policy.
+    """
+    user_profile = get_graph_api_client().user_profile(user.username)
+    return user_eligible_to_be_pi(user_profile)
 
 
 @register.simple_tag

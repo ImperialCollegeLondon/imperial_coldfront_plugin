@@ -1,13 +1,24 @@
 {% load projects %}
 <h1 class="display-4">Welcome to the Imperial Research Computing Access Portal</h1>
 <p>
-  This system is used to manage the resources provided by the Research Computing
-  Service including High Performance Computing (HPC) and the Research Data Facility.
+    This system is used to manage the resources provided by the Research Computing
+    Service including High Performance Computing (HPC) and the Research Data Facility.
 </p>
 {% get_user_projects user as groups %}
 {% if groups %}
-  <p>
+<p>
     See the Group Spaces you own or are a member of on the
     <a href="{% url 'project-list' %}">Groups</a> page.
-  </p>
+</p>
+{% else %}
+    {% user_can_self_create_project user as can_self_create_project %}
+    {% if can_self_create_project %}
+        <p>
+            Your user account has been identified as eligible to self-enroll to create
+            a Group Space. This is the first step to request access to RCS services.
+            Please see the
+            <a href="{% url 'imperial_coldfront_plugin:user_create_group' %}">Create Group</a>
+            page.
+        </p>
+    {% endif %}
 {% endif %}
