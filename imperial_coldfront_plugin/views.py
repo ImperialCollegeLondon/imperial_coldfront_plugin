@@ -29,11 +29,16 @@ from .forms import (
     DartIDForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
+    UserProjectCreationForm,
     get_department_choices,
 )
 from .microsoft_graph_client import get_graph_api_client
 from .models import CreditTransaction, ICLProject
-from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
+from .policy import (
+    check_project_pi_or_superuser,
+    user_eligible_for_hpc_access,
+    user_eligible_to_be_pi,
+)
 from .tasks import create_rdf_allocation
 
 if TYPE_CHECKING:
@@ -231,6 +236,45 @@ def project_creation(request: HttpRequest) -> HttpResponse:
             return redirect("project-detail", pk=project.pk)
     else:
         form = AdminProjectCreationForm()
+    return render(
+        request,
+        "imperial_coldfront_plugin/project_creation_form.html",
+        context=dict(form=form),
+    )
+
+
+@login_required
+def user_project_creation(request: "AuthenticatedHttpRequest") -> HttpResponse:
+    """View to create a new project for the logged in user.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the project creation form or redirects to the new project page.
+    """
+    if not request.user.is_superuser:
+        if Project.objects.filter(pi=request.user).exists():
+            return HttpResponseForbidden()
+        user_profile = get_graph_api_client().user_profile(request.user.username)
+        if not user_eligible_to_be_pi(user_profile):
+            return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = UserProjectCreationForm(request.POST)
+        if form.is_valid():
+            project = ICLProject.objects.create_iclproject(
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                field_of_science=form.cleaned_data["field_of_science"],
+                user=request.user,
+                faculty=form.cleaned_data["faculty"],
+                department=form.cleaned_data["department"],
+                group_id=request.user.username,
+            )
+            return redirect("project-detail", pk=project.pk)
+    else:
+        form = UserProjectCreationForm()
     return render(
         request,
         "imperial_coldfront_plugin/project_creation_form.html",

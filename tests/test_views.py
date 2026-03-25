@@ -15,7 +15,11 @@ from django.utils import timezone
 from django_q.models import Task
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import AdminProjectCreationForm, RDFAllocationForm
+from imperial_coldfront_plugin.forms import (
+    AdminProjectCreationForm,
+    RDFAllocationForm,
+    UserProjectCreationForm,
+)
 from imperial_coldfront_plugin.models import CreditTransaction
 
 
@@ -435,6 +439,158 @@ class TestProjectCreation(LoginRequiredMixin):
             response.context["form"].errors["username"][0]
             == "Username not found locally or in College directory."
         )
+
+
+class TestUserProjectCreation(LoginRequiredMixin):
+    """Tests for the user_project_creation view."""
+
+    @pytest.fixture(autouse=True)
+    def get_graph_api_client_mock(self, mocker, parsed_profile):
+        """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
+        mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
+        mock().user_profile.return_value = parsed_profile
+        return mock
+
+    @pytest.fixture(autouse=True)
+    def eligible_pi_mock(self, mocker):
+        """Mock the PI eligibility filter."""
+        mock = mocker.patch("imperial_coldfront_plugin.views.user_eligible_to_be_pi")
+        mock.return_value = True
+        return mock
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:user_create_group")
+
+    def test_get(self, user_client, eligible_pi_mock):
+        """Test get method."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == 200
+        assert isinstance(response.context["form"], UserProjectCreationForm)
+        eligible_pi_mock.assert_called_once()
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        form = soup.find("form")
+        assert form
+        assert form.find("input", attrs={"name": "title"})
+        assert form.find("textarea", attrs={"name": "description"})
+        assert form.find("select", attrs={"name": "field_of_science"})
+        assert form.find("select", attrs={"name": "faculty"})
+        assert form.find("select", attrs={"name": "department"})
+        assert not form.find("input", attrs={"name": "username"})
+        assert not form.find("input", attrs={"name": "group_id"})
+        assert not form.find("input", attrs={"name": "ticket_id"})
+
+    def test_get_ineligible_user_returns_forbidden(self, user_client, eligible_pi_mock):
+        """Test that ineligible users cannot access the view."""
+        eligible_pi_mock.return_value = False
+        response = user_client.get(self._get_url())
+        assert response.status_code == 403
+
+    def test_get_existing_pi_returns_forbidden(
+        self, user_client, project, eligible_pi_mock
+    ):
+        """Test that existing PIs cannot access the view."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == 403
+        eligible_pi_mock.assert_not_called()
+
+    def test_post(self, user_client, user, mocker, eligible_pi_mock):
+        """Test posting with valid data."""
+        from coldfront.core.field_of_science.models import FieldOfScience
+
+        FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+        mock_pk = 123
+        mock_create_iclproject.return_value.pk = mock_pk
+
+        faculty = "foe"
+        department = "dsde"
+        title = "group title"
+        description = "group_description"
+
+        response = user_client.post(
+            self._get_url(),
+            data=dict(
+                title=title,
+                description=description,
+                field_of_science=FieldOfScience.DEFAULT_PK,
+                department=department,
+                faculty=faculty,
+            ),
+        )
+
+        assertRedirects(
+            response,
+            reverse("project-detail", args=[mock_pk]),
+            fetch_redirect_response=False,
+        )
+        eligible_pi_mock.assert_called_once()
+        mock_create_iclproject.assert_called_once_with(
+            title=title,
+            description=description,
+            field_of_science=FieldOfScience.objects.get(pk=FieldOfScience.DEFAULT_PK),
+            user=user,
+            faculty=faculty,
+            department=department,
+            group_id=user.username,
+        )
+
+    def test_post_ineligible_user_returns_forbidden(
+        self, user_client, mocker, eligible_pi_mock
+    ):
+        """Test that ineligible users cannot create a project."""
+        eligible_pi_mock.return_value = False
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+
+        response = user_client.post(
+            self._get_url(),
+            data=dict(
+                title="group title",
+                description="group_description",
+                faculty="foe",
+                department="dsde",
+            ),
+        )
+
+        assert response.status_code == 403
+        mock_create_iclproject.assert_not_called()
+
+    def test_post_existing_pi_returns_forbidden(
+        self, user_client, project, mocker, eligible_pi_mock
+    ):
+        """Test that existing PIs cannot create another project."""
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+
+        response = user_client.post(
+            self._get_url(),
+            data=dict(
+                title="group title",
+                description="group_description",
+                faculty="foe",
+                department="dsde",
+            ),
+        )
+
+        assert response.status_code == 403
+        eligible_pi_mock.assert_not_called()
+        mock_create_iclproject.assert_not_called()
+
+    def test_get_superuser_bypasses_profile_and_existing_pi_checks(
+        self, superuser_client, project, eligible_pi_mock, get_graph_api_client_mock
+    ):
+        """Test that superusers can access the view without eligibility checks."""
+        response = superuser_client.get(self._get_url())
+
+        assert response.status_code == 200
+        assert isinstance(response.context["form"], UserProjectCreationForm)
+        eligible_pi_mock.assert_not_called()
+        get_graph_api_client_mock().user_profile.assert_not_called()
 
 
 class TestCreateCreditTransaction(LoginRequiredMixin):
