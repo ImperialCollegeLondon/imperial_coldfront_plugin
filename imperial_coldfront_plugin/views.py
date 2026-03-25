@@ -24,10 +24,10 @@ from django_q.tasks import async_task, fetch
 
 from .dart import create_dart_id_attribute
 from .forms import (
+    AdminProjectCreationForm,
     CreditTransactionForm,
     DartIDForm,
     ProjectAddUsersToAllocationShortnameForm,
-    ProjectCreationForm,
     RDFAllocationForm,
     get_department_choices,
 )
@@ -216,7 +216,7 @@ def project_creation(request: HttpRequest) -> HttpResponse:
         return HttpResponseForbidden()
 
     if request.method == "POST":
-        form = ProjectCreationForm(request.POST)
+        form = AdminProjectCreationForm(request.POST)
         if form.is_valid():
             project = ICLProject.objects.create_iclproject(
                 title=form.cleaned_data["title"],
@@ -230,7 +230,7 @@ def project_creation(request: HttpRequest) -> HttpResponse:
             )
             return redirect("project-detail", pk=project.pk)
     else:
-        form = ProjectCreationForm()
+        form = AdminProjectCreationForm()
     return render(
         request,
         "imperial_coldfront_plugin/project_creation_form.html",

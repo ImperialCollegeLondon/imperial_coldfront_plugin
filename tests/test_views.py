@@ -15,7 +15,7 @@ from django.utils import timezone
 from django_q.models import Task
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import ProjectCreationForm, RDFAllocationForm
+from imperial_coldfront_plugin.forms import AdminProjectCreationForm, RDFAllocationForm
 from imperial_coldfront_plugin.models import CreditTransaction
 
 
@@ -355,7 +355,7 @@ class TestProjectCreation(LoginRequiredMixin):
         """Test get method."""
         response = superuser_client.get(self._get_url())
         assert response.status_code == 200
-        assert isinstance(response.context["form"], ProjectCreationForm)
+        assert isinstance(response.context["form"], AdminProjectCreationForm)
 
     def test_post(self, superuser_client, user, mocker):
         """Test posting with valid data."""
