@@ -2,7 +2,6 @@
 
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -358,25 +357,17 @@ class TestProjectCreation(LoginRequiredMixin):
         assert response.status_code == 200
         assert isinstance(response.context["form"], ProjectCreationForm)
 
-    def test_post(self, superuser_client, user, settings):
+    def test_post(self, superuser_client, user, mocker):
         """Test posting with valid data."""
         from coldfront.core.field_of_science.models import FieldOfScience
-        from coldfront.core.project.models import (
-            ProjectStatusChoice,
-            ProjectUserRoleChoice,
-            ProjectUserStatusChoice,
-        )
 
-        from imperial_coldfront_plugin.models import ICLProject
-
-        ProjectStatusChoice.objects.create(name="Active")
-        project_user_status = ProjectUserStatusChoice.objects.create(name="Active")
-        project_user_role = ProjectUserRoleChoice.objects.create(name="Manager")
         FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+        mock_pk = 123
+        mock_create_iclproject.return_value.pk = mock_pk
 
-        settings.GPFS_FILESYSTEM_NAME = "fsname"
-        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
-        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
         faculty = "foe"
         department = "dsde"
 
@@ -396,41 +387,21 @@ class TestProjectCreation(LoginRequiredMixin):
             ),
         )
 
-        project = ICLProject.objects.get()
         assertRedirects(
             response,
-            reverse(
-                "project-detail",
-                args=[project.pk],
-            ),
+            reverse("project-detail", args=[mock_pk]),
             fetch_redirect_response=False,
         )
-
-        assert project.title == title
-        assert project.pi == user
-        assert project.description == description
-
-        project_user = project.projectuser_set.get()
-        assert project_user.status == project_user_status
-        assert project_user.role == project_user_role
-        project.projectattribute_set.get
-        project.faculty
-        project.department
-        group_id = project.group_id
-        project.projectattribute_set.get(
-            proj_attr_type__name="Filesystem location",
-            value=str(
-                Path(
-                    settings.GPFS_FILESYSTEM_MOUNT_PATH,
-                    settings.GPFS_FILESYSTEM_NAME,
-                    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-                    faculty,
-                    department,
-                    group_id,
-                )
-            ),
+        mock_create_iclproject.assert_called_once_with(
+            title=title,
+            description=description,
+            field_of_science=FieldOfScience.objects.get(pk=FieldOfScience.DEFAULT_PK),
+            user=user,
+            faculty=faculty,
+            department=department,
+            group_id=user.username,
+            ticket_id=ticket_id,
         )
-        assert project.ask_ticket_reference_attr.value == ticket_id
 
     def test_post_existing_username_group_id(self, superuser_client, user, project):
         """Test project creation is blocked if there is already a group with that id."""

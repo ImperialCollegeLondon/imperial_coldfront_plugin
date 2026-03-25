@@ -1,7 +1,6 @@
 """Plugin views."""
 
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from coldfront.core.allocation.models import Allocation
@@ -15,7 +14,6 @@ from coldfront.core.project.models import (
 )
 from coldfront.core.project.views import ProjectAddUsersSearchResultsView
 from coldfront.core.user.utils import CombinedUserSearch, UserSearch
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.forms import formset_factory
@@ -34,7 +32,7 @@ from .forms import (
     get_department_choices,
 )
 from .microsoft_graph_client import get_graph_api_client
-from .models import CreditTransaction
+from .models import CreditTransaction, ICLProject
 from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
 from .tasks import create_rdf_allocation
 
@@ -204,73 +202,6 @@ def add_dart_id_to_allocation(
     )
 
 
-def create_new_project(form: ProjectCreationForm) -> Project:
-    """Create a new project from the form data.
-
-    Args:
-      form: The validated project creation form.
-
-    Returns:
-        The newly created project.
-    """
-    from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
-
-    project_obj = form.save(commit=False)
-    project_obj.status = ProjectStatusChoice.objects.get(name="Active")
-    project_obj.pi = form.cleaned_data["user"]
-    project_obj.save()
-    ProjectUser.objects.create(
-        user=form.cleaned_data["user"],
-        project=project_obj,
-        role=ProjectUserRoleChoice.objects.get(name="Manager"),
-        status=ProjectUserStatusChoice.objects.get(name="Active"),
-    )
-    group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
-    location_attribute_type = ProjectAttributeType.objects.get(
-        name="Filesystem location"
-    )
-    department_attribute_type = ProjectAttributeType.objects.get(name="Department")
-    faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
-    ProjectAttribute.objects.create(
-        proj_attr_type=department_attribute_type,
-        project=project_obj,
-        value=form.cleaned_data["department"],
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=faculty_attribute_type,
-        project=project_obj,
-        value=form.cleaned_data["faculty"],
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=group_id_attribute_type,
-        project=project_obj,
-        value=form.cleaned_data["group_id"],
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=location_attribute_type,
-        project=project_obj,
-        value=str(
-            Path(
-                settings.GPFS_FILESYSTEM_MOUNT_PATH,
-                settings.GPFS_FILESYSTEM_NAME,
-                settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-                form.cleaned_data["faculty"],
-                form.cleaned_data["department"],
-                form.cleaned_data["group_id"],
-            )
-        ),
-    )
-    if ticket_id := form.cleaned_data.get("ticket_id"):
-        ticket_attribute_type = ProjectAttributeType.objects.get(
-            name="ASK Ticket Reference"
-        )
-        ProjectAttribute.objects.create(
-            proj_attr_type=ticket_attribute_type, project=project_obj, value=ticket_id
-        )
-
-    return project_obj
-
-
 @login_required
 def project_creation(request: HttpRequest) -> HttpResponse:
     """View to create a new project for any user.
@@ -287,7 +218,16 @@ def project_creation(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = ProjectCreationForm(request.POST)
         if form.is_valid():
-            project = create_new_project(form)
+            project = ICLProject.objects.create_iclproject(
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                field_of_science=form.cleaned_data["field_of_science"],
+                user=form.cleaned_data["user"],
+                faculty=form.cleaned_data["faculty"],
+                department=form.cleaned_data["department"],
+                group_id=form.cleaned_data["group_id"],
+                ticket_id=form.cleaned_data["ticket_id"],
+            )
             return redirect("project-detail", pk=project.pk)
     else:
         form = ProjectCreationForm()
