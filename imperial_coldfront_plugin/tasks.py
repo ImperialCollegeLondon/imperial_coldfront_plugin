@@ -22,6 +22,7 @@ from imperial_coldfront_plugin.models import RDFAllocation
 from .emails import (
     Discrepancy,
     QuotaDiscrepancy,
+    notify_platforms_to_manually_delete_allocation,
     send_allocation_deletion_notification,
     send_allocation_deletion_warning,
     send_allocation_expiry_warning,
@@ -309,6 +310,15 @@ def update_allocation_status() -> None:
     )
     deleted_status = AllocationStatusChoice.objects.get(name="Deleted")
     allocations_to_delete.update(status=deleted_status)
+
+    for allocation in allocations_to_delete:
+        try:
+            shortname = allocation.allocationattribute_set.get(
+                allocation_attribute_type__name="Shortname"
+            ).value
+        except AllocationAttribute.DoesNotExist:
+            shortname = f"Allocation ID {allocation.pk}"
+        notify_platforms_to_manually_delete_allocation(shortname, allocation.pk)
 
 
 def check_rdf_allocation_expiry_notifications() -> None:

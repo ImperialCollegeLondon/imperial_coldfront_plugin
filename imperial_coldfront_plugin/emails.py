@@ -153,6 +153,42 @@ All associated data has been permanently removed.
     )
 
 
+def notify_platforms_to_manually_delete_allocation(
+    allocation_shortname: str, allocation_id: int
+) -> None:
+    """Notify RCS Platforms team to manually delete data.
+
+    For an allocation that has hit the 'Deleted' status.
+    """
+    receipient_list = [
+        email.strip()
+        for email in settings.RCS_NOTIFICATION_EMAILS.split(",")
+        if email.strip()
+    ]
+
+    if not receipient_list:
+        return
+
+    subject = (
+        f"Manual Deletion Required for RDF Allocation - {allocation_shortname}"
+        f" (ID: {allocation_id})"
+    )
+
+    message = f"""
+    The RDF allocation '{allocation_shortname}' with ID {allocation_id}
+    has reached the 'Deleted' status.
+    Please take the necessary steps to manually delete all associated data
+    for this allocation.
+    """
+
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=receipient_list,
+    )
+
+
 class QuotaDiscrepancy(TypedDict):
     """Structure for holding discrepancies found during quota consistency check."""
 
