@@ -137,7 +137,7 @@ class HX2Allocation(Allocation):
             is_changeable=allocation.is_changeable,
         )
 
-    def _get_attribute(self, attribute_name) -> AllocationAttribute:
+    def _get_attribute(self, attribute_name: str) -> AllocationAttribute:
         try:
             return self.allocationattribute_set.get(
                 allocation_attribute_type__name=attribute_name

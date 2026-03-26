@@ -179,7 +179,7 @@ class TestICLProject:
 
     def test_group_id_missing(self, project):
         """Test that ValueError is raised when Group ID attribute is missing."""
-        project.projectattribute_set.filter(proj_attr_type__name="GID").delete()
+        project.projectattribute_set.filter(proj_attr_type__name="Group ID").delete()
 
         with pytest.raises(ValueError, match="Group ID attribute not found"):
             project.group_id
