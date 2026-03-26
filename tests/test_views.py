@@ -723,13 +723,13 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         settings.SHOW_CREDIT_BALANCE = True
         transactions = [
             CreditTransaction.objects.create(
-                project=project, amount=100, description="First"
+                project=project, amount=100, description="First", authoriser="Admin"
             ),
             CreditTransaction.objects.create(
-                project=project, amount=50, description="Second"
+                project=project, amount=50, description="Second", authoriser="Admin"
             ),
             CreditTransaction.objects.create(
-                project=project, amount=-30, description="Third"
+                project=project, amount=-30, description="Third", authoriser="Admin"
             ),
         ]
         now = timezone.now()
@@ -743,7 +743,6 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert response.status_code == 200
 
         soup = BeautifulSoup(response.content, "html.parser")
-        # check link back to project detail
         assert soup.find(
             "a",
             class_="btn",
@@ -754,15 +753,15 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
 
         rows = table.tbody.findChildren("tr")
         assert len(rows) == len(transactions)
-        # check ordering of table rows is chronological
+
         total = 0
         for row, transaction in zip(rows, transactions):
             cells = row.findChildren("td")
-            assert cells[2].span.text.strip() == str(transaction.amount)
+            assert cells[2].text.strip() == transaction.authoriser
+            assert cells[3].span.text.strip() == str(transaction.amount)
             total += transaction.amount
-            assert cells[3].text.strip() == str(total)
+            assert cells[4].text.strip() == str(total)
 
-        # check total in footer
         footer = table.tfoot.tr
         assert footer.find(tag_with_text_filter("th", str(total)))
 
