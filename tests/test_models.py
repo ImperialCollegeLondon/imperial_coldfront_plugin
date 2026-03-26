@@ -212,7 +212,6 @@ class TestHX2Allocation:
     def test_clean_valid(self, hx2_allocation):
         """Test that clean passes for a valid HX2 allocation."""
         # This should not raise an error:
-        print(hx2_allocation.shortname)
         hx2_allocation.clean()
 
     def test_clean_no_resource(self, hx2_allocation, mocker):

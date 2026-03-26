@@ -114,9 +114,7 @@ class HX2Allocation(Allocation):
 
     def clean(self) -> None:
         """Clean and validate HX2Allocation."""
-        print("Stop 1")
         super().clean()
-        print("Hi")
         resource = self.get_parent_resource
         if not resource or resource.name != "HX2":
             raise ValueError("HX2Allocation must be associated with the 'HX2' resource")
