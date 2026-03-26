@@ -408,10 +408,16 @@ def project_credit_transactions(
     )
 
     running = 0
-    rows: list[dict[str, int | CreditTransaction]] = []
+    rows: list[dict[str, int | str | CreditTransaction]] = []
     for transaction in transactions:
         running += transaction.amount
-        rows.append({"transaction": transaction, "running_balance": running})
+        rows.append(
+            {
+                "transaction": transaction,
+                "running_balance": running,
+                "authoriser": transaction.authoriser,
+            }
+        )
 
     return render(
         request,
