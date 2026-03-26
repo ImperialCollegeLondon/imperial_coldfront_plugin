@@ -1,5 +1,6 @@
 """Pytest configuration."""
 
+import datetime
 import pkgutil
 from random import choices
 from string import ascii_lowercase
@@ -434,3 +435,41 @@ def signals_async_task_mock(mocker):
 def enable_ldap(settings):
     """Fixture to enable LDAP in settings."""
     settings.LDAP_ENABLED = True
+
+
+@pytest.fixture
+def hx2_allocation_group_id():
+    """Shortname applied to hx2_allocation fixture."""
+    return "test-group"
+
+
+@pytest.fixture
+def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id):
+    """A Coldfront allocation representing an HX2 RDF storage allocation."""
+    from coldfront.core.allocation.models import (
+        AllocationAttribute,
+        AllocationAttributeType,
+        AllocationStatusChoice,
+    )
+    from coldfront.core.resource.models import Resource
+
+    from imperial_coldfront_plugin.models import HX2Allocation
+
+    hx2_resource = Resource.objects.get(name="HX2")
+    group_id_attribute_type = AllocationAttributeType.objects.get(name="GID")
+
+    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+    allocation = HX2Allocation.objects.create(
+        project=project,
+        status=allocation_active_status,
+        start_date=datetime.date.today(),
+        end_date=datetime.date.today() + datetime.timedelta(days=365),
+    )
+    allocation.resources.add(hx2_resource)
+
+    AllocationAttribute.objects.create(
+        allocation_attribute_type=group_id_attribute_type,
+        allocation=allocation,
+        value=hx2_allocation_group_id,
+    )
+    return allocation

@@ -104,6 +104,67 @@ class RDFAllocation(Allocation):
         return value
 
 
+class HX2Allocation(Allocation):
+    """Proxy model for HX2 RDF Active allocations."""
+
+    class Meta:
+        """Meta class for HX2Allocation."""
+
+        proxy = True
+
+    def clean(self) -> None:
+        """Clean and validate HX2Allocation."""
+        print("Stop 1")
+        super().clean()
+        print("Hi")
+        resource = self.get_parent_resource
+        if not resource or resource.name != "HX2":
+            raise ValueError("HX2Allocation must be associated with the 'HX2' resource")
+
+    @classmethod
+    def from_allocation(cls, allocation: Allocation) -> typing.Self:
+        """Create an HX2Allocation instance from a base Allocation instance."""
+        return cls(
+            pk=allocation.pk,
+            project=allocation.project,
+            status=allocation.status,
+            quantity=allocation.quantity,
+            start_date=allocation.start_date,
+            end_date=allocation.end_date,
+            justification=allocation.justification,
+            description=allocation.description,
+            is_locked=allocation.is_locked,
+            is_changeable=allocation.is_changeable,
+        )
+
+    def _get_attribute(self, attribute_name) -> AllocationAttribute:
+        try:
+            return self.allocationattribute_set.get(
+                allocation_attribute_type__name=attribute_name
+            )
+        except AllocationAttribute.MultipleObjectsReturned:
+            raise ValueError(
+                f"Multiple {attribute_name} attributes found for allocation - {self}"
+            )
+        except (AllocationAttribute.DoesNotExist, AttributeError):
+            raise ValueError(
+                f"{attribute_name} attribute not found for allocation - {self}"
+            )
+
+    @property
+    def shortname(self) -> str:
+        """Get the shortname attribute of the allocation."""
+        value = self._get_attribute("GID").typed_value()
+        if not isinstance(value, str):
+            raise ValueError(f"Expected shortname to be a string, got {type(value)}")
+        return value
+
+    @property
+    def ldap_shortname(self) -> str:
+        """Get the shortname of the allocation, with the LDAP prefix appended."""
+        return f"{settings.LDAP_SHORTNAME_PREFIX}{self.shortname}"
+
+
 class ICLProject(Project):
     """Proxy model for RDF Projects."""
 

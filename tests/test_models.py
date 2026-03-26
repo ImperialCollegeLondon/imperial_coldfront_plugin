@@ -1,3 +1,6 @@
+import datetime
+from types import SimpleNamespace
+
 import pytest
 
 
@@ -176,7 +179,7 @@ class TestICLProject:
 
     def test_group_id_missing(self, project):
         """Test that ValueError is raised when Group ID attribute is missing."""
-        project.projectattribute_set.filter(proj_attr_type__name="Group ID").delete()
+        project.projectattribute_set.filter(proj_attr_type__name="GID").delete()
 
         with pytest.raises(ValueError, match="Group ID attribute not found"):
             project.group_id
@@ -201,3 +204,103 @@ class TestICLProject:
             ValueError, match="ASK Ticket Reference attribute not found"
         ):
             project.ask_ticket_reference_attr
+
+
+class TestHX2Allocation:
+    """Tests for the HX2Allocation model."""
+
+    def test_clean_valid(self, hx2_allocation):
+        """Test that clean passes for a valid HX2 allocation."""
+        # This should not raise an error:
+        print(hx2_allocation.shortname)
+        hx2_allocation.clean()
+
+    def test_clean_no_resource(self, hx2_allocation, mocker):
+        """Test that clean raises ValueError when there is no parent resource."""
+        mocker.patch.object(
+            type(hx2_allocation),
+            "get_parent_resource",
+            new_callable=lambda: property(lambda self: None),
+        )
+        with pytest.raises(ValueError, match="HX2"):
+            hx2_allocation.clean()
+
+    def test_from_allocation(self, rdf_allocation):
+        """Test that from_allocation correctly copies fields from a base Allocation."""
+        from imperial_coldfront_plugin.models import HX2Allocation
+
+        hx2 = HX2Allocation.from_allocation(rdf_allocation)
+
+        assert isinstance(hx2, HX2Allocation)
+        assert hx2.pk == rdf_allocation.pk
+        assert hx2.project == rdf_allocation.project
+        assert hx2.status == rdf_allocation.status
+        assert hx2.quantity == rdf_allocation.quantity
+        assert hx2.start_date == rdf_allocation.start_date
+        assert hx2.end_date == rdf_allocation.end_date
+        assert hx2.justification == rdf_allocation.justification
+        assert hx2.description == rdf_allocation.description
+        assert hx2.is_locked == rdf_allocation.is_locked
+        assert hx2.is_changeable == rdf_allocation.is_changeable
+
+    def test_from_allocation_invalid_resource(self, rdf_allocation, mocker):
+        """Test that clean raises when from_allocation is given a non-HX2 allocation."""
+        from imperial_coldfront_plugin.models import HX2Allocation
+
+        rdf_allocation.start_date = datetime.date.today()
+        rdf_allocation.end_date = datetime.date.today() + datetime.timedelta(days=365)
+        hx2 = HX2Allocation.from_allocation(rdf_allocation)
+        mocker.patch.object(
+            type(hx2),
+            "get_parent_resource",
+            new_callable=lambda: property(
+                lambda self: SimpleNamespace(name="RDF Allocation")
+            ),
+        )
+        with pytest.raises(ValueError, match="HX2"):
+            hx2.clean()
+
+    def test_shortname(self, hx2_allocation, hx2_allocation_group_id):
+        """Test that shortname returns the correct value."""
+        assert hx2_allocation.shortname == hx2_allocation_group_id
+
+    def test_shortname_missing(self, hx2_allocation):
+        """Test that ValueError is raised when Shortname attribute is missing."""
+        from coldfront.core.allocation.models import AllocationAttribute
+
+        AllocationAttribute.objects.filter(
+            allocation=hx2_allocation,
+            allocation_attribute_type__name="GID",
+        ).delete()
+
+        with pytest.raises(ValueError, match="GID attribute not found"):
+            hx2_allocation.shortname
+
+    def test_shortname_multiple(self, hx2_allocation):
+        """Test that ValueError is raised when multiple Shortname attributes exist."""
+        from coldfront.core.allocation.models import (
+            AllocationAttribute,
+            AllocationAttributeType,
+        )
+
+        attr_type = AllocationAttributeType.objects.get(name="GID")
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=attr_type,
+            allocation=hx2_allocation,
+            value="duplicate-short",
+        )
+
+        with pytest.raises(ValueError, match="Multiple GID attributes"):
+            hx2_allocation.shortname
+
+    def test_ldap_shortname(self, hx2_allocation, hx2_allocation_group_id, settings):
+        """Test that ldap_shortname returns shortname with LDAP prefix."""
+        settings.LDAP_SHORTNAME_PREFIX = "ldap-"
+        assert hx2_allocation.ldap_shortname == f"ldap-{hx2_allocation_group_id}"
+
+    def test_ldap_shortname_empty_prefix(
+        self, hx2_allocation, hx2_allocation_group_id, settings
+    ):
+        """Test that ldap_shortname works with an empty prefix."""
+        settings.LDAP_SHORTNAME_PREFIX = ""
+        assert hx2_allocation.ldap_shortname == hx2_allocation_group_id
