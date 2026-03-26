@@ -123,6 +123,20 @@ class TestHomeView:
             "a", href=reverse("imperial_coldfront_plugin:user_create_group")
         )
 
+    def test_feature_flag(self, request_, settings, get_graph_api_client_mock):
+        """Test home view renders correctly when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_not_called()
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
     def test_eligible_user_without_projects(
         self, request_, mocker, get_graph_api_client_mock
     ):
@@ -597,6 +611,13 @@ class TestUserProjectCreation(LoginRequiredMixin):
         assert not form.find("input", attrs={"name": "username"})
         assert not form.find("input", attrs={"name": "group_id"})
         assert not form.find("input", attrs={"name": "ticket_id"})
+
+    def test_feature_flag(self, user_client, settings, eligible_pi_mock):
+        """Test that the view is inaccessible when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = user_client.get(self._get_url())
+        assert response.status_code == 403
+        eligible_pi_mock.assert_not_called()
 
     def test_get_ineligible_user_returns_forbidden(self, user_client, eligible_pi_mock):
         """Test that ineligible users cannot access the view."""

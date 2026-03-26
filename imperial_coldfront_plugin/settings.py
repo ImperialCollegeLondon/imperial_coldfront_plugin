@@ -171,3 +171,6 @@ GPFS_ALLOCATION_CREATION_SLEEP = ENV.int("GPFS_ALLOCATION_CREATION_SLEEP", defau
 
 RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = 7
 """Number of days after an allocation expires to unlink from project."""
+
+ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=False)
+"""Feature flag to enable or disable creation of user groups for allocations."""

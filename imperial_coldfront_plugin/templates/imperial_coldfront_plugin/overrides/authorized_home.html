@@ -12,15 +12,17 @@
 </p>
 {% endif %}
 {% get_user_owned_projects user as groups %}
-{% if not groups %}
-    {% user_can_self_create_project user as can_self_create_project %}
-    {% if can_self_create_project %}
-        <p>
-            Your user account has been identified as eligible to self-enroll to create
-            a Group Space. This is the first step to request access to RCS services.
-            Please see the
-            <a href="{% url 'imperial_coldfront_plugin:user_create_group' %}">Create Group</a>
-            page.
-        </p>
+{% if settings.ENABLE_USER_GROUP_CREATION %}
+    {% if not groups %}
+        {% user_can_self_create_project user as can_self_create_project %}
+        {% if can_self_create_project %}
+            <p>
+                Your user account has been identified as eligible to self-enroll to create
+                a Group Space. This is the first step to request access to RCS services.
+                Please see the
+                <a href="{% url 'imperial_coldfront_plugin:user_create_group' %}">Create Group</a>
+                page.
+            </p>
+        {% endif %}
     {% endif %}
 {% endif %}

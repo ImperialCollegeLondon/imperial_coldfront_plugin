@@ -14,6 +14,7 @@ from coldfront.core.project.models import (
 )
 from coldfront.core.project.views import ProjectAddUsersSearchResultsView
 from coldfront.core.user.utils import CombinedUserSearch, UserSearch
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.forms import formset_factory
@@ -253,6 +254,9 @@ def user_project_creation(request: "AuthenticatedHttpRequest") -> HttpResponse:
     Returns:
       The page for the project creation form or redirects to the new project page.
     """
+    if not settings.ENABLE_USER_GROUP_CREATION:
+        return HttpResponseForbidden()
+
     if not request.user.is_superuser:
         if Project.objects.filter(pi=request.user).exists():
             return HttpResponseForbidden()
