@@ -123,7 +123,7 @@ class TestHomeView:
             "a", href=reverse("imperial_coldfront_plugin:user_create_group")
         )
 
-    def test_standard_user_without_projects_and_pi_eligible(
+    def test_eligible_user_without_projects(
         self, request_, mocker, get_graph_api_client_mock
     ):
         """Test that PI-eligible users without projects see the self-service link."""
@@ -139,6 +139,67 @@ class TestHomeView:
 
         soup = BeautifulSoup(response.content, "html.parser")
         assert not soup.find("a", href=reverse("project-list"))
+        assert soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
+    def test_eligible_user_with_project(
+        self, request_, project, mocker, get_graph_api_client_mock
+    ):
+        """Test that PI-eligible users with projects see the self-service link."""
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_not_called()
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("a", href=reverse("project-list"))
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
+    def test_eligible_user_with_existing_project_membership(
+        self,
+        request_,
+        project,
+        mocker,
+        get_graph_api_client_mock,
+        user_factory,
+    ):
+        """Test PI eligible users with project membership see the self-service link."""
+        user = user_factory()
+        request_.user = user
+        from coldfront.core.project.models import (
+            ProjectUser,
+            ProjectUserRoleChoice,
+            ProjectUserStatusChoice,
+        )
+
+        project_user_active_status, _ = ProjectUserStatusChoice.objects.get_or_create(
+            name="Active"
+        )
+        project_user_role_manager, _ = ProjectUserRoleChoice.objects.get_or_create(
+            name="Manager"
+        )
+        ProjectUser.objects.create(
+            user=user,
+            project=project,
+            role=project_user_role_manager,
+            status=project_user_active_status,
+        )
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_called_once_with(user.username)
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("a", href=reverse("project-list"))
         assert soup.find(
             "a", href=reverse("imperial_coldfront_plugin:user_create_group")
         )

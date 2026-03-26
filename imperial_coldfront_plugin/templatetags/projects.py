@@ -18,7 +18,7 @@ register = template.Library()
 
 
 @register.simple_tag
-def get_user_projects(user: "User") -> QuerySet[ICLProject]:
+def get_user_project_memberships(user: "User") -> QuerySet[ICLProject]:
     """Return a queryset with a user's projects.
 
     Args:
@@ -30,6 +30,19 @@ def get_user_projects(user: "User") -> QuerySet[ICLProject]:
     return ProjectUser.objects.filter(user=user, status__name="Active").values(
         "project"
     )
+
+
+@register.simple_tag
+def get_user_owned_projects(user: "User") -> QuerySet[ICLProject]:
+    """Return a queryset with a user's owned projects.
+
+    Args:
+      user: The user whose owned projects are to be retrieved.
+
+    Returns:
+        A queryset of the user's active owned projects.
+    """
+    return ICLProject.objects.filter(pi=user, status__name="Active")
 
 
 @register.simple_tag
