@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('allocation', '0006_alter_historicalallocation_options_and_more'),
+        ("allocation", "0005_auto_20211117_1413"),
         ('imperial_coldfront_plugin', '0018_add_hx2_hx3_resources'),
     ]
 
