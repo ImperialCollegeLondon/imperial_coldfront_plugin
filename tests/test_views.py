@@ -115,7 +115,7 @@ class TestHomeView:
             "imperial_coldfront_plugin/overrides/authorized_home.html",
         )
         assert response.status_code == 200
-        get_graph_api_client_mock.user_profile.assert_not_called()
+        get_graph_api_client_mock().user_profile.assert_not_called()
 
         soup = BeautifulSoup(response.content, "html.parser")
         assert soup.find("a", href=reverse("project-list"))

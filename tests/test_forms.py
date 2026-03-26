@@ -275,7 +275,9 @@ class TestAdminProjectCreationForm(TestUserProjectCreationForm):
         form_data["username"] = "(£(£invalid"
         form = self.form_cls(data=form_data)
         assert not form.is_valid()
-        form.errors["group_id"] == "Name must contain only lowercase letters or numbers"
+        assert form.errors["group_id"] == [
+            "Name must contain only lowercase letters or numbers"
+        ]
 
     def test_group_id_from_username_validation_chars(
         self, form_data, get_graph_api_client_mock
@@ -284,7 +286,9 @@ class TestAdminProjectCreationForm(TestUserProjectCreationForm):
         form_data["username"] = "(£(£invalid"
         form = self.form_cls(data=form_data)
         assert not form.is_valid()
-        form.errors["group_id"] == "Name must contain only lowercase letters or numbers"
+        assert form.errors["group_id"] == [
+            "Name must contain only lowercase letters or numbers"
+        ]
 
     def test_group_id_from_username_validation_length(
         self, form_data, get_graph_api_client_mock
