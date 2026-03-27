@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 
@@ -150,6 +152,78 @@ class TestRDFAllocation:
 
 class TestICLProject:
     """Tests for the ICLProject model."""
+
+    def test_create_iclproject(self, user, settings):
+        """Test that the manager creates the project, membership, and attributes."""
+        from coldfront.core.field_of_science.models import FieldOfScience
+        from coldfront.core.project.models import (
+            ProjectAttributeType,
+            ProjectStatusChoice,
+            ProjectUserRoleChoice,
+            ProjectUserStatusChoice,
+        )
+
+        from imperial_coldfront_plugin.models import ICLProject
+
+        ProjectStatusChoice.objects.create(name="Active")
+        project_user_status = ProjectUserStatusChoice.objects.create(name="Active")
+        project_user_role = ProjectUserRoleChoice.objects.create(name="Manager")
+        field_of_science = FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
+
+        settings.GPFS_FILESYSTEM_NAME = "fsname"
+        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
+        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
+
+        faculty = "foe"
+        department = "dsde"
+        title = "group title"
+        description = "group_description"
+        ticket_id = "RQST3939393"
+
+        project = ICLProject.objects.create_iclproject(
+            title=title,
+            description=description,
+            field_of_science=field_of_science,
+            user=user,
+            faculty=faculty,
+            department=department,
+            group_id=user.username,
+            ticket_id=ticket_id,
+        )
+
+        assert project.title == title
+        assert project.pi == user
+        assert project.description == description
+
+        project_user = project.projectuser_set.get()
+        assert project_user.status == project_user_status
+        assert project_user.role == project_user_role
+
+        assert project.faculty == faculty
+        assert project.department == department
+        assert project.group_id == user.username
+
+        project.projectattribute_set.get(
+            proj_attr_type__name="Filesystem location",
+            value=str(
+                Path(
+                    settings.GPFS_FILESYSTEM_MOUNT_PATH,
+                    settings.GPFS_FILESYSTEM_NAME,
+                    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+                    faculty,
+                    department,
+                    user.username,
+                )
+            ),
+        )
+
+        ticket_attribute_type = ProjectAttributeType.objects.get(
+            name="ASK Ticket Reference"
+        )
+        project.projectattribute_set.get(
+            proj_attr_type=ticket_attribute_type,
+            value=ticket_id,
+        )
 
     def test_group_id(self, project):
         """Test that group_id returns the correct value."""

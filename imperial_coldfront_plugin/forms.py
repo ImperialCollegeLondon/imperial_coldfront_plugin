@@ -210,8 +210,8 @@ class DartIDForm(forms.Form):
         return dart_id
 
 
-class ProjectCreationForm(forms.ModelForm[ICLProject]):
-    """Form for creating a new research group (project)."""
+class UserProjectCreationForm(forms.ModelForm[ICLProject]):
+    """Form users to create their own project."""
 
     class Meta:
         """Meta class for the form."""
@@ -219,11 +219,30 @@ class ProjectCreationForm(forms.ModelForm[ICLProject]):
         model = ICLProject
         fields = ("title", "description", "field_of_science")
 
+    faculty = forms.ChoiceField(choices=get_faculty_choices)
+    department = forms.ChoiceField(choices=get_initial_department_choices)
+
+    def clean(self) -> dict[str, Any] | None:
+        """Check if the faculty and department combination is valid.
+
+        Raises:
+            ValidationError: If the combination is invalid.
+        """
+        cleaned_data = super().clean()
+        if cleaned_data:
+            faculty_id = cleaned_data["faculty"]
+            department_id = cleaned_data.get("department")
+            if department_id not in settings.DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
+                raise ValidationError("Invalid faculty and department combination.")
+        return cleaned_data
+
+
+class AdminProjectCreationForm(UserProjectCreationForm):
+    """Form for admins creating a new research group (project)."""
+
     username = forms.CharField(
         help_text="Username of group owner (must be a valid imperial username).",
     )
-    faculty = forms.ChoiceField(choices=get_faculty_choices)
-    department = forms.ChoiceField(choices=get_initial_department_choices)
     group_id = forms.CharField(
         required=False,
         min_length=3,
@@ -284,20 +303,6 @@ class ProjectCreationForm(forms.ModelForm[ICLProject]):
         ):
             raise ValidationError("Name already in use.")
         return group_id
-
-    def clean(self) -> dict[str, Any] | None:
-        """Check if the faculty and department combination is valid.
-
-        Raises:
-            ValidationError: If the combination is invalid.
-        """
-        cleaned_data = super().clean()
-        if cleaned_data:
-            faculty_id = cleaned_data["faculty"]
-            department_id = cleaned_data.get("department")
-            if department_id not in settings.DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
-                raise ValidationError("Invalid faculty and department combination.")
-        return cleaned_data
 
 
 class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
