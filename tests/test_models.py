@@ -263,33 +263,30 @@ class TestHX2Allocation:
         """Test that shortname returns the correct value."""
         assert hx2_allocation.shortname == hx2_allocation_group_id
 
-    def test_shortname_missing(self, hx2_allocation):
+    def test_shortname_missing(self, project, hx2_allocation):
         """Test that ValueError is raised when Shortname attribute is missing."""
-        from coldfront.core.allocation.models import AllocationAttribute
+        from coldfront.core.project.models import ProjectAttribute
 
-        AllocationAttribute.objects.filter(
-            allocation=hx2_allocation,
-            allocation_attribute_type__name="GID",
+        ProjectAttribute.objects.filter(
+            project=project,
+            proj_attr_type__name="Group ID",
         ).delete()
 
-        with pytest.raises(ValueError, match="GID attribute not found"):
+        with pytest.raises(ValueError, match="Group ID attribute not found"):
             hx2_allocation.shortname
 
-    def test_shortname_multiple(self, hx2_allocation):
+    def test_shortname_multiple(self, project, hx2_allocation):
         """Test that ValueError is raised when multiple Shortname attributes exist."""
-        from coldfront.core.allocation.models import (
-            AllocationAttribute,
-            AllocationAttributeType,
-        )
+        from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
 
-        attr_type = AllocationAttributeType.objects.get(name="GID")
-        AllocationAttribute.objects.create(
-            allocation_attribute_type=attr_type,
-            allocation=hx2_allocation,
+        attr_type = ProjectAttributeType.objects.get(name="Group ID")
+        ProjectAttribute.objects.create(
+            proj_attr_type=attr_type,
+            project=project,
             value="duplicate-short",
         )
 
-        with pytest.raises(ValueError, match="Multiple GID attributes"):
+        with pytest.raises(ValueError, match="Multiple Group ID attributes"):
             hx2_allocation.shortname
 
     def test_ldap_shortname(self, hx2_allocation, hx2_allocation_group_id, settings):

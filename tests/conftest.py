@@ -440,23 +440,18 @@ def enable_ldap(settings):
 @pytest.fixture
 def hx2_allocation_group_id():
     """Shortname applied to hx2_allocation fixture."""
-    return "test-group"
+    return "testuser"
 
 
 @pytest.fixture
 def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id):
     """A Coldfront allocation representing an HX2 RDF storage allocation."""
-    from coldfront.core.allocation.models import (
-        AllocationAttribute,
-        AllocationAttributeType,
-        AllocationStatusChoice,
-    )
+    from coldfront.core.allocation.models import AllocationStatusChoice
     from coldfront.core.resource.models import Resource
 
     from imperial_coldfront_plugin.models import HX2Allocation
 
     hx2_resource = Resource.objects.get(name="HX2")
-    group_id_attribute_type = AllocationAttributeType.objects.get(name="GID")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
     allocation = HX2Allocation.objects.create(
@@ -466,10 +461,4 @@ def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id
         end_date=datetime.date.today() + datetime.timedelta(days=365),
     )
     allocation.resources.add(hx2_resource)
-
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=group_id_attribute_type,
-        allocation=allocation,
-        value=hx2_allocation_group_id,
-    )
     return allocation

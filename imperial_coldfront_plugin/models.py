@@ -135,24 +135,20 @@ class HX2Allocation(Allocation):
             is_changeable=allocation.is_changeable,
         )
 
-    def _get_attribute(self, attribute_name: str) -> AllocationAttribute:
-        try:
-            return self.allocationattribute_set.get(
-                allocation_attribute_type__name=attribute_name
-            )
-        except AllocationAttribute.MultipleObjectsReturned:
-            raise ValueError(
-                f"Multiple {attribute_name} attributes found for allocation - {self}"
-            )
-        except (AllocationAttribute.DoesNotExist, AttributeError):
-            raise ValueError(
-                f"{attribute_name} attribute not found for allocation - {self}"
-            )
-
     @property
     def shortname(self) -> str:
-        """Get the shortname attribute of the allocation."""
-        value = self._get_attribute("GID").typed_value()
+        """Get the shortname attribute of the allocation, which is based on Group ID."""
+        try:
+            value = self.project.projectattribute_set.get(
+                proj_attr_type__name="Group ID"
+            ).value
+        except ProjectAttribute.MultipleObjectsReturned:
+            raise ValueError(
+                f"Multiple Group ID attributes found for allocation - {self}"
+            )
+        except (ProjectAttribute.DoesNotExist, AttributeError):
+            raise ValueError(f"Group ID attribute not found for allocation - {self}")
+
         if not isinstance(value, str):
             raise ValueError(f"Expected shortname to be a string, got {type(value)}")
         return value
