@@ -4,6 +4,7 @@ from imperial_coldfront_plugin.gid import (
     ALLOWED_GID_RANGES,
     NoGIDAvailableError,
     get_new_gid,
+    validate_gid_range_overlap,
     validate_gid_ranges,
 )
 
@@ -15,10 +16,10 @@ def test_get_new_gid_no_existing_gids(db, settings):
     when no existing GIDs are present.
     """
     # Override the GID_RANGES setting using the fixture
-    settings.GID_RANGES = [range(1000, 2000)]
+    settings.GID_RANGES = dict(test=[range(1000, 2000)])
 
     # Call the get_new_gid function
-    gid = get_new_gid()
+    gid = get_new_gid("test")
 
     # Assert that the returned GID is the start of the range
     assert gid == 1000
@@ -43,17 +44,17 @@ def test_get_new_gid(
     the range, at the end of the range, or outside the configured ranges.
     """
     # Override the GID_RANGES setting using the fixture
-    settings.GID_RANGES = [range(1000, 2000)]
+    settings.GID_RANGES = dict(test=[range(1000, 2000)])
 
     # Create an existing GID at the end of the range
     allocation_attribute_factory(name="GID", value=existing_gid)
     if raised_error:
         # Assert that NoGIDAvailableError is raised
         with pytest.raises(NoGIDAvailableError):
-            get_new_gid()
+            get_new_gid("test")
     else:
         # Call the get_new_gid function
-        gid = get_new_gid()
+        gid = get_new_gid("test")
         # Assert that the returned GID is the next available GID
         assert gid == existing_gid + 1
 
@@ -61,13 +62,13 @@ def test_get_new_gid(
 def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
     """Test when existing GID is smaller than the minimum of the range."""
     # Override the GID_RANGES setting using the fixture
-    settings.GID_RANGES = [range(1000, 2000)]
+    settings.GID_RANGES = dict(test=[range(1000, 2000)])
 
     # Create an existing GID outside the range
     allocation_attribute_factory(name="GID", value=999)
 
     # Call the get_new_gid function
-    gid = get_new_gid()
+    gid = get_new_gid("test")
 
     # Assert that the returned GID is the start of the range
     assert gid == 1000
@@ -76,13 +77,13 @@ def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
 def test_multiple_gid_ranges_overflow(settings, allocation_attribute_factory):
     """Test that gid selection moves to the next range if at the end of previous one."""
     # Override the GID_RANGES setting using the fixture
-    settings.GID_RANGES = [range(1000, 1100), range(2000, 2100)]
+    settings.GID_RANGES = dict(test=[range(1000, 1100), range(2000, 2100)])
 
     # Create an existing GID at the end of the first range
     allocation_attribute_factory(name="GID", value=1099)
 
     # Call the get_new_gid function
-    gid = get_new_gid()
+    gid = get_new_gid("test")
 
     # Assert that the returned GID is the start of the next range
     assert gid == 2000
@@ -91,13 +92,13 @@ def test_multiple_gid_ranges_overflow(settings, allocation_attribute_factory):
 def test_multiple_gid_ranges(settings, allocation_attribute_factory):
     """Test when multiple GID ranges are configured."""
     # Override the GID_RANGES setting using the fixture
-    settings.GID_RANGES = [range(1000, 1100), range(2000, 2100)]
+    settings.GID_RANGES = dict(test=[range(1000, 1100), range(2000, 2100)])
 
     # Create an existing GID in the second range
     allocation_attribute_factory(name="GID", value=2005)
 
     # Call the get_new_gid function
-    gid = get_new_gid()
+    gid = get_new_gid("test")
 
     # Assert that the returned GID is next in the second range
     assert gid == 2006
@@ -150,3 +151,22 @@ def test_invalid_gid_range_validation(invalid_ranges, msg_contains):
     """Test that invalid GID ranges raise ValueError."""
     with pytest.raises(ValueError, match=msg_contains):
         validate_gid_ranges(invalid_ranges)
+
+
+def test_validate_gid_range_overlap():
+    """Test that overlapping GID ranges raise ValueError."""
+    ranges = dict(
+        test1=[range(TEST_GID_START, TEST_GID_START + 500)],
+        test2=[range(TEST_GID_START + 500, TEST_GID_START + 1500)],
+    )
+    validate_gid_range_overlap(ranges)
+
+
+def test_validate_gid_range_overlap_with_overlap():
+    """Test that overlapping GID ranges across different types raise ValueError."""
+    ranges = dict(
+        test1=[range(TEST_GID_START, TEST_GID_START + 500)],
+        test2=[range(TEST_GID_START + 499, TEST_GID_START + 900)],
+    )
+    with pytest.raises(ValueError, match="Overlapping GID ranges detected"):
+        validate_gid_range_overlap(ranges)

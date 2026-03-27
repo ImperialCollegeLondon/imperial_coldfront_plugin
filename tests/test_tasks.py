@@ -180,7 +180,7 @@ def test_create_rdf_allocation(
         rdf_allocation_shortname,
     )
 
-    gid = get_new_gid()
+    gid = get_new_gid("rdf")
 
     form = RDFAllocationForm(data=rdf_form_data)
     assert form.is_valid(), f"Form errors: {form.errors}"
@@ -285,7 +285,7 @@ def test_create_rdf_allocation_gpfs_rollback(
     """Test create_rdf_allocation task rolls back on GPFS error."""
     # first gpfs call now raises an error
     gpfs_create_fileset_mock.side_effect = RuntimeError("oh no!")
-    gid = get_new_gid()
+    gid = get_new_gid("rdf")
     form = RDFAllocationForm(data=rdf_form_data)
     assert form.is_valid(), f"Form errors: {form.errors}"
     with pytest.raises(RuntimeError):

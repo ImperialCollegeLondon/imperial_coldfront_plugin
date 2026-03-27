@@ -18,10 +18,12 @@ class ImperialColdfrontPluginConfig(AppConfig):
         from django.conf import settings
 
         from . import signals  # noqa: F401
-        from .gid import validate_gid_ranges
+        from .gid import validate_gid_range_overlap, validate_gid_ranges
 
         django_stubs_ext.monkeypatch()
 
         # Ensure GID_RANGES setting is valid
         # do it here to avoid circular import issues
-        validate_gid_ranges(settings.GID_RANGES)
+        validate_gid_ranges(settings.GID_RANGES["hx2"])
+        validate_gid_ranges(settings.GID_RANGES["rdf"])
+        validate_gid_range_overlap(settings.GID_RANGES)
