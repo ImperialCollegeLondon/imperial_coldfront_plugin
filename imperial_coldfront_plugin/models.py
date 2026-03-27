@@ -30,6 +30,19 @@ class RDFAllocation(Allocation):
                     "RDFAllocation must be associated with the 'RDF Active' resource"
                 )
 
+    def __str__(self) -> str:
+        """String representation of the RDFAllocation."""
+        # this is overridden from the base Allocation to avoid including the resource in
+        # the string representation, as if an instance does not have a resource assigned
+        # this leads to errors when trying to print them. Without this override it's
+        # difficult to get any clean backtraces for error handling as they often involve
+        # printing the allocation which then raises an error due to the missing
+        # resource, which is often a symptom of the underlying issue rather than the
+        # root cause. By removing the resource from the string representation we can
+        # avoid these issues and get clearer error messages that point to the actual
+        # problem. V. annoying!!!
+        return f"RDFAllocation(id={self.pk}, project={self.project.title})"
+
     @classmethod
     def from_allocation(cls, allocation: Allocation) -> typing.Self:
         """Create an RDFAllocation instance from a base Allocation instance."""
