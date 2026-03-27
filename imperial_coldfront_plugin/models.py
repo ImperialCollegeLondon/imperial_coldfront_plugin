@@ -16,14 +16,19 @@ class RDFAllocation(Allocation):
 
         proxy = True
 
-    def clean(self) -> None:
-        """Clean and validate RDFAllocation."""
-        super().clean()
-        resource = self.get_parent_resource
-        if not resource or resource.name != "RDF Active":
-            raise ValueError(
-                "RDFAllocation must be associated with the 'RDF Active' resource"
-            )
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize RDFAllocation and validate resource association."""
+        super().__init__(*args, **kwargs)
+        if self.pk:
+            # Only validate resource association for existing allocations, as new
+            # allocations may not have a resource assigned yet. This allows for
+            # RDFAllocations to be created and then have the resource assigned
+            # afterwards without raising an error.
+            resource = self.get_parent_resource
+            if not resource or resource.name != "RDF Active":
+                raise ValueError(
+                    "RDFAllocation must be associated with the 'RDF Active' resource"
+                )
 
     @classmethod
     def from_allocation(cls, allocation: Allocation) -> typing.Self:

@@ -1,4 +1,8 @@
 import pytest
+from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
+from django.utils import timezone
+
+from imperial_coldfront_plugin.models import RDFAllocation
 
 
 class TestCreditTransaction:
@@ -146,6 +150,45 @@ class TestRDFAllocation:
         )
         with pytest.raises(ValueError):
             rdf_allocation.storage_quota_tb
+
+    def test_init_new_allocation(self, project):
+        """Test a new RDFAllocation can be initialized without a RDF resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        # should not raise an error
+        RDFAllocation(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+    def test_create(self, project):
+        """Test that RDFAllocation can be created without an RDF resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        RDFAllocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+    def test_init_for_saved_non_rdf_allocation(self, project):
+        """Test initialising RDFAllocation with saved nonRDF Allocation raises error."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+
+        # create a non-RDF allocation
+        allocation = Allocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+        with pytest.raises(ValueError):
+            RDFAllocation.objects.get(pk=allocation.pk)
+
+        with pytest.raises(ValueError):
+            RDFAllocation.from_allocation(allocation)
 
 
 class TestICLProject:
