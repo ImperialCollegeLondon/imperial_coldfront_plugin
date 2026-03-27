@@ -369,10 +369,13 @@ def create_credit_transaction(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = CreditTransactionForm(request.POST)
         if form.is_valid():
-            transaction = form.save()
+            transaction = form.save(commit=False)
+            transaction.authoriser = request.user.username
+            transaction.save()
             return redirect("project-detail", pk=transaction.project.pk)
     else:
         form = CreditTransactionForm()
+
     return render(
         request,
         "imperial_coldfront_plugin/credit_transaction_form.html",
@@ -393,10 +396,16 @@ def project_credit_transactions(
     )
 
     running = 0
-    rows: list[dict[str, int | CreditTransaction]] = []
+    rows: list[dict[str, int | str | CreditTransaction]] = []
     for transaction in transactions:
         running += transaction.amount
-        rows.append({"transaction": transaction, "running_balance": running})
+        rows.append(
+            {
+                "transaction": transaction,
+                "running_balance": running,
+                "authoriser": transaction.authoriser,
+            }
+        )
 
     return render(
         request,
