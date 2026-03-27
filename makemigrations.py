@@ -34,7 +34,7 @@ settings.configure(
         "timeout": 300,
         "retry": 600,
     },
-    GID_RANGES=[range(1031386, 1031435)],
+    GID_RANGES=dict(hx2=[], rdf=[]),
 )
 
 django.setup()
