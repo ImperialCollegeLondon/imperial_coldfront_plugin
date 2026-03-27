@@ -1,7 +1,9 @@
-import datetime
-from types import SimpleNamespace
-
 import pytest
+from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
+from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
+from django.utils import timezone
+
+from imperial_coldfront_plugin.models import HX2Allocation
 
 
 class TestCreditTransaction:
@@ -209,55 +211,44 @@ class TestICLProject:
 class TestHX2Allocation:
     """Tests for the HX2Allocation model."""
 
-    def test_clean_valid(self, hx2_allocation):
-        """Test that clean passes for a valid HX2 allocation."""
-        # This should not raise an error:
-        hx2_allocation.clean()
-
-    def test_clean_no_resource(self, hx2_allocation, mocker):
-        """Test that clean raises ValueError when there is no parent resource."""
-        mocker.patch.object(
-            type(hx2_allocation),
-            "get_parent_resource",
-            new_callable=lambda: property(lambda self: None),
+    def test_init_new_allocation(self, project):
+        """Test a new HX2Allocation can be initialised without a HX2 Resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        # Should not raise an error:
+        HX2Allocation(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
         )
-        with pytest.raises(ValueError, match="HX2"):
-            hx2_allocation.clean()
 
-    def test_from_allocation(self, rdf_allocation):
-        """Test that from_allocation correctly copies fields from a base Allocation."""
-        from imperial_coldfront_plugin.models import HX2Allocation
-
-        hx2 = HX2Allocation.from_allocation(rdf_allocation)
-
-        assert isinstance(hx2, HX2Allocation)
-        assert hx2.pk == rdf_allocation.pk
-        assert hx2.project == rdf_allocation.project
-        assert hx2.status == rdf_allocation.status
-        assert hx2.quantity == rdf_allocation.quantity
-        assert hx2.start_date == rdf_allocation.start_date
-        assert hx2.end_date == rdf_allocation.end_date
-        assert hx2.justification == rdf_allocation.justification
-        assert hx2.description == rdf_allocation.description
-        assert hx2.is_locked == rdf_allocation.is_locked
-        assert hx2.is_changeable == rdf_allocation.is_changeable
-
-    def test_from_allocation_invalid_resource(self, rdf_allocation, mocker):
-        """Test that clean raises when from_allocation is given a non-HX2 allocation."""
-        from imperial_coldfront_plugin.models import HX2Allocation
-
-        rdf_allocation.start_date = datetime.date.today()
-        rdf_allocation.end_date = datetime.date.today() + datetime.timedelta(days=365)
-        hx2 = HX2Allocation.from_allocation(rdf_allocation)
-        mocker.patch.object(
-            type(hx2),
-            "get_parent_resource",
-            new_callable=lambda: property(
-                lambda self: SimpleNamespace(name="RDF Allocation")
-            ),
+    def test_create(self, project):
+        """Test that HX2Allocation can be created without a HX2 resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        HX2Allocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
         )
-        with pytest.raises(ValueError, match="HX2"):
-            hx2.clean()
+
+    def test_init_for_saved_non_rdf_allocation(self, project):
+        """Test initialising HX2Allocation with non-HX2 Allocation raises error."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+
+        # create a non-RDF allocation
+        allocation = Allocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+        with pytest.raises(ValueError):
+            HX2Allocation.objects.get(pk=allocation.pk)
+
+        with pytest.raises(ValueError):
+            HX2Allocation.from_allocation(allocation)
 
     def test_shortname(self, hx2_allocation, hx2_allocation_group_id):
         """Test that shortname returns the correct value."""
@@ -265,8 +256,6 @@ class TestHX2Allocation:
 
     def test_shortname_missing(self, project, hx2_allocation):
         """Test that ValueError is raised when Shortname attribute is missing."""
-        from coldfront.core.project.models import ProjectAttribute
-
         ProjectAttribute.objects.filter(
             project=project,
             proj_attr_type__name="Group ID",
@@ -277,8 +266,6 @@ class TestHX2Allocation:
 
     def test_shortname_multiple(self, project, hx2_allocation):
         """Test that ValueError is raised when multiple Shortname attributes exist."""
-        from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
-
         attr_type = ProjectAttributeType.objects.get(name="Group ID")
         ProjectAttribute.objects.create(
             proj_attr_type=attr_type,

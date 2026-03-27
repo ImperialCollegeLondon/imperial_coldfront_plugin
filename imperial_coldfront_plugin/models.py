@@ -112,12 +112,23 @@ class HX2Allocation(Allocation):
 
         proxy = True
 
-    def clean(self) -> None:
-        """Clean and validate HX2Allocation."""
-        super().clean()
-        resource = self.get_parent_resource
-        if not resource or resource.name != "HX2":
-            raise ValueError("HX2Allocation must be associated with the 'HX2' resource")
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialise HX2Allocation and validate resource association."""
+        super().__init__(*args, **kwargs)
+        if self.pk:
+            # Only validate resource association for existing allocations, as new
+            # allocations may not have a resource assigned yet.
+            resource = self.get_parent_resource
+            if not resource or resource.name != "HX2":
+                raise ValueError(
+                    "HX2Allocation must be associated with the 'HX2' resource"
+                )
+
+    def __str__(self) -> str:
+        """String representation of HX2Allocation."""
+        # This is an override from the base Allocation to avoid including the resource.
+        # For further explanation see __str__ method of RDFAllocation.
+        return f"HX2Allocation(id={self.pk}, project={self.project.title})"
 
     @classmethod
     def from_allocation(cls, allocation: Allocation) -> typing.Self:
