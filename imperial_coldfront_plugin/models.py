@@ -310,6 +310,7 @@ class CreditTransaction(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     amount = models.IntegerField()
     description = models.CharField(max_length=255)
+    authoriser = models.CharField(max_length=255, default="")
     project = models.ForeignKey(ICLProject, on_delete=models.CASCADE)
 
     def __str__(self) -> str:
