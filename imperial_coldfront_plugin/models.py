@@ -84,7 +84,7 @@ class RDFAllocation(Allocation):
     @property
     def ldap_shortname(self) -> str:
         """Get the shortname of the allocation, with the LDAP prefix appended."""
-        return f"{settings.LDAP_SHORTNAME_PREFIX}{self.shortname}"
+        return f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{self.shortname}"
 
     @property
     def storage_quota_tb_attr(self) -> AllocationAttribute:
@@ -180,7 +180,7 @@ class HX2Allocation(Allocation):
     @property
     def ldap_shortname(self) -> str:
         """Get the shortname of the allocation, with the LDAP prefix appended."""
-        return f"{settings.LDAP_SHORTNAME_PREFIX}{self.shortname}"
+        return f"{settings.LDAP_HX2_SHORTNAME_PREFIX}{self.shortname}"
 
 
 class ICLProjectManager(models.Manager["ICLProject"]):

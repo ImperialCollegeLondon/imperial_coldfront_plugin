@@ -52,7 +52,7 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
     # dart_id = form_data["dart_id"]
     project = form_data["project"]
     shortname = form_data["allocation_shortname"]
-    ldap_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
+    ldap_name = f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
 
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     location_attribute_type = AllocationAttributeType.objects.get(
@@ -189,11 +189,10 @@ def check_ldap_consistency() -> list[Discrepancy]:
         allocationattribute__allocation_attribute_type__name="Shortname",
     ).distinct()
 
-    ldap_groups = ldap_group_member_search(f"{settings.LDAP_SHORTNAME_PREFIX}*")
+    ldap_groups = ldap_group_member_search(f"{settings.LDAP_RDF_SHORTNAME_PREFIX}*")
 
     for allocation in allocations:
-        shortname = allocation.shortname
-        group_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
+        group_name = allocation.ldap_shortname
 
         active_users = AllocationUser.objects.filter(
             allocation=allocation, status__name="Active"
@@ -256,14 +255,6 @@ def remove_allocation_group_members(allocation_id: int) -> None:
 
     allocation = RDFAllocation.objects.get(pk=allocation_id)
 
-    try:
-        shortname = allocation.shortname
-    except ValueError:
-        return
-
-    # Get the shortname/group_id from the allocation
-    group_id = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-
     # Get all active users from the database
     active_users = AllocationUser.objects.filter(
         allocation=allocation, status__name="Active"
@@ -272,7 +263,7 @@ def remove_allocation_group_members(allocation_id: int) -> None:
     # Remove each user from the LDAP group
     for allocation_user in active_users:
         ldap_remove_member_from_group(
-            group_id,
+            allocation.ldap_shortname,
             allocation_user.user.username,
             allow_missing=True,
         )
