@@ -1,11 +1,24 @@
 """Plugin Django models."""
 
 import typing
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from coldfront.core.allocation.models import Allocation, AllocationAttribute
-from coldfront.core.project.models import Project, ProjectAttribute
+from coldfront.core.project.models import (
+    Project,
+    ProjectAttribute,
+    ProjectAttributeType,
+    ProjectStatusChoice,
+    ProjectUser,
+    ProjectUserRoleChoice,
+    ProjectUserStatusChoice,
+)
 from django.conf import settings
 from django.db import models
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User as UserType
 
 
 class RDFAllocation(Allocation):
@@ -170,8 +183,88 @@ class HX2Allocation(Allocation):
         return f"{settings.LDAP_SHORTNAME_PREFIX}{self.shortname}"
 
 
+class ICLProjectManager(models.Manager["ICLProject"]):
+    """Manager for RDF projects."""
+
+    def create_iclproject(
+        self,
+        *,
+        title: str,
+        description: str,
+        field_of_science: object,
+        user: "UserType",
+        faculty: str,
+        department: str,
+        group_id: str,
+        ticket_id: str = "",
+    ) -> "ICLProject":
+        """Create a new ICL project from validated data."""
+        project_obj = self.model(
+            title=title,
+            description=description,
+            field_of_science=field_of_science,
+            status=ProjectStatusChoice.objects.get(name="Active"),
+            pi=user,
+        )
+        project_obj.save()
+        ProjectUser.objects.create(
+            user=user,
+            project=project_obj,
+            role=ProjectUserRoleChoice.objects.get(name="Manager"),
+            status=ProjectUserStatusChoice.objects.get(name="Active"),
+        )
+        group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
+        location_attribute_type = ProjectAttributeType.objects.get(
+            name="Filesystem location"
+        )
+        department_attribute_type = ProjectAttributeType.objects.get(name="Department")
+        faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
+        ProjectAttribute.objects.create(
+            proj_attr_type=department_attribute_type,
+            project=project_obj,
+            value=department,
+        )
+        ProjectAttribute.objects.create(
+            proj_attr_type=faculty_attribute_type,
+            project=project_obj,
+            value=faculty,
+        )
+        ProjectAttribute.objects.create(
+            proj_attr_type=group_id_attribute_type,
+            project=project_obj,
+            value=group_id,
+        )
+        ProjectAttribute.objects.create(
+            proj_attr_type=location_attribute_type,
+            project=project_obj,
+            value=str(
+                Path(
+                    settings.GPFS_FILESYSTEM_MOUNT_PATH,
+                    settings.GPFS_FILESYSTEM_NAME,
+                    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+                    faculty,
+                    department,
+                    group_id,
+                )
+            ),
+        )
+        if ticket_id:
+            ticket_attribute_type = ProjectAttributeType.objects.get(
+                name="ASK Ticket Reference"
+            )
+            ProjectAttribute.objects.create(
+                proj_attr_type=ticket_attribute_type,
+                project=project_obj,
+                value=ticket_id,
+            )
+
+        return project_obj
+
+
 class ICLProject(Project):
     """Proxy model for RDF Projects."""
+
+    objects = ICLProjectManager()
 
     class Meta:
         """Meta class for ICLProject."""

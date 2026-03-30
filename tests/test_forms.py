@@ -2,16 +2,19 @@ from datetime import datetime, timedelta
 from random import choices
 
 import pytest
+from django import forms
 from django.conf import settings
 
 from imperial_coldfront_plugin.forms import (
+    AdminProjectCreationForm,
     CreditTransactionForm,
-    ProjectCreationForm,
     RDFAllocationForm,
+    UserProjectCreationForm,
     get_department_choices,
     get_faculty_choices,
     get_initial_department_choices,
 )
+from imperial_coldfront_plugin.models import ICLProject
 
 
 def test_get_faculty_choices():
@@ -160,8 +163,8 @@ def test_get_or_create_user(
 
 
 @pytest.fixture
-def project_form_data(user):
-    """Fixture to provide RDFAllocationForm data."""
+def user_project_form_data(db):
+    """Fixture to provide UserProjectCreationForm data."""
     from coldfront.core.field_of_science.models import FieldOfScience
 
     field_of_science_other, _ = FieldOfScience.objects.get_or_create(
@@ -175,128 +178,151 @@ def project_form_data(user):
         title="project title",
         description="A description fdor the project",
         field_of_science=field_of_science_other.pk,
-        username=user.username,
         faculty=faculty_id,
         department=department_id,
     )
 
 
-def test_project_form_clean_valid_combination(project_form_data):
-    """Test that RDFAllocationForm.clean() raises a ValidationError."""
-    form = ProjectCreationForm(data=project_form_data)
-    assert form.is_valid()
+@pytest.fixture
+def admin_project_form_data(user, user_project_form_data):
+    """Fixture to provide AdminProjectCreationForm data."""
+    return {
+        **user_project_form_data,
+        "username": user.username,
+    }
 
 
-def test_project_form_clean_invalid_combination(project_form_data):
-    """Test that RDFAllocationForm.clean() raises a ValidationError."""
-    # choose department from a different faculty
-    project_form_data["department"] = settings.DEPARTMENTS_IN_FACULTY["fons"][0]
-    form = ProjectCreationForm(data=project_form_data)
-    assert not form.is_valid()
-    assert form.errors == dict(__all__=["Invalid faculty and department combination."])
+class TestUserProjectCreationForm:
+    """Tests for UserProjectCreationForm."""
+
+    form_cls: type[forms.ModelForm[ICLProject]] = UserProjectCreationForm
+
+    @pytest.fixture
+    def form_data(self, user_project_form_data):
+        """Fixture to provide form data for the configured form class."""
+        return user_project_form_data
+
+    def test_clean_valid_combination(self, form_data):
+        """Test that the form accepts a valid faculty/department pair."""
+        form = self.form_cls(data=form_data)
+        assert form.is_valid()
+
+    def test_clean_invalid_combination(self, form_data):
+        """Test that the form rejects an invalid faculty/department pair."""
+        form_data["department"] = settings.DEPARTMENTS_IN_FACULTY["fons"][0]
+        form = self.form_cls(data=form_data)
+        assert not form.is_valid()
+        assert form.errors == dict(
+            __all__=["Invalid faculty and department combination."]
+        )
 
 
-def test_project_form_group_id_blank(project_form_data):
-    """Test that group_id value is derived from username if blank."""
-    form = ProjectCreationForm(data=project_form_data)
-    assert form.is_valid()
-    assert form.cleaned_data["group_id"] == project_form_data["username"]
+class TestAdminProjectCreationForm(TestUserProjectCreationForm):
+    """Tests for AdminProjectCreationForm."""
 
+    form_cls = AdminProjectCreationForm
 
-@pytest.mark.parametrize("group_id,passes", PATH_COMPONENT_COMBINATIONS)
-def test_project_form_group_id_characters(group_id, passes, db, project_form_data):
-    """Test that valid characters are being checked for group_id field."""
-    project_form_data["group_id"] = group_id
-    form = ProjectCreationForm(data=project_form_data)
-    form.is_valid()
-    if passes:
-        assert not form.errors.get("group_id")
-    else:
+    @pytest.fixture
+    def form_data(self, admin_project_form_data):
+        """Fixture to provide form data for the configured form class."""
+        return admin_project_form_data
+
+    def test_group_id_blank(self, form_data):
+        """Test that group_id value is derived from username if blank."""
+        form = self.form_cls(data=form_data)
+        assert form.is_valid()
+        assert form.cleaned_data["group_id"] == form_data["username"]
+
+    @pytest.mark.parametrize("group_id,passes", PATH_COMPONENT_COMBINATIONS)
+    def test_group_id_characters(self, group_id, passes, db, form_data):
+        """Test that valid characters are being checked for group_id field."""
+        form_data["group_id"] = group_id
+        form = self.form_cls(data=form_data)
+        form.is_valid()
+        if passes:
+            assert not form.errors.get("group_id")
+        else:
+            assert form.errors["group_id"] == [
+                "Name must contain only lowercase letters or numbers"
+            ]
+
+    def test_group_id_min_length(self, settings, form_data):
+        """Test that min length is being checked for group_id field."""
+        form_data["group_id"] = "".join(
+            choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=2)
+        )
+        form = self.form_cls(data=form_data)
+        form.is_valid()
+        assert form.errors["group_id"] == [
+            "Ensure this value has at least 3 characters (it has 2)."
+        ]
+
+    def test_group_id_max_length(self, settings, form_data):
+        """Test that max length is being checked for group_id field."""
+        form_data["group_id"] = "".join(
+            choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=13)
+        )
+        form = self.form_cls(data=form_data)
+        form.is_valid()
+        assert form.errors["group_id"] == [
+            "Ensure this value has at most 12 characters (it has 13)."
+        ]
+
+    def test_group_id_from_username_validation(
+        self, form_data, get_graph_api_client_mock
+    ):
+        """Test that group_id is validated even if it is derived from the username."""
+        form_data["username"] = "(£(£invalid"
+        form = self.form_cls(data=form_data)
+        assert not form.is_valid()
         assert form.errors["group_id"] == [
             "Name must contain only lowercase letters or numbers"
         ]
 
+    def test_group_id_from_username_validation_chars(
+        self, form_data, get_graph_api_client_mock
+    ):
+        """Test that group_id chars are validated when derived from the username."""
+        form_data["username"] = "(£(£invalid"
+        form = self.form_cls(data=form_data)
+        assert not form.is_valid()
+        assert form.errors["group_id"] == [
+            "Name must contain only lowercase letters or numbers"
+        ]
 
-def test_project_form_group_id_min_length(settings, project_form_data):
-    """Test that min length is being checked for allocation_shortname field."""
-    project_form_data["group_id"] = "".join(
-        choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=2)
-    )
-    form = ProjectCreationForm(data=project_form_data)
-    form.is_valid()
-    assert form.errors["group_id"] == [
-        "Ensure this value has at least 3 characters (it has 2)."
-    ]
+    def test_group_id_from_username_validation_length(
+        self, form_data, get_graph_api_client_mock
+    ):
+        """Test that group_id length is validated when derived from the username."""
+        form_data["username"] = "ao"
+        form = self.form_cls(data=form_data)
+        assert not form.is_valid()
+        form.errors["group_id"] == ["Must be between 3 and 12 characters."]
 
+    def test_group_id_unique(self, project, form_data):
+        """Test that uniqueness is being checked for group_id field."""
+        form_data["group_id"] = project.pi.username
+        form = self.form_cls(data=form_data)
+        assert not form.is_valid()
+        assert form.errors["group_id"] == ["Name already in use."]
 
-def test_project_form_group_id_max_length(settings, project_form_data):
-    """Test that max length is being checked for allocation_shortname field."""
-    project_form_data["group_id"] = "".join(
-        choices(list(settings.PATH_COMPONENT_VALID_CHARACTERS), k=13)
-    )
-    form = ProjectCreationForm(data=project_form_data)
-    form.is_valid()
-    assert form.errors["group_id"] == [
-        "Ensure this value has at most 12 characters (it has 13)."
-    ]
+    def test_group_id_overrides_username(self, form_data):
+        """Test that group_id value overrides username if provided."""
+        group_id = "override"
+        form_data["group_id"] = group_id
+        form = self.form_cls(data=form_data)
+        assert form.is_valid()
+        assert form.cleaned_data["group_id"] == group_id
 
-
-def test_project_form_group_id_from_username_validation(
-    project_form_data, get_graph_api_client_mock
-):
-    """Test that group_id is validated even if it is derived from the username."""
-    project_form_data["username"] = "(£(£invalid"
-    form = ProjectCreationForm(data=project_form_data)
-    assert not form.is_valid()
-    form.errors["group_id"] == "Name must contain only lowercase letters or numbers"
-
-
-def test_project_form_group_id_from_username_validation_chars(
-    project_form_data, get_graph_api_client_mock
-):
-    """Test that group_id chars are validated even when derived from the username."""
-    project_form_data["username"] = "(£(£invalid"
-    form = ProjectCreationForm(data=project_form_data)
-    assert not form.is_valid()
-    form.errors["group_id"] == "Name must contain only lowercase letters or numbers"
-
-
-def test_project_form_group_id_from_username_validation_length(
-    project_form_data, get_graph_api_client_mock
-):
-    """Test that group_id lengeth is validated even when derived from the username."""
-    project_form_data["username"] = "ao"
-    form = ProjectCreationForm(data=project_form_data)
-    assert not form.is_valid()
-    form.errors["group_id"] == ["Must be between 3 and 12 characters."]
-
-
-def test_project_form_group_id_unique(project, project_form_data):
-    """Test that uniqueness is being checked for group_id field."""
-    project_form_data["group_id"] = project.pi.username
-    form = ProjectCreationForm(data=project_form_data)
-    assert not form.is_valid()
-    assert form.errors["group_id"] == ["Name already in use."]
-
-
-def test_project_form_group_id_overrides_username(project_form_data):
-    """Test that group_id value overrides username if provided."""
-    group_id = "override"
-    project_form_data["group_id"] = group_id
-    form = ProjectCreationForm(data=project_form_data)
-    assert form.is_valid()
-    assert form.cleaned_data["group_id"] == group_id
-
-
-def test_project_form_group_id_without_username(project_form_data):
-    """Test that group_id is picked up even if username is not provided."""
-    del project_form_data["username"]
-    group_id = "groupgroup"
-    project_form_data["group_id"] = group_id
-    form = ProjectCreationForm(data=project_form_data)
-    assert not form.is_valid()
-    assert form.cleaned_data["group_id"] == group_id
-    assert "group_id" not in form.errors
+    def test_group_id_without_username(self, form_data):
+        """Test that group_id is picked up even if username is not provided."""
+        del form_data["username"]
+        group_id = "groupgroup"
+        form_data["group_id"] = group_id
+        form = self.form_cls(data=form_data)
+        assert not form.is_valid()
+        assert form.cleaned_data["group_id"] == group_id
+        assert "group_id" not in form.errors
 
 
 def test_credit_transaction_form_valid(project):

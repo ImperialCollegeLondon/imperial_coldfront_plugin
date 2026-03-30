@@ -77,7 +77,7 @@ def pytest_configure():
         EMAIL_SIGNATURE="",
         CENTER_NAME="",
         CENTER_BASE_URL="",
-        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE"],
+        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE", "ENABLE_USER_GROUP_CREATION"],
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
@@ -97,6 +97,7 @@ def pytest_configure():
             GID_RANGES=[range(1031386, 1031435)],
             GPFS_ALLOCATION_CREATION_SLEEP=0,
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
+            ENABLE_USER_GROUP_CREATION=True,
         ),  # override settings loaded by env var for tests
     )
 
