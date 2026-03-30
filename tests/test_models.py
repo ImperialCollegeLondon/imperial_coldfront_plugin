@@ -306,7 +306,7 @@ class TestHX2Allocation:
             end_date=timezone.now(),
         )
 
-    def test_init_for_saved_non_rdf_allocation(self, project):
+    def test_init_for_saved_non_hx2_allocation(self, project):
         """Test initialising HX2Allocation with non-HX2 Allocation raises error."""
         active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
 
