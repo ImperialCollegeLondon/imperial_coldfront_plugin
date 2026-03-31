@@ -193,8 +193,6 @@ def remove_ldap_group_members_if_allocation_inactive(
     if rdf_allocation.status.name == "Active":
         return
 
-    rdf_allocation.ldap_shortname
-
     async_task(remove_allocation_group_members, instance.pk)
 
 
