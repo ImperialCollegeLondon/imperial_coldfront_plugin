@@ -178,7 +178,7 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
 
 
 def check_ldap_consistency() -> list[Discrepancy]:
-    """Check the consistency of LDAP groups with the database."""
+    """Check the consistency of LDAP groups with the RDF Active allocations."""
     if not settings.LDAP_ENABLED:
         return []
 
