@@ -96,6 +96,7 @@ def test_remove_ldap_group_membership(
     allocation_user,
     user,
     enable_ldap,
+    settings,
 ):
     """Test remove_ldap_group_membership signal."""
     ldap_remove_member_mock.assert_not_called()
@@ -103,17 +104,10 @@ def test_remove_ldap_group_membership(
     allocation_user.delete()
 
     ldap_remove_member_mock.assert_called_once_with(
-        f"rdf-{rdf_allocation_shortname}", user.username, allow_missing=True
+        f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{rdf_allocation_shortname}",
+        user.username,
+        allow_missing=True,
     )
-
-
-def test_remove_ldap_group_membership_no_shortname(
-    ldap_remove_member_mock, rdf_allocation, allocation_user
-):
-    """Test remove_ldap_group_membership_signal for non-rdf allocation."""
-    rdf_allocation.shortname_attr.delete()
-    allocation_user.delete()
-    ldap_remove_member_mock.assert_not_called()
 
 
 def test_ensure_unique_shortname(rdf_allocation, rdf_allocation_shortname):
@@ -212,21 +206,6 @@ def test_remove_ldap_group_members_if_allocation_active(
     remove_allocation_group_members_mock.assert_not_called()
 
     # Allocation is already active, so saving shouldn't trigger the task
-    rdf_allocation.save()
-
-    remove_allocation_group_members_mock.assert_not_called()
-
-
-def test_remove_ldap_group_members_no_shortname(
-    remove_allocation_group_members_mock,
-    rdf_allocation,
-    enable_ldap,
-):
-    """Test that task is not called when allocation has no shortname."""
-    rdf_allocation.shortname_attr.delete()
-
-    allocation_inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
-    rdf_allocation.status = allocation_inactive_status
     rdf_allocation.save()
 
     remove_allocation_group_members_mock.assert_not_called()

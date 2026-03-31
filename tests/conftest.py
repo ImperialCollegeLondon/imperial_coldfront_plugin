@@ -316,7 +316,7 @@ def rdf_allocation_shortname(settings):
 @pytest.fixture
 def rdf_allocation_ldap_name(settings, rdf_allocation_shortname):
     """LDAP group name associated with rdf_allocation fixture."""
-    return f"{settings.LDAP_SHORTNAME_PREFIX}{rdf_allocation_shortname}"
+    return f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{rdf_allocation_shortname}"
 
 
 @pytest.fixture

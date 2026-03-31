@@ -352,12 +352,12 @@ class TestHX2Allocation:
 
     def test_ldap_shortname(self, hx2_allocation, hx2_allocation_group_id, settings):
         """Test that ldap_shortname returns shortname with LDAP prefix."""
-        settings.LDAP_SHORTNAME_PREFIX = "ldap-"
+        settings.LDAP_HX2_SHORTNAME_PREFIX = "ldap-"
         assert hx2_allocation.ldap_shortname == f"ldap-{hx2_allocation_group_id}"
 
     def test_ldap_shortname_empty_prefix(
         self, hx2_allocation, hx2_allocation_group_id, settings
     ):
         """Test that ldap_shortname works with an empty prefix."""
-        settings.LDAP_SHORTNAME_PREFIX = ""
+        settings.LDAP_HX2_SHORTNAME_PREFIX = ""
         assert hx2_allocation.ldap_shortname == hx2_allocation_group_id
