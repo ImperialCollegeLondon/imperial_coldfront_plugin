@@ -473,7 +473,7 @@ def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id
 
 @pytest.fixture
 def hx2_allocation_user(allocation_user_active_status, hx2_allocation, user):
-    """Provides an active user for rdf_allocation fixture."""
+    """Provides an active user for hx2_allocation fixture."""
     from coldfront.core.allocation.models import AllocationUser
 
     return AllocationUser.objects.create(

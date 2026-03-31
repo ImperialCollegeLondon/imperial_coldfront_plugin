@@ -419,13 +419,13 @@ class TestCheckHX2LdapConsistency:
     def test_check_ldap_consistency_no_discrepancies(
         self,
         hx2_allocation,
-        allocation_user,
+        hx2_allocation_user,
         ldap_group_search_mock,
         notify_mock,
         hx2_allocation_ldap_name,
     ):
         """Test when everything is in sync between Coldfront and AD."""
-        username = allocation_user.user.username
+        username = hx2_allocation_user.user.username
         ldap_group_search_mock.return_value = {hx2_allocation_ldap_name: [username]}
 
         result = check_hx2_ldap_consistency()
@@ -450,8 +450,6 @@ class TestCheckHX2LdapConsistency:
 
         assert len(result) == 1
         discrepancy = result[0]
-        print(discrepancy)
-        print(hx2_allocation.id)
         assert discrepancy["allocation_id"] == hx2_allocation.id
         assert discrepancy["group_name"] == hx2_allocation_ldap_name
         assert discrepancy["project_name"] == hx2_allocation.project.title
@@ -982,7 +980,7 @@ class TestCheckQuotaConsistency:
 
     @pytest.mark.parametrize(
         "alloc_storage_quota, alloc_files_quota, gpfs_storage_quota, gpfs_files_quota,"
-        "fileset_shortname, expected_discrpancy",
+        "fileset_shortname, expected_discrepancy",
         [
             # Case 1: No discrepancies
             (
@@ -1066,7 +1064,7 @@ class TestCheckQuotaConsistency:
         gpfs_storage_quota,
         gpfs_files_quota,
         fileset_shortname,
-        expected_discrpancy,
+        expected_discrepancy,
     ):
         """Test check_quota_consistency task."""
         from imperial_coldfront_plugin.tasks import check_quota_consistency
@@ -1086,10 +1084,10 @@ class TestCheckQuotaConsistency:
 
         check_quota_consistency()
 
-        # Checks that the proper discrepancies have been logged (or nonea at all).
-        if expected_discrpancy:
+        # Checks that the proper discrepancies have been logged (or none at all).
+        if expected_discrepancy:
             send_quota_discrepancy_notification_mock.assert_called_once_with(
-                expected_discrpancy
+                expected_discrepancy
             )
         else:
             send_quota_discrepancy_notification_mock.assert_not_called()
