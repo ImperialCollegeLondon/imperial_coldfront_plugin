@@ -17,7 +17,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from imperial_coldfront_plugin.models import RDFAllocation
+from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
 
 from .emails import (
     Discrepancy,
@@ -190,6 +190,49 @@ def check_ldap_consistency() -> list[Discrepancy]:
     ).distinct()
 
     ldap_groups = ldap_group_member_search(f"{settings.LDAP_RDF_SHORTNAME_PREFIX}*")
+
+    for allocation in allocations:
+        group_name = allocation.ldap_shortname
+
+        active_users = AllocationUser.objects.filter(
+            allocation=allocation, status__name="Active"
+        )
+        expected_usernames = [au.user.username for au in active_users]
+
+        actual_members = ldap_groups.get(group_name, [])
+        missing_members = set(expected_usernames) - set(actual_members)
+        extra_members = set(actual_members) - set(expected_usernames)
+
+        if missing_members or extra_members:
+            discrepancies.append(
+                {
+                    "allocation_id": allocation.id,
+                    "group_name": group_name,
+                    "project_name": allocation.project.title,
+                    "missing_members": list(missing_members),
+                    "extra_members": list(extra_members),
+                }
+            )
+
+    if discrepancies:
+        send_discrepancy_notification(discrepancies)
+
+    return discrepancies
+
+
+def check_hx2_ldap_consistency() -> list[Discrepancy]:
+    """Check the consistency of LDAP groups with the HX2 allocations in the database."""
+    if not settings.LDAP_ENABLED:
+        return []
+
+    discrepancies: list[Discrepancy] = []
+    allocations = HX2Allocation.objects.filter(
+        resources__name="HX2",
+        status__name="Active",
+        project__projectattribute__proj_attr_type__name="Group ID",
+    ).distinct()
+
+    ldap_groups = ldap_group_member_search(f"{settings.LDAP_HX2_SHORTNAME_PREFIX}*")
 
     for allocation in allocations:
         group_name = allocation.ldap_shortname
