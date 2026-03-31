@@ -29,14 +29,32 @@ class RDFAllocation(Allocation):
 
         proxy = True
 
-    def clean(self) -> None:
-        """Clean and validate RDFAllocation."""
-        super().clean()
-        resource = self.get_parent_resource
-        if not resource or resource.name != "RDF Active":
-            raise ValueError(
-                "RDFAllocation must be associated with the 'RDF Active' resource"
-            )
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize RDFAllocation and validate resource association."""
+        super().__init__(*args, **kwargs)
+        if self.pk:
+            # Only validate resource association for existing allocations, as new
+            # allocations may not have a resource assigned yet. This allows for
+            # RDFAllocations to be created and then have the resource assigned
+            # afterwards without raising an error.
+            resource = self.get_parent_resource
+            if not resource or resource.name != "RDF Active":
+                raise ValueError(
+                    "RDFAllocation must be associated with the 'RDF Active' resource"
+                )
+
+    def __str__(self) -> str:
+        """String representation of the RDFAllocation."""
+        # this is overridden from the base Allocation to avoid including the resource in
+        # the string representation, as if an instance does not have a resource assigned
+        # this leads to errors when trying to print them. Without this override it's
+        # difficult to get any clean backtraces for error handling as they often involve
+        # printing the allocation which then raises an error due to the missing
+        # resource, which is often a symptom of the underlying issue rather than the
+        # root cause. By removing the resource from the string representation we can
+        # avoid these issues and get clearer error messages that point to the actual
+        # problem. V. annoying!!!
+        return f"RDFAllocation(id={self.pk}, project={self.project.title})"
 
     @classmethod
     def from_allocation(cls, allocation: Allocation) -> typing.Self:
