@@ -414,7 +414,7 @@ class TestCheckLdapConsistency:
 
 
 class TestCheckHX2LdapConsistency:
-    """Tests for check_ldap_consistency task."""
+    """Tests for check_hx2_ldap_consistency task."""
 
     def test_check_ldap_consistency_no_discrepancies(
         self,
