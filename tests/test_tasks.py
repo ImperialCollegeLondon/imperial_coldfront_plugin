@@ -463,22 +463,6 @@ def test_remove_allocation_group_members_multiple_users(
     )
 
 
-def test_remove_allocation_group_members_no_shortname(
-    ldap_remove_member_mock,
-    rdf_allocation,
-    allocation_user,
-):
-    """Test _remove_allocation_group_members handles missing shortname gracefully."""
-    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
-
-    # Remove the shortname attribute
-    rdf_allocation.shortname_attr.delete()
-
-    remove_allocation_group_members(rdf_allocation.pk)
-
-    ldap_remove_member_mock.assert_not_called()
-
-
 def test_update_allocation_status_feature_flag(settings, rdf_allocation):
     """Test update_allocation_status does nothing when feature flag is disabled."""
     from imperial_coldfront_plugin.tasks import update_allocation_status

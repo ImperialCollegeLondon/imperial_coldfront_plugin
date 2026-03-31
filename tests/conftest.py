@@ -1,5 +1,6 @@
 """Pytest configuration."""
 
+import datetime
 import pkgutil
 from random import choices
 from string import ascii_lowercase
@@ -76,7 +77,7 @@ def pytest_configure():
         EMAIL_SIGNATURE="",
         CENTER_NAME="",
         CENTER_BASE_URL="",
-        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE"],
+        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE", "ENABLE_USER_GROUP_CREATION"],
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
@@ -96,6 +97,7 @@ def pytest_configure():
             GID_RANGES=[range(1031386, 1031435)],
             GPFS_ALLOCATION_CREATION_SLEEP=0,
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
+            ENABLE_USER_GROUP_CREATION=True,
         ),  # override settings loaded by env var for tests
     )
 
@@ -314,7 +316,7 @@ def rdf_allocation_shortname(settings):
 @pytest.fixture
 def rdf_allocation_ldap_name(settings, rdf_allocation_shortname):
     """LDAP group name associated with rdf_allocation fixture."""
-    return f"{settings.LDAP_SHORTNAME_PREFIX}{rdf_allocation_shortname}"
+    return f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{rdf_allocation_shortname}"
 
 
 @pytest.fixture
@@ -434,3 +436,30 @@ def signals_async_task_mock(mocker):
 def enable_ldap(settings):
     """Fixture to enable LDAP in settings."""
     settings.LDAP_ENABLED = True
+
+
+@pytest.fixture
+def hx2_allocation_group_id():
+    """Shortname applied to hx2_allocation fixture."""
+    return "testuser"
+
+
+@pytest.fixture
+def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id):
+    """A Coldfront allocation representing an HX2 RDF storage allocation."""
+    from coldfront.core.allocation.models import AllocationStatusChoice
+    from coldfront.core.resource.models import Resource
+
+    from imperial_coldfront_plugin.models import HX2Allocation
+
+    hx2_resource = Resource.objects.get(name="HX2")
+
+    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+    allocation = HX2Allocation.objects.create(
+        project=project,
+        status=allocation_active_status,
+        start_date=datetime.date.today(),
+        end_date=datetime.date.today() + datetime.timedelta(days=365),
+    )
+    allocation.resources.add(hx2_resource)
+    return allocation

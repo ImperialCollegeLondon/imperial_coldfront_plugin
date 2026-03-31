@@ -90,8 +90,10 @@ LDAP_GROUP_OU = ENV.str(
     default="OU=RCS,OU=Groups,OU=Imperial College (London),DC=ic,DC=ac,DC=uk",
 )
 """The organisational unit containing RDF access groups."""
-LDAP_SHORTNAME_PREFIX = "rdf-"
-"""Prefix added to allocation shortname for corresponding Active Directory group."""
+LDAP_RDF_SHORTNAME_PREFIX = ENV.str("LDAP_RDF_SHORTNAME_PREFIX", default="rdfdev-")
+"""Prefix added to allocation shortname for RDF Active Directory group."""
+LDAP_HX2_SHORTNAME_PREFIX = ENV.str("LDAP_HX2_SHORTNAME_PREFIX", default="hx2dev-")
+"""Prefix added to allocation shortname for HX2 Active Directory group."""
 
 AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
 """The Active Directory domain."""
@@ -171,3 +173,6 @@ GPFS_ALLOCATION_CREATION_SLEEP = ENV.int("GPFS_ALLOCATION_CREATION_SLEEP", defau
 
 RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = 7
 """Number of days after an allocation expires to unlink from project."""
+
+ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=False)
+"""Feature flag to enable or disable creation of user groups for allocations."""

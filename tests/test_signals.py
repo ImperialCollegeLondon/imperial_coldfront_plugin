@@ -96,6 +96,7 @@ def test_remove_ldap_group_membership(
     allocation_user,
     user,
     enable_ldap,
+    settings,
 ):
     """Test remove_ldap_group_membership signal."""
     ldap_remove_member_mock.assert_not_called()
@@ -103,7 +104,9 @@ def test_remove_ldap_group_membership(
     allocation_user.delete()
 
     ldap_remove_member_mock.assert_called_once_with(
-        f"rdf-{rdf_allocation_shortname}", user.username, allow_missing=True
+        f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{rdf_allocation_shortname}",
+        user.username,
+        allow_missing=True,
     )
 
 
