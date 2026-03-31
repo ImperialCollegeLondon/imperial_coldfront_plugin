@@ -146,13 +146,13 @@ class TestProjectAttributeEnsureUniqueGroupID:
 
 @pytest.fixture
 def allocation_active_status(db):
-    """Fixture to create an Active AllocationUserStatusChoice."""
+    """Fixture to create an Active AllocationStatusChoice."""
     return AllocationStatusChoice.objects.get_or_create(name="Active")[0]
 
 
 @pytest.fixture
 def allocation_inactive_status(db):
-    """Fixture to create an Inactive AllocationUserStatusChoice."""
+    """Fixture to create an Inactive AllocationStatusChoice."""
     return AllocationStatusChoice.objects.get_or_create(name="Inactive")[0]
 
 
@@ -461,12 +461,12 @@ class TestAllocationExpiryZeroQuota:
     def test_skips_new_allocations(
         self,
         project,
-        remove_allocation_group_members_mock,
+        zero_quota_mock,
         expired_status,
     ):
         """Test that creating new allocation does not trigger the task (pk is None)."""
         Allocation.objects.create(project=project, status=expired_status)
-        remove_allocation_group_members_mock.assert_not_called()
+        zero_quota_mock.assert_not_called()
 
     def test_non_rdf_allocation(
         self, project, zero_quota_mock, allocation_active_status, expired_status

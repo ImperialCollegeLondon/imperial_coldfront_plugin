@@ -313,7 +313,7 @@ def ldap_connection_mock(mocker):
     return mocker.patch(
         "imperial_coldfront_plugin.ldap.Connection",
         side_effect=RuntimeError(
-            "Un-mocked LDAP connection. If you see this error during a test, it means"
+            "Un-mocked LDAP connection. If you see this error during a test, it means "
             "that the test is trying to use the LDAP connection without mocking it. "
             "Mock the interface to the LDAP module."
         ),

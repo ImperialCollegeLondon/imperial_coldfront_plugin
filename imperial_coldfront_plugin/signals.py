@@ -48,7 +48,7 @@ def allocation_attribute_ensure_no_existing_gid(
         return
     if AllocationAttribute.objects.filter(
         allocation_attribute_type__name="GID", value=instance.value
-    ):
+    ).exists():
         raise ValueError(
             f"GID {instance.value} is already assigned to another allocation."
         )
@@ -71,7 +71,7 @@ def allocation_attribute_ensure_unique_shortname(
         instance.allocation_attribute_type.name == "Shortname"
         and AllocationAttribute.objects.filter(
             allocation_attribute_type__name="Shortname", value=instance.value
-        )
+        ).exists()
     ):
         raise ValueError(f"An allocation with {instance.value} already exists.")
 
@@ -87,8 +87,11 @@ def project_attribute_ensure_unique_group_id(
         instance: The instance being saved.
         **kwargs: Additional keyword arguments.
     """
-    if instance.proj_attr_type.name == "Group ID" and ProjectAttribute.objects.filter(
-        proj_attr_type__name="Group ID", value=instance.value
+    if (
+        instance.proj_attr_type.name == "Group ID"
+        and ProjectAttribute.objects.filter(
+            proj_attr_type__name="Group ID", value=instance.value
+        ).exists()
     ):
         raise ValueError(f"A project with {instance.value} already exists.")
 
