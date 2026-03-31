@@ -1,7 +1,13 @@
+import datetime
 from pathlib import Path
 
 import pytest
-from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
+from coldfront.core.allocation.models import (
+    Allocation,
+    AllocationAttributeType,
+    AllocationStatusChoice,
+    AllocationUserStatusChoice,
+)
 from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
 from django.utils import timezone
 
@@ -93,7 +99,6 @@ class TestRDFAllocation:
         """Test that storage_quota_tb_attr returns the correct attribute."""
         from coldfront.core.allocation.models import (
             AllocationAttribute,
-            AllocationAttributeType,
         )
 
         attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
@@ -108,7 +113,6 @@ class TestRDFAllocation:
         """Test that files_quota_attr returns the correct attribute."""
         from coldfront.core.allocation.models import (
             AllocationAttribute,
-            AllocationAttributeType,
         )
 
         attr_type = AllocationAttributeType.objects.get(name="Files Quota")
@@ -142,7 +146,6 @@ class TestRDFAllocation:
         """Test that error is thrown when Storage Quota (TB) has a non-integer value."""
         from coldfront.core.allocation.models import (
             AllocationAttribute,
-            AllocationAttributeType,
         )
 
         attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
@@ -284,6 +287,64 @@ class TestICLProject:
 
 class TestHX2Allocation:
     """Tests for the HX2Allocation model."""
+
+    def test_create_hx2allocation(self, project, mocker):
+        """Test that the manager correctly create the HX2 Allocation."""
+        user_status = AllocationUserStatusChoice.objects.create(name="Active")
+        allocation_status = AllocationStatusChoice.objects.create(name="Active")
+
+        mock_gid = 99999
+        mocker.patch(
+            "imperial_coldfront_plugin.models.get_new_gid", return_value=mock_gid
+        )
+        mock_ldap_create_group = mocker.patch(
+            "imperial_coldfront_plugin.models.ldap_create_group"
+        )
+
+        start_date = datetime.date.today()
+        end_date = datetime.date.today() + datetime.timedelta(days=365)
+
+        allocation = HX2Allocation.objects.create_hx2allocation(
+            project=project,
+            status=allocation_status,
+            quantity=1,
+            start_date=start_date,
+            end_date=end_date,
+            justification="Test justification",
+            description="Test description",
+            is_locked=False,
+            is_changeable=True,
+        )
+
+        # Check that the HX2 Allocation was created with the correct inputs:
+        assert isinstance(allocation, HX2Allocation)
+        assert allocation.project == project
+        assert allocation.status == allocation_status
+        assert allocation.get_parent_resource.name == "HX2"
+        assert allocation.start_date == start_date
+        assert allocation.end_date == end_date
+        assert allocation.justification == "Test justification"
+        assert allocation.description == "Test description"
+        assert allocation.is_locked is False
+        assert allocation.is_changeable is True
+
+        # Check that the GID attribute was created with the correct value:
+        allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="GID",
+            value=mock_gid,
+        )
+
+        # Check that the LDAP group creation was called with the correct inputs:
+        mock_ldap_create_group.assert_called_once_with(
+            group_name=allocation.ldap_shortname,
+            gid=mock_gid,
+        )
+
+        # Check that the AllocationUser was created with the correct inputs:
+        allocation.allocationuser_set.get(
+            user=project.pi,
+            status=user_status,
+        )
 
     def test_init_new_allocation(self, project):
         """Test a new HX2Allocation can be initialised without a HX2 Resource."""
