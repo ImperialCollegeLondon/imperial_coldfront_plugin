@@ -274,10 +274,18 @@ class TestICLProject:
             project.ask_ticket_reference_attr
 
 
+@pytest.fixture
+def ldap_create_group_mock(mocker):
+    """Mock ldap_create_group."""
+    return mocker.patch("imperial_coldfront_plugin.models.ldap_create_group")
+
+
 class TestHX2Allocation:
     """Tests for the HX2Allocation model."""
 
-    def test_create_hx2allocation(self, project, mocker):
+    def test_create_hx2allocation(
+        self, project, mocker, ldap_create_group_mock, enable_ldap
+    ):
         """Test that the manager correctly create the HX2 Allocation."""
         user_status = AllocationUserStatusChoice.objects.create(name="Active")
         allocation_status = AllocationStatusChoice.objects.create(name="Active")
@@ -286,8 +294,8 @@ class TestHX2Allocation:
         mocker.patch(
             "imperial_coldfront_plugin.models.get_new_gid", return_value=mock_gid
         )
-        mock_ldap_create_group = mocker.patch(
-            "imperial_coldfront_plugin.models.ldap_create_group"
+        mocker.patch(
+            "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
         )
 
         start_date = datetime.date.today()
@@ -324,7 +332,7 @@ class TestHX2Allocation:
         )
 
         # Check that the LDAP group creation was called with the correct inputs:
-        mock_ldap_create_group.assert_called_once_with(
+        ldap_create_group_mock.assert_called_once_with(
             group_name=allocation.ldap_shortname,
             gid=mock_gid,
         )

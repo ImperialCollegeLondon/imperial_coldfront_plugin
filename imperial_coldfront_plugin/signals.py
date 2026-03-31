@@ -110,6 +110,12 @@ def sync_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
+    if instance.allocation.get_parent_resource.name == "HX2":
+        # TODO: Sorted in issue 339. This needed to be commented out, otherwise
+        # create_hx2allocation was hitting the next block and throwing an
+        # error.
+        return
+
     try:
         rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
     except ValueError:

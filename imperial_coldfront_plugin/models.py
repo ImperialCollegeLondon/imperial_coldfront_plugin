@@ -12,7 +12,6 @@ from coldfront.core.allocation.models import (
     AllocationStatusChoice,
     AllocationUser,
     AllocationUserStatusChoice,
-    Resource,
 )
 from coldfront.core.project.models import (
     Project,
@@ -23,6 +22,7 @@ from coldfront.core.project.models import (
     ProjectUserRoleChoice,
     ProjectUserStatusChoice,
 )
+from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import models
 
@@ -170,7 +170,8 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
             value=gid,
         )
 
-        ldap_create_group(group_name=allocation_obj.ldap_shortname, gid=gid)
+        if settings.LDAP_ENABLED:
+            ldap_create_group(group_name=allocation_obj.ldap_shortname, gid=gid)
 
         active_status = AllocationUserStatusChoice.objects.get(name="Active")
         AllocationUser.objects.create(
