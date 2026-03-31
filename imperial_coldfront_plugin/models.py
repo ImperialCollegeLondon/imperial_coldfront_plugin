@@ -24,7 +24,7 @@ from coldfront.core.project.models import (
 )
 from coldfront.core.resource.models import Resource
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.ldap import ldap_create_group
@@ -146,40 +146,41 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
         is_changeable: bool,
     ) -> "HX2Allocation":
         """Create a new HX2Allocation from validated data."""
-        allocation_obj = self.model(
-            project=project,
-            status=status,
-            quantity=quantity,
-            start_date=start_date,
-            end_date=end_date,
-            justification=justification,
-            description=description,
-            is_locked=is_locked,
-            is_changeable=is_changeable,
-        )
-        allocation_obj.save()
+        with transaction.atomic():
+            allocation_obj = self.model(
+                project=project,
+                status=status,
+                quantity=quantity,
+                start_date=start_date,
+                end_date=end_date,
+                justification=justification,
+                description=description,
+                is_locked=is_locked,
+                is_changeable=is_changeable,
+            )
+            allocation_obj.save()
 
-        hx2_resource = Resource.objects.get(name="HX2")
-        allocation_obj.resources.add(hx2_resource)
+            hx2_resource = Resource.objects.get(name="HX2")
+            allocation_obj.resources.add(hx2_resource)
 
-        gid = get_new_gid()
-        gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
-        AllocationAttribute.objects.create(
-            allocation=allocation_obj,
-            allocation_attribute_type=gid_attribute_type,
-            value=gid,
-        )
+            gid = get_new_gid()
+            gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
+            AllocationAttribute.objects.create(
+                allocation=allocation_obj,
+                allocation_attribute_type=gid_attribute_type,
+                value=gid,
+            )
 
-        if settings.LDAP_ENABLED:
-            ldap_create_group(group_name=allocation_obj.ldap_shortname, gid=gid)
+            if settings.LDAP_ENABLED:
+                ldap_create_group(group_name=allocation_obj.ldap_shortname, gid=gid)
 
-        active_status = AllocationUserStatusChoice.objects.get(name="Active")
-        AllocationUser.objects.create(
-            allocation=allocation_obj,
-            user=project.pi,
-            status=active_status,
-        )
-        return allocation_obj
+            active_status = AllocationUserStatusChoice.objects.get(name="Active")
+            AllocationUser.objects.create(
+                allocation=allocation_obj,
+                user=project.pi,
+                status=active_status,
+            )
+            return allocation_obj
 
 
 class HX2Allocation(Allocation):
