@@ -456,7 +456,7 @@ class TestCheckHX2LdapConsistency:
         assert username in discrepancy["missing_members"]
         assert not discrepancy["extra_members"]
 
-        notify_mock.assert_called_once()
+        notify_mock.assert_called_once_with(result, source="HX2")
 
     def test_check_ldap_consistency_extra_members(
         self,
@@ -483,7 +483,7 @@ class TestCheckHX2LdapConsistency:
         assert not discrepancy["missing_members"]
         assert extra_user in discrepancy["extra_members"]
 
-        notify_mock.assert_called_once()
+        notify_mock.assert_called_once_with(result, source="HX2")
 
 
 class TestRemoveAllocationGroupMembers:

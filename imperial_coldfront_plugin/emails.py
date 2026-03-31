@@ -16,16 +16,22 @@ class Discrepancy(TypedDict):
     extra_members: list[str]
 
 
-def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
+def send_discrepancy_notification(
+    discrepancies: list[Discrepancy], source: str = "RDF"
+) -> None:
     """Send email notification for discrepancies found during the consistency check.
 
     Args:
         discrepancies: List of discrepancies found.
+        source: The source of the discrepancies ("RDF" or "HX2").
     """
     if not settings.ADMINS:
         return
 
-    message = "The following discrepancies were detected between Coldfront and AD:\n\n"
+    message = (
+        f"The following discrepancies for {source} were detected between "
+        f"Coldfront and AD:\n\n"
+    )
 
     message += "Membership Discrepancies:\n"
     for discrepancy in discrepancies:
@@ -44,7 +50,7 @@ def send_discrepancy_notification(discrepancies: list[Discrepancy]) -> None:
                 message += f"    - {member}\n"
 
     mail_admins(
-        subject="LDAP Consistency Check - Discrepancies Found",
+        subject=f"LDAP Consistency Check - Discrepancies Found in {source}",
         message=message,
     )
 

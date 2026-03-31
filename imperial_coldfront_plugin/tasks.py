@@ -258,7 +258,7 @@ def check_hx2_ldap_consistency() -> list[Discrepancy]:
             )
 
     if discrepancies:
-        send_discrepancy_notification(discrepancies)
+        send_discrepancy_notification(discrepancies, source="HX2")
 
     return discrepancies
 
