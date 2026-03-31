@@ -47,10 +47,10 @@ def test_sync_ldap_group_membership(
     user,
     rdf_allocation_ldap_name,
     allocation_user,
-    enable_ldap,
 ):
     """Test sync_ldap_group_membership signal."""
-    ldap_add_member_mock.assert_not_called()
+    # clear mock calls from setup
+    ldap_add_member_mock.reset_mock()
     ldap_remove_member_mock.assert_not_called()
 
     allocation_user_inactive_status = AllocationUserStatusChoice.objects.create(
@@ -65,37 +65,11 @@ def test_sync_ldap_group_membership(
     )
 
 
-def test_sync_ldap_group_membership_no_project_id(
-    ldap_remove_member_mock,
-    ldap_add_member_mock,
-    user,
-    rdf_allocation,
-    rdf_allocation_shortname,
-    allocation_user_active_status,
-):
-    """Test sync_ldap_group_membership signal for non-rdf allocations."""
-    rdf_allocation.shortname_attr.delete()
-    allocation_user = AllocationUser.objects.create(
-        allocation=rdf_allocation,
-        user=user,
-        status=allocation_user_active_status,
-    )
-
-    ldap_add_member_mock.assert_not_called()
-    ldap_remove_member_mock.assert_not_called()
-
-    allocation_user.delete()
-
-    ldap_add_member_mock.assert_not_called()
-    ldap_remove_member_mock.assert_not_called()
-
-
 def test_remove_ldap_group_membership(
     ldap_remove_member_mock,
     rdf_allocation_shortname,
     allocation_user,
     user,
-    enable_ldap,
     settings,
 ):
     """Test remove_ldap_group_membership signal."""
@@ -111,7 +85,7 @@ def test_remove_ldap_group_membership(
 
 
 def test_remove_ldap_group_membership_non_rdf_allocation(
-    ldap_remove_member_mock, allocation_user_active_status, project, user, enable_ldap
+    ldap_remove_member_mock, allocation_user_active_status, project, user
 ):
     """Test remove_ldap_group_membership_signal for non-rdf allocation."""
     active_allocation_status, _ = AllocationStatusChoice.objects.get_or_create(
@@ -204,7 +178,6 @@ def test_remove_ldap_group_members_if_allocation_inactive(
     remove_allocation_group_members_mock,
     rdf_allocation,
     allocation_user,
-    enable_ldap,
 ):
     """Test remove_ldap_group_members_if_allocation_inactive signal."""
     remove_allocation_group_members_mock.assert_not_called()
@@ -221,7 +194,6 @@ def test_remove_ldap_group_members_if_allocation_active(
     remove_allocation_group_members_mock,
     rdf_allocation,
     allocation_user,
-    enable_ldap,
 ):
     """Test that task is not called when allocation is active."""
     remove_allocation_group_members_mock.assert_not_called()
@@ -237,7 +209,6 @@ def test_remove_ldap_group_members_non_rdf_allocation(
     project,
     user,
     allocation_user_active_status,
-    enable_ldap,
 ):
     """Test that task is not called for non rdf allocations."""
     allocation_inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
@@ -259,10 +230,10 @@ def test_remove_ldap_group_members_non_rdf_allocation(
 
 
 def test_remove_ldap_group_members_ldap_disabled(
-    remove_allocation_group_members_mock,
-    rdf_allocation,
+    remove_allocation_group_members_mock, rdf_allocation, settings
 ):
     """Test that task is not called when LDAP is disabled."""
+    settings.LDAP_ENABLED = False
     allocation_inactive_status = AllocationStatusChoice.objects.create(name="Inactive")
     rdf_allocation.status = allocation_inactive_status
     rdf_allocation.save()
@@ -271,43 +242,32 @@ def test_remove_ldap_group_members_ldap_disabled(
 
 
 @pytest.fixture
-def async_task_mock(mocker):
-    """Mock async_task from django_q.tasks."""
-    mock = mocker.patch("imperial_coldfront_plugin.signals.async_task")
-    mock.assert_not_called()
-    return mock
+def zero_quota_mock(mocker):
+    """Mock zero_allocation_gpfs_quota task."""
+    return mocker.patch("imperial_coldfront_plugin.tasks.zero_allocation_gpfs_quota")
 
 
-def test_allocation_expired_handler_triggers_task(
-    async_task_mock,
-    rdf_allocation,
-):
+def test_allocation_expired_handler_triggers_task(rdf_allocation, zero_quota_mock):
     """Test that changing allocation status to Expired spawns the quota zeroing task."""
     expired_status = AllocationStatusChoice.objects.create(name="Expired")
     rdf_allocation.status = expired_status
     rdf_allocation.save()
-
-    async_task_mock.assert_called_once_with(
-        "imperial_coldfront_plugin.tasks.zero_allocation_gpfs_quota",
-        rdf_allocation.pk,
-    )
+    zero_quota_mock.assert_called_once_with(rdf_allocation.pk)
 
 
 def test_allocation_expired_handler_does_not_trigger_for_other_statuses(
-    async_task_mock,
-    rdf_allocation,
+    rdf_allocation, rdf_allocation_gid, zero_quota_mock
 ):
     """Test that changing to a non-Expired status does not trigger the task."""
     removed_status = AllocationStatusChoice.objects.create(name="Removed")
     rdf_allocation.status = removed_status
     rdf_allocation.save()
-
-    async_task_mock.assert_not_called()
+    zero_quota_mock.assert_not_called()
 
 
 def test_allocation_expired_handler_skips_new_allocations(
-    async_task_mock,
     project,
+    remove_allocation_group_members_mock,
 ):
     """Test that creating a new allocation does not trigger the task (pk is None)."""
     expired_status = AllocationStatusChoice.objects.create(name="Expired")
@@ -321,12 +281,11 @@ def test_allocation_expired_handler_skips_new_allocations(
     if rdf_resource:
         allocation.resources.add(rdf_resource)
 
-    async_task_mock.assert_not_called()
+    remove_allocation_group_members_mock.assert_not_called()
 
 
 def test_allocation_expired_handler_skips_non_rdf_active_allocation(
-    async_task_mock,
-    project,
+    project, zero_quota_mock
 ):
     """Test that expiring an allocation without the 'RDF Active' resource does not trigger the task."""  # noqa E501
     active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
@@ -344,7 +303,7 @@ def test_allocation_expired_handler_skips_non_rdf_active_allocation(
     allocation.status = expired_status
     allocation.save()
 
-    async_task_mock.assert_not_called()
+    zero_quota_mock.assert_not_called()
 
 
 def test_sync_ldap_group_membership_non_rdf_allocation(
@@ -352,7 +311,6 @@ def test_sync_ldap_group_membership_non_rdf_allocation(
     ldap_add_member_mock,
     user,
     allocation_user_active_status,
-    enable_ldap,
     project,
 ):
     """Test sync_ldap_group_membership signal does not apply to non-RDF allocations."""

@@ -158,7 +158,6 @@ def test_create_rdf_allocation(
     rdf_allocation_ldap_name,
     settings,
     rdf_form_data,
-    enable_ldap,
 ):
     """Test create_rdf_allocation task."""
     # set all of these so they are not empty
@@ -254,7 +253,6 @@ def test_create_rdf_allocation_ldap_rollback(
     rdf_allocation_ldap_name,
     settings,
     rdf_form_data,
-    enable_ldap,
 ):
     """Test create_rdf_allocation task rolls back on LDAP error."""
     # first ldap call now raises an error
@@ -280,7 +278,6 @@ def test_create_rdf_allocation_gpfs_rollback(
     rdf_allocation_ldap_name,
     settings,
     rdf_form_data,
-    enable_ldap,
 ):
     """Test create_rdf_allocation task rolls back on GPFS error."""
     # first gpfs call now raises an error
@@ -336,7 +333,6 @@ def test_check_ldap_consistency_missing_members(
     ldap_group_search_mock,
     notify_mock,
     rdf_allocation_ldap_name,
-    enable_ldap,
 ):
     """Test when a user is missing from AD group."""
     username = allocation_user.user.username
@@ -361,7 +357,6 @@ def test_check_ldap_consistency_extra_members(
     ldap_group_search_mock,
     notify_mock,
     rdf_allocation_ldap_name,
-    enable_ldap,
 ):
     """Test when there are extra users in AD group."""
     username = allocation_user.user.username
@@ -400,7 +395,6 @@ def test_remove_allocation_group_members(
     rdf_allocation,
     allocation_user,
     rdf_allocation_ldap_name,
-    enable_ldap,
 ):
     """Test _remove_allocation_group_members removes all active users."""
     from imperial_coldfront_plugin.tasks import remove_allocation_group_members
@@ -423,7 +417,6 @@ def test_remove_allocation_group_members_multiple_users(
     allocation_user_active_status,
     user_factory,
     rdf_allocation_ldap_name,
-    enable_ldap,
 ):
     """Test _remove_allocation_group_members removes multiple active users."""
     from imperial_coldfront_plugin.tasks import remove_allocation_group_members
@@ -492,7 +485,6 @@ def test_update_allocation_status_feature_flag(settings, rdf_allocation):
 )
 def test_update_allocation_status(
     rdf_allocation,
-    enable_ldap,
     days_offset,
     expected_status_name,
 ):
