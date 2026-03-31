@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from coldfront.core.allocation.models import (
     Allocation,
+    AllocationAttribute,
     AllocationAttributeType,
     AllocationStatusChoice,
     AllocationUserStatusChoice,
@@ -97,10 +98,6 @@ class TestRDFAllocation:
 
     def test_storage_quota_tb_attr(self, rdf_allocation):
         """Test that storage_quota_tb_attr returns the correct attribute."""
-        from coldfront.core.allocation.models import (
-            AllocationAttribute,
-        )
-
         attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
         AllocationAttribute.objects.create(
             allocation_attribute_type=attr_type, allocation=rdf_allocation, value=10
@@ -111,10 +108,6 @@ class TestRDFAllocation:
 
     def test_files_quota_attr(self, rdf_allocation):
         """Test that files_quota_attr returns the correct attribute."""
-        from coldfront.core.allocation.models import (
-            AllocationAttribute,
-        )
-
         attr_type = AllocationAttributeType.objects.get(name="Files Quota")
         AllocationAttribute.objects.create(
             allocation_attribute_type=attr_type, allocation=rdf_allocation, value=1000
@@ -144,10 +137,6 @@ class TestRDFAllocation:
 
     def test_storage_quota_tb_bad_value(self, rdf_allocation):
         """Test that error is thrown when Storage Quota (TB) has a non-integer value."""
-        from coldfront.core.allocation.models import (
-            AllocationAttribute,
-        )
-
         attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
         AllocationAttribute.objects.create(
             allocation_attribute_type=attr_type,
