@@ -389,7 +389,6 @@ class TestCheckLdapConsistency:
 
         assert len(result) == 1
         discrepancy = result[0]
-        assert discrepancy["allocation_id"] == rdf_allocation.id
         assert discrepancy["group_name"] == rdf_allocation_ldap_name
         assert discrepancy["project_name"] == rdf_allocation.project.title
         assert username in discrepancy["missing_members"]
@@ -416,7 +415,6 @@ class TestCheckLdapConsistency:
 
         assert len(result) == 1
         discrepancy = result[0]
-        assert discrepancy["allocation_id"] == rdf_allocation.id
         assert discrepancy["group_name"] == rdf_allocation_ldap_name
         assert not discrepancy["missing_members"]
         assert extra_user in discrepancy["extra_members"]
@@ -460,7 +458,6 @@ class TestCheckHX2LdapConsistency:
 
         assert len(result) == 1
         discrepancy = result[0]
-        assert discrepancy["allocation_id"] == hx2_allocation.id
         assert discrepancy["group_name"] == hx2_allocation_ldap_name
         assert discrepancy["project_name"] == hx2_allocation.project.title
         assert username in discrepancy["missing_members"]
@@ -487,7 +484,6 @@ class TestCheckHX2LdapConsistency:
 
         assert len(result) == 1
         discrepancy = result[0]
-        assert discrepancy["allocation_id"] == hx2_allocation.id
         assert discrepancy["group_name"] == hx2_allocation_ldap_name
         assert not discrepancy["missing_members"]
         assert extra_user in discrepancy["extra_members"]

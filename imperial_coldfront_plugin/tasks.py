@@ -5,7 +5,6 @@ import time
 from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
-    Allocation,
     AllocationAttribute,
     AllocationAttributeType,
     AllocationAttributeUsage,
@@ -16,6 +15,7 @@ from coldfront.core.allocation.models import (
 from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
@@ -179,7 +179,7 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
 
 
 def find_discrepancies_helper(
-    allocations: list[Allocation], ldap_groups: dict[str, list[str]]
+    allocations: QuerySet, ldap_groups: dict[str, list[str]]
 ) -> list[Discrepancy]:
     """Finds discrepancies between LDAP groups and allocation users."""
     discrepancies: list[Discrepancy] = []
@@ -198,7 +198,6 @@ def find_discrepancies_helper(
         if missing_members or extra_members:
             discrepancies.append(
                 {
-                    "allocation_id": allocation.id,
                     "group_name": group_name,
                     "project_name": allocation.project.title,
                     "missing_members": list(missing_members),
