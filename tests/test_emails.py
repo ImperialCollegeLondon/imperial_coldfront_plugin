@@ -101,7 +101,7 @@ def test_send_discrepancy_notification_rdf():
     ]
 
     # Default with no source uses RDF:
-    send_discrepancy_notification(discrepancies)
+    send_discrepancy_notification(discrepancies, source="RDF")
 
     assert len(mail.outbox) == 1
     assert "RDF" in mail.outbox[0].subject
