@@ -179,7 +179,8 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
 
 
 def find_discrepancies_helper(
-    allocations: QuerySet, ldap_groups: dict[str, list[str]]
+    allocations: QuerySet[RDFAllocation | HX2Allocation],
+    ldap_groups: dict[str, list[str]],
 ) -> list[Discrepancy]:
     """Finds discrepancies between LDAP groups and allocation users."""
     discrepancies: list[Discrepancy] = []
