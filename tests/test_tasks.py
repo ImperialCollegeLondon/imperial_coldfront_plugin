@@ -184,7 +184,7 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
 class TestCreateRDFAllocation:
     """Tests for create_rdf_allocation task."""
 
-    def test_create_rdf_allocation(
+    def test_success(
         self,
         gpfs_create_fileset_mock,
         ldap_create_group_mock,
@@ -282,7 +282,7 @@ class TestCreateRDFAllocation:
             logger=logging.getLogger("django-q"),
         )
 
-    def test_create_rdf_allocation_ldap_rollback(
+    def test_error_causes_rollback(
         self,
         gpfs_create_fileset_mock,
         ldap_create_group_mock,
@@ -307,7 +307,7 @@ class TestCreateRDFAllocation:
         # check initial database actions have been rolled back
         assert not Allocation.objects.all()
 
-    def test_create_rdf_allocation_gpfs_rollback(
+    def test_gpfs_rollback(
         self,
         gpfs_create_fileset_mock,
         ldap_create_group_mock,
@@ -343,7 +343,7 @@ class TestCreateRDFAllocation:
 class TestCheckLdapConsistency:
     """Tests for check_ldap_consistency task."""
 
-    def test_check_ldap_consistency_no_discrepancies(
+    def test_no_discrepancies(
         self,
         rdf_allocation,
         allocation_user,
@@ -360,7 +360,7 @@ class TestCheckLdapConsistency:
         assert result == []
         notify_mock.assert_not_called()
 
-    def test_check_ldap_consistency_missing_members(
+    def test_missing_members(
         self,
         rdf_allocation,
         allocation_user,
@@ -385,7 +385,7 @@ class TestCheckLdapConsistency:
 
         notify_mock.assert_called_once()
 
-    def test_check_ldap_consistency_extra_members(
+    def test_extra_members(
         self,
         rdf_allocation,
         allocation_user,
@@ -416,7 +416,7 @@ class TestCheckLdapConsistency:
 class TestCheckHX2LdapConsistency:
     """Tests for check_hx2_ldap_consistency task."""
 
-    def test_check_ldap_consistency_no_discrepancies(
+    def test_no_discrepancies(
         self,
         hx2_allocation,
         hx2_allocation_user,
@@ -433,7 +433,7 @@ class TestCheckHX2LdapConsistency:
         assert result == []
         notify_mock.assert_not_called()
 
-    def test_check_ldap_consistency_missing_members(
+    def test_missing_members(
         self,
         hx2_allocation,
         hx2_allocation_user,
@@ -458,7 +458,7 @@ class TestCheckHX2LdapConsistency:
 
         notify_mock.assert_called_once_with(result, source="HX2")
 
-    def test_check_ldap_consistency_extra_members(
+    def test_extra_members(
         self,
         hx2_allocation,
         hx2_allocation_user,
@@ -489,9 +489,7 @@ class TestCheckHX2LdapConsistency:
 class TestRemoveAllocationGroupMembers:
     """Tests for remove_allocation_group_members task."""
 
-    def test_remove_allocation_group_members_feature_flag(
-        self, settings, rdf_allocation, ldap_remove_member_mock
-    ):
+    def test_feature_flag(self, settings, rdf_allocation, ldap_remove_member_mock):
         """Test task does nothing when feature flag is disabled."""
         from imperial_coldfront_plugin.tasks import remove_allocation_group_members
 
@@ -501,7 +499,7 @@ class TestRemoveAllocationGroupMembers:
 
         ldap_remove_member_mock.assert_not_called()
 
-    def test_remove_allocation_group_members(
+    def test_success(
         self,
         ldap_remove_member_mock,
         rdf_allocation,
@@ -522,7 +520,7 @@ class TestRemoveAllocationGroupMembers:
             allow_missing=True,
         )
 
-    def test_remove_allocation_group_members_multiple_users(
+    def test_remove_multiple_users(
         self,
         ldap_remove_member_mock,
         rdf_allocation,
@@ -573,7 +571,7 @@ class TestRemoveAllocationGroupMembers:
 class TestUpdateAllocationStatus:
     """Tests for update_allocation_status task."""
 
-    def test_update_allocation_status_feature_flag(self, settings, rdf_allocation):
+    def test_feature_flag(self, settings, rdf_allocation):
         """Test update_allocation_status does nothing when feature flag is disabled."""
         from imperial_coldfront_plugin.tasks import update_allocation_status
 
@@ -599,7 +597,7 @@ class TestUpdateAllocationStatus:
             (0, "Active"),
         ],
     )
-    def test_update_allocation_status(
+    def test_function(
         self,
         rdf_allocation,
         enable_ldap,
@@ -621,7 +619,7 @@ class TestUpdateAllocationStatus:
 class TestCheckRDFExpiryNotifications:
     """Tests for check_rdf_allocation_expiry_notifications task."""
 
-    def test_check_expiry_notifications_feature_flag(
+    def test_feature_flag(
         self,
         rdf_allocation,
         send_expiry_warning_mock,
@@ -644,7 +642,7 @@ class TestCheckRDFExpiryNotifications:
         send_deletion_warning_mock.assert_not_called()
         send_deletion_notification_mock.assert_not_called()
 
-    def test_check_expiry_notifications_expiry_warning(
+    def test_expiry_warning(
         self,
         rdf_allocation,
         send_expiry_warning_mock,
@@ -670,7 +668,7 @@ class TestCheckRDFExpiryNotifications:
         send_deletion_warning_mock.assert_not_called()
         send_deletion_notification_mock.assert_not_called()
 
-    def test_check_expiry_notifications_removal_warning(
+    def test_removal_warning(
         self,
         rdf_allocation,
         send_expiry_warning_mock,
@@ -692,7 +690,7 @@ class TestCheckRDFExpiryNotifications:
         send_deletion_warning_mock.assert_not_called()
         send_deletion_notification_mock.assert_not_called()
 
-    def test_check_expiry_notifications_deletion_warning(
+    def test_deletion_warning(
         self,
         rdf_allocation,
         send_expiry_warning_mock,
@@ -718,7 +716,7 @@ class TestCheckRDFExpiryNotifications:
         send_removal_warning_mock.assert_not_called()
         send_deletion_notification_mock.assert_not_called()
 
-    def test_check_expiry_notifications_deletion_notification(
+    def test_deletion_notification(
         self,
         rdf_allocation,
         send_expiry_warning_mock,
@@ -746,7 +744,7 @@ class TestCheckRDFExpiryNotifications:
         send_removal_warning_mock.assert_not_called()
         send_deletion_warning_mock.assert_not_called()
 
-    def test_check_expiry_notifications_no_end_date(
+    def test_no_end_date(
         self,
         rdf_allocation,
         send_expiry_warning_mock,
@@ -760,7 +758,7 @@ class TestCheckRDFExpiryNotifications:
 
         send_expiry_warning_mock.assert_not_called()
 
-    def test_check_expiry_notifications_multiple_allocations(
+    def test_multiple_allocations(
         self,
         rdf_allocation,
         rdf_allocation_dependencies,
@@ -807,7 +805,7 @@ class TestCheckRDFExpiryNotifications:
 class TestZeroAllocationGPFSQuota:
     """Tests for zero_allocation_gpfs_quota task."""
 
-    def test_zero_allocation_gpfs_quota_feature_flag(
+    def test_feature_flag(
         self,
         async_task_mock,
         gpfs_client_mock,
@@ -824,7 +822,7 @@ class TestZeroAllocationGPFSQuota:
 
         gpfs_client_mock.assert_not_called()
 
-    def test_zero_allocation_gpfs_quota_success(
+    def test_success(
         self,
         async_task_mock,
         gpfs_client_mock,
@@ -879,7 +877,7 @@ class TestZeroAllocationGPFSQuota:
         files_quota_attr.refresh_from_db()
         assert files_quota_attr.value == "0"
 
-    def test_zero_allocation_gpfs_quota_removed_status(
+    def test_removed_status(
         self,
         async_task_mock,
         gpfs_client_mock,
@@ -921,7 +919,7 @@ class TestZeroAllocationGPFSQuota:
             files_quota="0",
         )
 
-    def test_zero_allocation_gpfs_quota_gpfs_error(
+    def test_gpfs_error(
         self,
         async_task_mock,
         gpfs_client_mock,
@@ -1053,7 +1051,7 @@ class TestCheckQuotaConsistency:
             ),
         ],
     )
-    def test_check_quota_consistency_issues(
+    def test_various_states(
         self,
         rdf_allocation,
         send_quota_discrepancy_notification_mock,
@@ -1103,7 +1101,7 @@ class TestCheckQuotaConsistency:
 class TestUnlinkExpiredAllocationFilesets:
     """Tests for unlink_expired_allocation_filesets task."""
 
-    def test_unlink_expired_allocation_filesets_feature_flag(
+    def test_feature_flag(
         self,
         gpfs_client_mock,
         rdf_allocation,
@@ -1121,7 +1119,7 @@ class TestUnlinkExpiredAllocationFilesets:
 
         gpfs_client_mock.assert_not_called()
 
-    def test_unlink_expired_allocation_filesets_gpfs_disabled(
+    def test_gpfs_disabled(
         self,
         gpfs_client_mock,
         rdf_allocation,
@@ -1139,7 +1137,7 @@ class TestUnlinkExpiredAllocationFilesets:
 
         gpfs_client_mock.assert_not_called()
 
-    def test_unlink_expired_allocation_filesets_success(
+    def test_success(
         self,
         gpfs_client_mock,
         rdf_allocation,
@@ -1163,7 +1161,7 @@ class TestUnlinkExpiredAllocationFilesets:
             force=True,
         )
 
-    def test_unlink_expired_allocation_filesets_missing_shortname(
+    def test_missing_shortname(
         self,
         gpfs_client_mock,
         rdf_allocation,
