@@ -9,7 +9,6 @@ from django.core.mail import mail_admins, send_mail
 class Discrepancy(TypedDict):
     """Structure for holding discrepancies found during LDAP consistency check."""
 
-    allocation_id: int
     group_name: str
     project_name: str
     missing_members: list[str]
@@ -17,7 +16,7 @@ class Discrepancy(TypedDict):
 
 
 def send_discrepancy_notification(
-    discrepancies: list[Discrepancy], source: str = "RDF"
+    discrepancies: list[Discrepancy], source: str
 ) -> None:
     """Send email notification for discrepancies found during the consistency check.
 
@@ -50,7 +49,9 @@ def send_discrepancy_notification(
                 message += f"    - {member}\n"
 
     mail_admins(
-        subject=f"LDAP Consistency Check - Discrepancies Found in {source}",
+        subject=(
+            f"LDAP Consistency Check - Discrepancies found for {source} allocations"
+        ),
         message=message,
     )
 

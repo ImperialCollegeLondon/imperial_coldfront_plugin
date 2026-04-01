@@ -18,8 +18,8 @@ from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.tasks import (
     check_hx2_ldap_consistency,
-    check_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
+    check_rdf_ldap_consistency,
     create_rdf_allocation,
     unlink_expired_allocation_filesets,
 )
@@ -355,7 +355,7 @@ class TestCheckLdapConsistency:
         username = allocation_user.user.username
         ldap_group_search_mock.return_value = {rdf_allocation_ldap_name: [username]}
 
-        result = check_ldap_consistency()
+        result = check_rdf_ldap_consistency()
 
         assert result == []
         notify_mock.assert_not_called()
@@ -373,7 +373,7 @@ class TestCheckLdapConsistency:
         username = allocation_user.user.username
         ldap_group_search_mock.return_value = {rdf_allocation_ldap_name: []}
 
-        result = check_ldap_consistency()
+        result = check_rdf_ldap_consistency()
 
         assert len(result) == 1
         discrepancy = result[0]
@@ -401,7 +401,7 @@ class TestCheckLdapConsistency:
             rdf_allocation_ldap_name: [username, extra_user]
         }
 
-        result = check_ldap_consistency()
+        result = check_rdf_ldap_consistency()
 
         assert len(result) == 1
         discrepancy = result[0]

@@ -5,6 +5,7 @@ import time
 from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
+    Allocation,
     AllocationAttribute,
     AllocationAttributeType,
     AllocationAttributeUsage,
@@ -177,20 +178,11 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
     return rdf_allocation.pk
 
 
-def check_ldap_consistency() -> list[Discrepancy]:
-    """Check the consistency of LDAP groups with the RDF Active allocations."""
-    if not settings.LDAP_ENABLED:
-        return []
-
+def find_discrepancies_helper(
+    allocations: list[Allocation], ldap_groups: dict[str, list[str]]
+) -> list[Discrepancy]:
+    """Finds discrepancies between LDAP groups and allocation users."""
     discrepancies: list[Discrepancy] = []
-    allocations = RDFAllocation.objects.filter(
-        resources__name="RDF Active",
-        status__name="Active",
-        allocationattribute__allocation_attribute_type__name="Shortname",
-    ).distinct()
-
-    ldap_groups = ldap_group_member_search(f"{settings.LDAP_RDF_SHORTNAME_PREFIX}*")
-
     for allocation in allocations:
         group_name = allocation.ldap_shortname
 
@@ -213,9 +205,25 @@ def check_ldap_consistency() -> list[Discrepancy]:
                     "extra_members": list(extra_members),
                 }
             )
+    return discrepancies
+
+
+def check_rdf_ldap_consistency() -> list[Discrepancy]:
+    """Check the consistency of LDAP groups with the RDF Active allocations."""
+    if not settings.LDAP_ENABLED:
+        return []
+
+    allocations = RDFAllocation.objects.filter(
+        resources__name="RDF Active",
+        status__name="Active",
+        allocationattribute__allocation_attribute_type__name="Shortname",
+    ).distinct()
+    ldap_groups = ldap_group_member_search(f"{settings.LDAP_RDF_SHORTNAME_PREFIX}*")
+
+    discrepancies = find_discrepancies_helper(allocations, ldap_groups)
 
     if discrepancies:
-        send_discrepancy_notification(discrepancies)
+        send_discrepancy_notification(discrepancies, source="RDF")
 
     return discrepancies
 
@@ -225,37 +233,14 @@ def check_hx2_ldap_consistency() -> list[Discrepancy]:
     if not settings.LDAP_ENABLED:
         return []
 
-    discrepancies: list[Discrepancy] = []
     allocations = HX2Allocation.objects.filter(
         resources__name="HX2",
         status__name="Active",
         project__projectattribute__proj_attr_type__name="Group ID",
     ).distinct()
-
     ldap_groups = ldap_group_member_search(f"{settings.LDAP_HX2_SHORTNAME_PREFIX}*")
 
-    for allocation in allocations:
-        group_name = allocation.ldap_shortname
-
-        active_users = AllocationUser.objects.filter(
-            allocation=allocation, status__name="Active"
-        )
-        expected_usernames = [au.user.username for au in active_users]
-
-        actual_members = ldap_groups.get(group_name, [])
-        missing_members = set(expected_usernames) - set(actual_members)
-        extra_members = set(actual_members) - set(expected_usernames)
-
-        if missing_members or extra_members:
-            discrepancies.append(
-                {
-                    "allocation_id": allocation.id,
-                    "group_name": group_name,
-                    "project_name": allocation.project.title,
-                    "missing_members": list(missing_members),
-                    "extra_members": list(extra_members),
-                }
-            )
+    discrepancies = find_discrepancies_helper(allocations, ldap_groups)
 
     if discrepancies:
         send_discrepancy_notification(discrepancies, source="HX2")
