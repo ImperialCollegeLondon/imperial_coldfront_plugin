@@ -319,21 +319,31 @@ def ldap_create_group_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.models.ldap_create_group")
 
 
+@pytest.fixture
+def get_new_gid_mock(mocker):
+    """Mock get_new_gid."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.models.get_new_gid", return_value=99999
+    )
+
+
+@pytest.fixture
+def ldap_gid_in_use_mock(mocker):
+    """Mock ldap_gid_in_use."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+    )
+
+
 class TestHX2Allocation:
     """Tests for the HX2Allocation model."""
 
-    def test_create_hx2allocation(self, project, mocker, ldap_create_group_mock):
+    def test_create_hx2allocation(
+        self, project, get_new_gid_mock, ldap_gid_in_use_mock, ldap_create_group_mock
+    ):
         """Test that the manager correctly create the HX2 Allocation."""
         user_status = AllocationUserStatusChoice.objects.create(name="Active")
         allocation_status = AllocationStatusChoice.objects.create(name="Active")
-
-        mock_gid = 99999
-        mocker.patch(
-            "imperial_coldfront_plugin.models.get_new_gid", return_value=mock_gid
-        )
-        mocker.patch(
-            "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
-        )
 
         start_date = datetime.date.today()
         end_date = datetime.date.today() + datetime.timedelta(days=365)
@@ -365,13 +375,13 @@ class TestHX2Allocation:
         # Check that the GID attribute was created with the correct value:
         allocation.allocationattribute_set.get(
             allocation_attribute_type__name="GID",
-            value=mock_gid,
+            value=get_new_gid_mock.return_value,
         )
 
         # Check that the LDAP group creation was called with the correct inputs:
         ldap_create_group_mock.assert_called_once_with(
             group_name=allocation.ldap_shortname,
-            gid=mock_gid,
+            gid=get_new_gid_mock.return_value,
         )
 
         # Check that the AllocationUser was created with the correct inputs:
@@ -380,16 +390,35 @@ class TestHX2Allocation:
             status=user_status,
         )
 
-    def test_init_new_allocation(self, project):
-        """Test a new HX2Allocation can be initialised without a HX2 Resource."""
-        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
-        # Should not raise an error:
-        HX2Allocation(
-            project=project,
-            status=active_status,
-            start_date=timezone.now(),
-            end_date=timezone.now(),
-        )
+    def test_create_hx2allocation_ldap_rollback(
+        self,
+        project,
+        get_new_gid_mock,
+        ldap_gid_in_use_mock,
+        ldap_create_group_mock,
+    ):
+        """Test that create_hx2allocation rolls back on LDAP error."""
+        status = AllocationStatusChoice.objects.create(name="Active")
+        ldap_create_group_mock.side_effect = RuntimeError("oh no!")
+
+        with pytest.raises(RuntimeError):
+            HX2Allocation.objects.create_hx2allocation(
+                project=project,
+                status=status,
+                quantity=1,
+                start_date=datetime.date.today(),
+                end_date=datetime.date.today() + datetime.timedelta(days=365),
+                justification="Test justification",
+                description="Test description",
+                is_locked=False,
+                is_changeable=True,
+            )
+
+        # Ensure that the runtime error came from the LDAP group creation:
+        ldap_create_group_mock.assert_called_once()
+
+        # Ensure that no allocation was created in the database:
+        assert not Allocation.objects.all()
 
     def test_create(self, project):
         """Test that HX2Allocation can be created without a HX2 resource."""
