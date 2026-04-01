@@ -322,9 +322,7 @@ def ldap_create_group_mock(mocker):
 class TestHX2Allocation:
     """Tests for the HX2Allocation model."""
 
-    def test_create_hx2allocation(
-        self, project, mocker, ldap_create_group_mock, enable_ldap
-    ):
+    def test_create_hx2allocation(self, project, mocker, ldap_create_group_mock):
         """Test that the manager correctly create the HX2 Allocation."""
         user_status = AllocationUserStatusChoice.objects.create(name="Active")
         allocation_status = AllocationStatusChoice.objects.create(name="Active")
