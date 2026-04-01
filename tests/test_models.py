@@ -12,7 +12,7 @@ from coldfront.core.allocation.models import (
 from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
 from django.utils import timezone
 
-from imperial_coldfront_plugin.models import HX2Allocation
+from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
 
 
 class TestCreditTransaction:
@@ -145,6 +145,45 @@ class TestRDFAllocation:
         )
         with pytest.raises(ValueError):
             rdf_allocation.storage_quota_tb
+
+    def test_init_new_allocation(self, project):
+        """Test a new RDFAllocation can be initialized without a RDF resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        # should not raise an error
+        RDFAllocation(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+    def test_create(self, project):
+        """Test that RDFAllocation can be created without an RDF resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        RDFAllocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+    def test_init_for_saved_non_rdf_allocation(self, project):
+        """Test initialising RDFAllocation with saved nonRDF Allocation raises error."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+
+        # create a non-RDF allocation
+        allocation = Allocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+        with pytest.raises(ValueError):
+            RDFAllocation.objects.get(pk=allocation.pk)
+
+        with pytest.raises(ValueError):
+            RDFAllocation.from_allocation(allocation)
 
 
 class TestICLProject:
@@ -410,12 +449,12 @@ class TestHX2Allocation:
 
     def test_ldap_shortname(self, hx2_allocation, hx2_allocation_group_id, settings):
         """Test that ldap_shortname returns shortname with LDAP prefix."""
-        settings.LDAP_SHORTNAME_PREFIX = "ldap-"
+        settings.LDAP_HX2_SHORTNAME_PREFIX = "ldap-"
         assert hx2_allocation.ldap_shortname == f"ldap-{hx2_allocation_group_id}"
 
     def test_ldap_shortname_empty_prefix(
         self, hx2_allocation, hx2_allocation_group_id, settings
     ):
         """Test that ldap_shortname works with an empty prefix."""
-        settings.LDAP_SHORTNAME_PREFIX = ""
+        settings.LDAP_HX2_SHORTNAME_PREFIX = ""
         assert hx2_allocation.ldap_shortname == hx2_allocation_group_id
