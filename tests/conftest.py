@@ -84,7 +84,7 @@ def pytest_configure():
             if key.isupper()
         }
         | dict(
-            LDAP_ENABLED=False,
+            LDAP_ENABLED=True,
             LDAP_USERNAME="",
             LDAP_PASSWORD="",
             LDAP_URI="",
@@ -307,6 +307,19 @@ def rdf_allocation_dependencies(db):
     AllocationUserStatusChoice.objects.create(name="Active")
 
 
+@pytest.fixture(autouse=True)
+def ldap_connection_mock(mocker):
+    """Mock LDAP connection for tests that require it."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.ldap.Connection",
+        side_effect=RuntimeError(
+            "Un-mocked LDAP connection. If you see this error during a test, it means "
+            "that the test is trying to use the LDAP connection without mocking it. "
+            "Mock the interface to the LDAP module."
+        ),
+    )
+
+
 @pytest.fixture
 def rdf_allocation_shortname(settings):
     """Shortname applied to rdf_allocation fixture."""
@@ -327,7 +340,11 @@ def rdf_allocation_gid(settings):
 
 @pytest.fixture
 def rdf_allocation(
-    project, rdf_allocation_dependencies, rdf_allocation_shortname, rdf_allocation_gid
+    project,
+    rdf_allocation_dependencies,
+    rdf_allocation_shortname,
+    rdf_allocation_gid,
+    mocker,
 ):
     """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.allocation.models import (
@@ -354,11 +371,14 @@ def rdf_allocation(
         allocation=allocation,
         value=rdf_allocation_shortname,
     )
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=gid_attribute_type,
-        allocation=allocation,
-        value=rdf_allocation_gid,
-    )
+    with mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+    ):
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=gid_attribute_type,
+            allocation=allocation,
+            value=rdf_allocation_gid,
+        )
     return allocation
 
 
@@ -371,15 +391,18 @@ def allocation_user_active_status(db):
 
 
 @pytest.fixture
-def allocation_user(allocation_user_active_status, rdf_allocation, user):
+def allocation_user(allocation_user_active_status, rdf_allocation, user, mocker):
     """Provides an active user for rdf_allocation fixture."""
     from coldfront.core.allocation.models import AllocationUser
 
-    return AllocationUser.objects.create(
-        allocation=rdf_allocation,
-        user=user,
-        status=allocation_user_active_status,
-    )
+    with mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_add_member_to_group",
+    ):
+        return AllocationUser.objects.create(
+            allocation=rdf_allocation,
+            user=user,
+            status=allocation_user_active_status,
+        )
 
 
 @pytest.fixture
@@ -430,12 +453,6 @@ def signals_async_task_mock(mocker):
         return func(*args, **kwargs)
 
     return mocker.patch("imperial_coldfront_plugin.signals.async_task", f)
-
-
-@pytest.fixture
-def enable_ldap(settings):
-    """Fixture to enable LDAP in settings."""
-    settings.LDAP_ENABLED = True
 
 
 @pytest.fixture

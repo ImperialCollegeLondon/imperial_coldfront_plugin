@@ -195,7 +195,6 @@ class TestCreateRDFAllocation:
         rdf_allocation_ldap_name,
         settings,
         rdf_form_data,
-        enable_ldap,
     ):
         """Test create_rdf_allocation task."""
         # set all of these so they are not empty
@@ -282,6 +281,22 @@ class TestCreateRDFAllocation:
             logger=logging.getLogger("django-q"),
         )
 
+
+def test_create_rdf_allocation_ldap_rollback(
+    gpfs_create_fileset_mock,
+    ldap_create_group_mock,
+    ldap_add_member_mock,
+    project,
+    rdf_allocation_dependencies,
+    rdf_allocation_shortname,
+    rdf_allocation_ldap_name,
+    settings,
+    rdf_form_data,
+):
+    """Test create_rdf_allocation task rolls back on LDAP error."""
+    # first ldap call now raises an error
+    ldap_create_group_mock.side_effect = RuntimeError("oh no!")
+
     def test_error_causes_rollback(
         self,
         gpfs_create_fileset_mock,
@@ -293,7 +308,6 @@ class TestCreateRDFAllocation:
         rdf_allocation_ldap_name,
         settings,
         rdf_form_data,
-        enable_ldap,
     ):
         """Test create_rdf_allocation task rolls back on LDAP error."""
         # first ldap call now raises an error
@@ -319,7 +333,6 @@ class TestCreateRDFAllocation:
         rdf_allocation_ldap_name,
         settings,
         rdf_form_data,
-        enable_ldap,
     ):
         """Test create_rdf_allocation task rolls back on GPFS error."""
         # first gpfs call now raises an error
@@ -367,7 +380,6 @@ class TestCheckLdapConsistency:
         ldap_group_search_mock,
         notify_mock,
         rdf_allocation_ldap_name,
-        enable_ldap,
     ):
         """Test when a user is missing from AD group."""
         username = allocation_user.user.username
@@ -392,7 +404,6 @@ class TestCheckLdapConsistency:
         ldap_group_search_mock,
         notify_mock,
         rdf_allocation_ldap_name,
-        enable_ldap,
     ):
         """Test when there are extra users in AD group."""
         username = allocation_user.user.username
@@ -440,7 +451,6 @@ class TestCheckHX2LdapConsistency:
         ldap_group_search_mock,
         notify_mock,
         hx2_allocation_ldap_name,
-        enable_ldap,
     ):
         """Test when a user is missing from AD group."""
         username = hx2_allocation_user.user.username
@@ -465,7 +475,6 @@ class TestCheckHX2LdapConsistency:
         ldap_group_search_mock,
         notify_mock,
         hx2_allocation_ldap_name,
-        enable_ldap,
     ):
         """Test when there are extra users in AD group."""
         username = hx2_allocation_user.user.username
@@ -505,7 +514,6 @@ class TestRemoveAllocationGroupMembers:
         rdf_allocation,
         allocation_user,
         rdf_allocation_ldap_name,
-        enable_ldap,
     ):
         """Test _remove_allocation_group_members removes all active users."""
         from imperial_coldfront_plugin.tasks import remove_allocation_group_members
@@ -528,7 +536,6 @@ class TestRemoveAllocationGroupMembers:
         allocation_user_active_status,
         user_factory,
         rdf_allocation_ldap_name,
-        enable_ldap,
     ):
         """Test _remove_allocation_group_members removes multiple active users."""
         from imperial_coldfront_plugin.tasks import remove_allocation_group_members
@@ -600,7 +607,6 @@ class TestUpdateAllocationStatus:
     def test_function(
         self,
         rdf_allocation,
-        enable_ldap,
         days_offset,
         expected_status_name,
     ):
