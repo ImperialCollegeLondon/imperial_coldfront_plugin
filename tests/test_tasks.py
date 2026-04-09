@@ -165,36 +165,8 @@ def helper_add_quota_attributes(allocation, storage_quota, files_quota):
     """Helper function to add quota attributes to an allocation."""
     from coldfront.core.allocation.models import AllocationAttributeType
 
-    gid = get_new_gid("rdf")
-
-    form = RDFAllocationForm(data=rdf_form_data)
-    assert form.is_valid(), f"Form errors: {form.errors}"
-    allocation = create_rdf_allocation(form.cleaned_data)
-
-    start_date = rdf_form_data["start_date"]
-    end_date = rdf_form_data["end_date"]
-    description = rdf_form_data["description"]
-    size = rdf_form_data["size"]
-    allocation = Allocation.objects.get(
-        project=project,
-        status__name="Active",
-        quantity=1,
-        start_date=start_date,
-        end_date=end_date,
-        justification=description,
-    )
-    storage_attribute = AllocationAttribute.objects.get(
-        allocation_attribute_type__name="Storage Quota (TB)",
-        allocation=allocation,
-        value=size,
-    )
-    AllocationAttributeUsage.objects.get(
-        allocation_attribute=storage_attribute, value=0
-    )
-    files_attribute = AllocationAttribute.objects.get(
-        allocation_attribute_type__name="Files Quota",
-        allocation=allocation,
-        value=settings.GPFS_FILES_QUOTA,
+    storage_quota_attribute_type = AllocationAttributeType.objects.get(
+        name="Storage Quota (TB)"
     )
     files_quota_attribute_type = AllocationAttributeType.objects.get(name="Files Quota")
     AllocationAttribute.objects.create(
@@ -244,7 +216,7 @@ class TestCreateRDFAllocation:
             rdf_allocation_shortname,
         )
 
-        gid = get_new_gid()
+        gid = get_new_gid("rdf")
 
         form = RDFAllocationForm(data=rdf_form_data)
         assert form.is_valid(), f"Form errors: {form.errors}"
@@ -309,147 +281,11 @@ class TestCreateRDFAllocation:
             logger=logging.getLogger("django-q"),
         )
 
-
-def test_create_rdf_allocation_ldap_rollback(
-    gpfs_create_fileset_mock,
-    ldap_create_group_mock,
-    ldap_add_member_mock,
-    project,
-    rdf_allocation_dependencies,
-    rdf_allocation_shortname,
-    rdf_allocation_ldap_name,
-    settings,
-    rdf_form_data,
-):
-    """Test create_rdf_allocation task rolls back on GPFS error."""
-    # first gpfs call now raises an error
-    gpfs_create_fileset_mock.side_effect = RuntimeError("oh no!")
-    gid = get_new_gid("rdf")
-    form = RDFAllocationForm(data=rdf_form_data)
-    assert form.is_valid(), f"Form errors: {form.errors}"
-    with pytest.raises(RuntimeError):
-        create_rdf_allocation(form.cleaned_data)
-
-    # check initial database actions have been rolled back
-    assert not Allocation.objects.all()
-
-    # check ldap group was created then deleted
-    ldap_create_group_mock.assert_called_once_with(rdf_allocation_ldap_name, gid)
-    ldap_delete_group_mock.assert_called_once_with(
-        rdf_allocation_ldap_name, allow_missing=True
-    )
-
-
-@pytest.fixture
-def ldap_group_search_mock(mocker):
-    """Mock the ldap Connection search method."""
-    return mocker.patch("imperial_coldfront_plugin.tasks.ldap_group_member_search")
-
-
-@pytest.fixture
-def notify_mock(mocker):
-    """Mock the send_discrepancy_notification function in tasks.py."""
-    return mocker.patch("imperial_coldfront_plugin.tasks.send_discrepancy_notification")
-
-
-def test_check_ldap_consistency_no_discrepancies(
-    rdf_allocation,
-    allocation_user,
-    ldap_group_search_mock,
-    notify_mock,
-    rdf_allocation_ldap_name,
-):
-    """Test when everything is in sync between Coldfront and AD."""
-    username = allocation_user.user.username
-    ldap_group_search_mock.return_value = {rdf_allocation_ldap_name: [username]}
-
-    result = check_ldap_consistency()
-
-    assert result == []
-    notify_mock.assert_not_called()
-
-
-def test_check_ldap_consistency_missing_members(
-    rdf_allocation,
-    allocation_user,
-    ldap_group_search_mock,
-    notify_mock,
-    rdf_allocation_ldap_name,
-):
-    """Test when a user is missing from AD group."""
-    username = allocation_user.user.username
-    ldap_group_search_mock.return_value = {rdf_allocation_ldap_name: []}
-
-    result = check_ldap_consistency()
-
-    assert len(result) == 1
-    discrepancy = result[0]
-    assert discrepancy["allocation_id"] == rdf_allocation.id
-    assert discrepancy["group_name"] == rdf_allocation_ldap_name
-    assert discrepancy["project_name"] == rdf_allocation.project.title
-    assert username in discrepancy["missing_members"]
-    assert not discrepancy["extra_members"]
-
-    notify_mock.assert_called_once()
-
-
-def test_check_ldap_consistency_extra_members(
-    rdf_allocation,
-    allocation_user,
-    ldap_group_search_mock,
-    notify_mock,
-    rdf_allocation_ldap_name,
-):
-    """Test when there are extra users in AD group."""
-    username = allocation_user.user.username
-    extra_user = "extra_user"
-    ldap_group_search_mock.return_value = {
-        rdf_allocation_ldap_name: [username, extra_user]
-    }
-
-    result = check_ldap_consistency()
-
-    assert len(result) == 1
-    discrepancy = result[0]
-    assert discrepancy["allocation_id"] == rdf_allocation.id
-    assert discrepancy["group_name"] == rdf_allocation_ldap_name
-    assert not discrepancy["missing_members"]
-    assert extra_user in discrepancy["extra_members"]
-
-    notify_mock.assert_called_once()
-
-
-def test_remove_allocation_group_members_feature_flag(
-    settings, rdf_allocation, ldap_remove_member_mock
-):
-    """Test task does nothing when feature flag is disabled."""
-    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
-
-    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
-
-    remove_allocation_group_members(rdf_allocation.pk)
-
-    ldap_remove_member_mock.assert_not_called()
-
-
-def test_remove_allocation_group_members(
-    ldap_remove_member_mock,
-    rdf_allocation,
-    allocation_user,
-    rdf_allocation_ldap_name,
-):
-    """Test _remove_allocation_group_members removes all active users."""
-    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
-
-    username = allocation_user.user.username
-
-    remove_allocation_group_members(rdf_allocation.pk)
-
-    def test_error_causes_rollback(
-        self,
+    def test_ldap_rollback(
         gpfs_create_fileset_mock,
         ldap_create_group_mock,
         ldap_add_member_mock,
+        ldap_delete_group_mock,
         project,
         rdf_allocation_dependencies,
         rdf_allocation_shortname,
@@ -457,7 +293,7 @@ def test_remove_allocation_group_members(
         settings,
         rdf_form_data,
     ):
-        """Test create_rdf_allocation task rolls back on LDAP error."""
+        """Test create_rdf_allocation task rolls back on GPFS error."""
         # first ldap call now raises an error
         ldap_create_group_mock.side_effect = RuntimeError("oh no!")
 
@@ -485,7 +321,7 @@ def test_remove_allocation_group_members(
         """Test create_rdf_allocation task rolls back on GPFS error."""
         # first gpfs call now raises an error
         gpfs_create_fileset_mock.side_effect = RuntimeError("oh no!")
-        gid = get_new_gid()
+        gid = get_new_gid("rdf")
         form = RDFAllocationForm(data=rdf_form_data)
         assert form.is_valid(), f"Form errors: {form.errors}"
         with pytest.raises(RuntimeError):
@@ -501,7 +337,7 @@ def test_remove_allocation_group_members(
         )
 
 
-class TestCheckLdapConsistency:
+class TestCheckRDFLdapConsistency:
     """Tests for check_ldap_consistency task."""
 
     def test_no_discrepancies(
