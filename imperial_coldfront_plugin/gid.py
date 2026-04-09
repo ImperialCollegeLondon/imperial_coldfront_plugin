@@ -21,7 +21,7 @@ def get_new_gid(range_name: str) -> int:
 
     This function checks the existing GID values in the database and returns
     the next available GID within the specified ranges. If no GID is
-    available, it raises a ValueError.
+    available, it raises a NoGIDAvailableError.
 
     Arguments:
         range_name: The name of the GID range to use (e.g., "hx2" or "rdf").
