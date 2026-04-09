@@ -33,14 +33,23 @@ def get_new_gid(range_name: str) -> int:
         allocation_attribute_type__name="GID"
     )
 
-    # Get the maximum GID value already assigned
+    gid_ranges = settings.GID_RANGES[range_name]
+    range_limits = gid_ranges[0].start, gid_ranges[-1].stop + 1
+
+    # Get the maximum GID value already assigned in the selected_range
     try:
-        max_gid = max(eg.typed_value() for eg in existing_gids)
+        max_gid = max(
+            (
+                val
+                if range_limits[0] <= (val := eg.typed_value()) <= range_limits[1]
+                else 0
+            )
+            for eg in existing_gids
+        )
     except ValueError:
         # if there are no existing gids
         max_gid = None
 
-    gid_ranges = settings.GID_RANGES[range_name]
     # Check each range to find the first available GID
     for index, range in enumerate(gid_ranges):
         if max_gid is None or max_gid < range[0]:

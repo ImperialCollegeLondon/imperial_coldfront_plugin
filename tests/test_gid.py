@@ -170,3 +170,23 @@ def test_validate_gid_range_overlap_with_overlap():
     )
     with pytest.raises(ValueError, match="Overlapping GID ranges detected"):
         validate_gid_range_overlap(ranges)
+
+
+def test_new_id_multiple_named_ranges(settings, allocation_attribute_factory):
+    """Test that get_new_gid correctly handles multiple named ranges."""
+    # Override the GID_RANGES setting using the fixture
+    settings.GID_RANGES = dict(
+        test1=[range(1000, 1100)],
+        test2=[range(2000, 2100)],
+    )
+
+    # Create existing GID in second range
+    allocation_attribute_factory(name="GID", value=2005)
+
+    # Call the get_new_gid function for both range names
+    gid1 = get_new_gid("test1")
+    gid2 = get_new_gid("test2")
+
+    # Assert that the returned GIDs are correct for each range
+    assert gid1 == 1000  # Next available in test1 range
+    assert gid2 == 2006  # Next available in test2 range
