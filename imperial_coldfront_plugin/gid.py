@@ -51,13 +51,13 @@ def get_new_gid(range_name: str) -> int:
         max_gid = None
 
     # Check each range to find the first available GID
-    for index, range in enumerate(gid_ranges):
+    for index, gid_range in enumerate(gid_ranges):
         if max_gid is None or max_gid < range[0]:
             # If no existing GIDs, return the first GID in the range
-            return range[0]
+            return gid_range[0]
 
-        elif max_gid in range:
-            if max_gid != range[-1]:  # If max_gid is not the last in the range
+        elif max_gid in gid_range:
+            if max_gid != gid_range[-1]:  # If max_gid is not the last in the range
                 return max_gid + 1
             else:
                 if index + 1 < len(
