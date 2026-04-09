@@ -52,7 +52,7 @@ def get_new_gid(range_name: str) -> int:
 
     # Check each range to find the first available GID
     for index, gid_range in enumerate(gid_ranges):
-        if max_gid is None or max_gid < range[0]:
+        if max_gid is None or max_gid < gid_range[0]:
             # If no existing GIDs, return the first GID in the range
             return gid_range[0]
 
