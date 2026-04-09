@@ -110,7 +110,7 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
             value=shortname,
         )
 
-        gid = get_new_gid()
+        gid = get_new_gid("rdf")
         # create the gid attribute now so it is reserved in the database
         # uniqueness is enforced in both database and Active Directory
         AllocationAttribute.objects.create(
