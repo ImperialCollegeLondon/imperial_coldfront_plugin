@@ -153,8 +153,8 @@ def test_invalid_gid_range_validation(invalid_ranges, msg_contains):
         validate_gid_ranges(invalid_ranges)
 
 
-def test_validate_gid_range_overlap():
-    """Test that overlapping GID ranges raise ValueError."""
+def test_validate_gid_range_neighboring():
+    """Test that neighboring GID ranges do not raise ValueError."""
     ranges = dict(
         test1=[range(TEST_GID_START, TEST_GID_START + 500)],
         test2=[range(TEST_GID_START + 500, TEST_GID_START + 1500)],
