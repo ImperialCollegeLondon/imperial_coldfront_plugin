@@ -464,6 +464,12 @@ def hx2_allocation_group_id():
 
 
 @pytest.fixture
+def hx2_allocation_ldap_name(settings, hx2_allocation_group_id):
+    """LDAP group name associated with hx2_allocation fixture."""
+    return f"{settings.LDAP_HX2_SHORTNAME_PREFIX}{hx2_allocation_group_id}"
+
+
+@pytest.fixture
 def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id):
     """A Coldfront allocation representing an HX2 RDF storage allocation."""
     from coldfront.core.allocation.models import AllocationStatusChoice
@@ -482,3 +488,15 @@ def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id
     )
     allocation.resources.add(hx2_resource)
     return allocation
+
+
+@pytest.fixture
+def hx2_allocation_user(allocation_user_active_status, hx2_allocation, user):
+    """Provides an active user for hx2_allocation fixture."""
+    from coldfront.core.allocation.models import AllocationUser
+
+    return AllocationUser.objects.create(
+        allocation=hx2_allocation,
+        user=user,
+        status=allocation_user_active_status,
+    )
