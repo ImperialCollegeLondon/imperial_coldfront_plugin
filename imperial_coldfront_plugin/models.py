@@ -181,7 +181,7 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
             hx2_resource = Resource.objects.get(name="HX2")
             allocation_obj.resources.add(hx2_resource)
 
-            gid = get_new_gid()
+            gid = get_new_gid("hx2")
             gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
             AllocationAttribute.objects.create(
                 allocation=allocation_obj,
