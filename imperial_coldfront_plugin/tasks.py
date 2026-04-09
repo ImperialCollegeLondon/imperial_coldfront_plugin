@@ -216,7 +216,6 @@ def check_rdf_ldap_consistency() -> list[Discrepancy]:
     allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active",
         status__name="Active",
-        allocationattribute__allocation_attribute_type__name="Shortname",
     ).distinct()
     ldap_groups = ldap_group_member_search(f"{settings.LDAP_RDF_SHORTNAME_PREFIX}*")
 
@@ -236,7 +235,6 @@ def check_hx2_ldap_consistency() -> list[Discrepancy]:
     allocations = HX2Allocation.objects.filter(
         resources__name="HX2",
         status__name="Active",
-        project__projectattribute__proj_attr_type__name="Group ID",
     ).distinct()
     ldap_groups = ldap_group_member_search(f"{settings.LDAP_HX2_SHORTNAME_PREFIX}*")
 
