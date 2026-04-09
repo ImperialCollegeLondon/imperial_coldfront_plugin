@@ -16,7 +16,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django_q.tasks import async_task
 
-from imperial_coldfront_plugin.models import RDFAllocation
+from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
 
 from .ldap import (
     ldap_add_member_to_group,
@@ -24,6 +24,7 @@ from .ldap import (
     ldap_remove_member_from_group,
 )
 from .tasks import remove_allocation_group_members
+from .utils import rdf_or_hx2_allocation
 
 
 @receiver(pre_save, sender=AllocationAttribute)
@@ -115,12 +116,12 @@ def allocation_user_sync_ldap_group_membership(
         return
 
     try:
-        rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
+        allocation = rdf_or_hx2_allocation(instance.allocation)
     except ValueError:
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
 
-    shortname = rdf_allocation.ldap_shortname
+    shortname = allocation.ldap_shortname
 
     if instance.allocation.status.name != "Active":
         # Only manage LDAP group membership for Active allocations
@@ -164,12 +165,10 @@ def allocation_user_ldap_group_membership_deletion(
         return
 
     try:
-        rdf_allocation = RDFAllocation.from_allocation(instance.allocation)
+        allocation = rdf_or_hx2_allocation(instance.allocation)
     except ValueError:
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
-
-    shortname = rdf_allocation.ldap_shortname
 
     if instance.allocation.status.name != "Active":
         # Only manage LDAP group membership for Active allocations
@@ -177,7 +176,7 @@ def allocation_user_ldap_group_membership_deletion(
 
     async_task(
         ldap_remove_member_from_group,
-        shortname,
+        allocation.ldap_shortname,
         instance.user.username,
         allow_missing=True,
     )
@@ -185,8 +184,11 @@ def allocation_user_ldap_group_membership_deletion(
 
 @receiver(post_save, sender=Allocation)
 @receiver(post_save, sender=RDFAllocation)
+@receiver(post_save, sender=HX2Allocation)
 def allocation_remove_ldap_group_members_if_inactive(
-    sender: object, instance: Allocation | RDFAllocation, **kwargs: object
+    sender: object,
+    instance: Allocation | RDFAllocation | HX2Allocation,
+    **kwargs: object,
 ) -> None:
     """Remove all LDAP group members if allocation is not Active.
 
@@ -195,12 +197,12 @@ def allocation_remove_ldap_group_members_if_inactive(
     if not settings.LDAP_ENABLED:
         return
     try:
-        rdf_allocation = RDFAllocation.from_allocation(instance)
+        allocation = rdf_or_hx2_allocation(instance)
     except ValueError:
         # Signal applies only to RDFAllocations
         return
 
-    if rdf_allocation.status.name == "Active":
+    if allocation.status.name == "Active":
         return
 
     async_task(remove_allocation_group_members, instance.pk)

@@ -5,6 +5,7 @@ import time
 from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
+    Allocation,
     AllocationAttribute,
     AllocationAttributeType,
     AllocationAttributeUsage,
@@ -34,6 +35,7 @@ from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
+from .utils import rdf_or_hx2_allocation
 
 
 def create_rdf_allocation(form_data: AllocationFormData) -> int:
@@ -253,7 +255,10 @@ def remove_allocation_group_members(allocation_id: int) -> None:
     if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
         return
 
-    allocation = RDFAllocation.objects.get(pk=allocation_id)
+    try:
+        allocation = rdf_or_hx2_allocation(Allocation.objects.get(pk=allocation_id))
+    except ValueError:
+        return
 
     # Get all active users from the database
     active_users = AllocationUser.objects.filter(

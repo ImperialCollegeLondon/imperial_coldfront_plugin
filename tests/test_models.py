@@ -335,11 +335,22 @@ def ldap_gid_in_use_mock(mocker):
     )
 
 
+@pytest.fixture
+def ldap_add_member_to_group_mock(mocker):
+    """Mock ldap_add_member_to_group."""
+    return mocker.patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
+
+
 class TestHX2Allocation:
     """Tests for the HX2Allocation model."""
 
     def test_create_hx2allocation(
-        self, project, get_new_gid_mock, ldap_gid_in_use_mock, ldap_create_group_mock
+        self,
+        project,
+        get_new_gid_mock,
+        ldap_gid_in_use_mock,
+        ldap_create_group_mock,
+        ldap_add_member_to_group_mock,
     ):
         """Test that the manager correctly create the HX2 Allocation."""
         user_status = AllocationUserStatusChoice.objects.create(name="Active")

@@ -391,7 +391,7 @@ def allocation_user_active_status(db):
 
 
 @pytest.fixture
-def allocation_user(allocation_user_active_status, rdf_allocation, user, mocker):
+def rdf_allocation_user(allocation_user_active_status, rdf_allocation, user, mocker):
     """Provides an active user for rdf_allocation fixture."""
     from coldfront.core.allocation.models import AllocationUser
 
@@ -406,7 +406,7 @@ def allocation_user(allocation_user_active_status, rdf_allocation, user, mocker)
 
 
 @pytest.fixture
-def allocation_attribute_factory(allocation_user):
+def allocation_attribute_factory(db):
     """Factory for creating AllocationAttribute instances for GID."""
     from coldfront.core.allocation.models import (
         AllocationAttribute,
@@ -419,8 +419,6 @@ def allocation_attribute_factory(allocation_user):
         value=None,
     ):
         """Create an AllocationAttribute instance."""
-        if allocation is None:
-            allocation = allocation_user.allocation
         name = name or random_string()
         return AllocationAttribute.objects.create(
             allocation=allocation,
@@ -480,3 +478,30 @@ def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id
     )
     allocation.resources.add(hx2_resource)
     return allocation
+
+
+@pytest.fixture
+def hx2_allocation_user(allocation_user_active_status, hx2_allocation, user, mocker):
+    """Provides an active user for hx2_allocation fixture."""
+    from coldfront.core.allocation.models import AllocationUser
+
+    with mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_add_member_to_group",
+    ):
+        return AllocationUser.objects.create(
+            allocation=hx2_allocation,
+            user=user,
+            status=allocation_user_active_status,
+        )
+
+
+@pytest.fixture(params=["rdf_allocation", "hx2_allocation"])
+def rdf_or_hx2_allocation(request):
+    """Fixture to provide either an RDF or HX2 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["rdf_allocation_user", "hx2_allocation_user"])
+def rdf_or_hx2_allocation_user(request):
+    """Fixture to provide an AllocationUser for either an RDF or HX2 allocation."""
+    return request.getfixturevalue(request.param)

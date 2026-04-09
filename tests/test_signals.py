@@ -169,8 +169,7 @@ class TestAllocationUserSyncLDAPGroupMembership:
         ldap_remove_member_mock,
         ldap_add_member_mock,
         user,
-        rdf_allocation_ldap_name,
-        rdf_allocation,
+        rdf_or_hx2_allocation,
         allocation_user_inactive_status,
     ):
         """Test sync_ldap_group_membership signal."""
@@ -179,12 +178,14 @@ class TestAllocationUserSyncLDAPGroupMembership:
         ldap_remove_member_mock.assert_not_called()
 
         AllocationUser.objects.create(
-            allocation=rdf_allocation, user=user, status=allocation_user_inactive_status
+            allocation=rdf_or_hx2_allocation,
+            user=user,
+            status=allocation_user_inactive_status,
         )
 
         ldap_add_member_mock.assert_not_called()
         ldap_remove_member_mock.assert_called_once_with(
-            rdf_allocation_ldap_name, user.username, allow_missing=True
+            rdf_or_hx2_allocation.ldap_shortname, user.username, allow_missing=True
         )
 
     def test_sync_ldap_group_membership_add(
@@ -192,8 +193,7 @@ class TestAllocationUserSyncLDAPGroupMembership:
         ldap_remove_member_mock,
         ldap_add_member_mock,
         user,
-        rdf_allocation_ldap_name,
-        rdf_allocation,
+        rdf_or_hx2_allocation,
         allocation_user_active_status,
     ):
         """Test sync_ldap_group_membership signal."""
@@ -201,11 +201,15 @@ class TestAllocationUserSyncLDAPGroupMembership:
         ldap_remove_member_mock.assert_not_called()
 
         AllocationUser.objects.create(
-            allocation=rdf_allocation, user=user, status=allocation_user_active_status
+            allocation=rdf_or_hx2_allocation,
+            user=user,
+            status=allocation_user_active_status,
         )
 
         ldap_add_member_mock.assert_called_once_with(
-            rdf_allocation_ldap_name, user.username, allow_already_present=True
+            rdf_or_hx2_allocation.ldap_shortname,
+            user.username,
+            allow_already_present=True,
         )
         ldap_remove_member_mock.assert_not_called()
 
@@ -213,7 +217,7 @@ class TestAllocationUserSyncLDAPGroupMembership:
         self,
         ldap_remove_member_mock,
         ldap_add_member_mock,
-        allocation_user,
+        rdf_or_hx2_allocation_user,
         settings,
         allocation_user_inactive_status,
     ):
@@ -222,13 +226,13 @@ class TestAllocationUserSyncLDAPGroupMembership:
         ldap_remove_member_mock.assert_not_called()
         settings.LDAP_ENABLED = False
 
-        allocation_user.status = allocation_user_inactive_status
-        allocation_user.save()
+        rdf_or_hx2_allocation_user.status = allocation_user_inactive_status
+        rdf_or_hx2_allocation_user.save()
 
         ldap_add_member_mock.assert_not_called()
         ldap_remove_member_mock.assert_not_called()
 
-    def test_non_rdf_allocation(
+    def test_non_rdf_or_hx2_allocation(
         self,
         ldap_remove_member_mock,
         ldap_add_member_mock,
@@ -259,19 +263,20 @@ class TestAllocationUserSyncLDAPGroupMembership:
         ldap_remove_member_mock,
         ldap_add_member_mock,
         user,
-        rdf_allocation,
+        rdf_or_hx2_allocation,
         allocation_inactive_status,
         allocation_user_active_status,
+        remove_allocation_group_members_mock,
     ):
         """Test that no LDAP operations are performed for inactive allocations."""
-        rdf_allocation.status = allocation_inactive_status
-        rdf_allocation.save()
+        rdf_or_hx2_allocation.status = allocation_inactive_status
+        rdf_or_hx2_allocation.save()
 
         ldap_add_member_mock.assert_not_called()
         ldap_remove_member_mock.assert_not_called()
 
         AllocationUser.objects.create(
-            allocation=rdf_allocation,
+            allocation=rdf_or_hx2_allocation,
             user=user,
             status=allocation_user_active_status,
         )
@@ -286,18 +291,17 @@ class TestAllocationUserLDAPGroupRemoveMembership:
     def test_success(
         self,
         ldap_remove_member_mock,
-        rdf_allocation_shortname,
-        allocation_user,
+        rdf_or_hx2_allocation_user,
         user,
         settings,
     ):
         """Test remove_ldap_group_membership signal."""
         ldap_remove_member_mock.assert_not_called()
 
-        allocation_user.delete()
+        rdf_or_hx2_allocation_user.delete()
 
         ldap_remove_member_mock.assert_called_once_with(
-            f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{rdf_allocation_shortname}",
+            rdf_or_hx2_allocation_user.allocation.ldap_shortname,
             user.username,
             allow_missing=True,
         )
@@ -305,14 +309,14 @@ class TestAllocationUserLDAPGroupRemoveMembership:
     def test_ldap_disabled(
         self,
         ldap_remove_member_mock,
-        allocation_user,
+        rdf_allocation_user,
         settings,
     ):
         """Test that no LDAP operations are performed when LDAP is disabled."""
         ldap_remove_member_mock.assert_not_called()
         settings.LDAP_ENABLED = False
 
-        allocation_user.delete()
+        rdf_allocation_user.delete()
 
         ldap_remove_member_mock.assert_not_called()
 
@@ -342,14 +346,14 @@ class TestAllocationUserLDAPGroupRemoveMembership:
         self,
         remove_allocation_group_members_mock,
         ldap_remove_member_mock,
-        allocation_user,
+        rdf_or_hx2_allocation_user,
         allocation_inactive_status,
     ):
         """Test that no LDAP operations are performed for inactive allocations."""
-        allocation_user.allocation.status = allocation_inactive_status
-        allocation_user.allocation.save()
+        rdf_or_hx2_allocation_user.allocation.status = allocation_inactive_status
+        rdf_or_hx2_allocation_user.allocation.save()
 
-        allocation_user.delete()
+        rdf_or_hx2_allocation_user.delete()
 
         ldap_remove_member_mock.assert_not_called()
 
@@ -360,30 +364,29 @@ class TestAllocationRemoveLDAPGroupMembersIfInactive:
     def test_success(
         self,
         remove_allocation_group_members_mock,
-        rdf_allocation,
         allocation_inactive_status,
-        allocation_user,
+        rdf_or_hx2_allocation_user,
     ):
         """Test remove_ldap_group_members_if_allocation_inactive signal."""
         remove_allocation_group_members_mock.assert_not_called()
 
         # Change allocation status to inactive
-        rdf_allocation.status = allocation_inactive_status
-        rdf_allocation.save()
+        allocation = rdf_or_hx2_allocation_user.allocation
+        allocation.status = allocation_inactive_status
+        allocation.save()
 
-        remove_allocation_group_members_mock.assert_called_once_with(rdf_allocation.pk)
+        remove_allocation_group_members_mock.assert_called_once_with(allocation.pk)
 
     def test_status_active(
         self,
         remove_allocation_group_members_mock,
-        rdf_allocation,
-        allocation_user,
+        rdf_or_hx2_allocation,
     ):
         """Test that task is not called when allocation is active."""
         remove_allocation_group_members_mock.assert_not_called()
 
         # Allocation is already active, so saving shouldn't trigger the task
-        rdf_allocation.save()
+        rdf_or_hx2_allocation.save()
 
         remove_allocation_group_members_mock.assert_not_called()
 
@@ -413,14 +416,14 @@ class TestAllocationRemoveLDAPGroupMembersIfInactive:
     def test_ldap_disabled(
         self,
         remove_allocation_group_members_mock,
-        rdf_allocation,
+        rdf_or_hx2_allocation,
         allocation_inactive_status,
         settings,
     ):
         """Test that task is not called when LDAP is disabled."""
         settings.LDAP_ENABLED = False
-        rdf_allocation.status = allocation_inactive_status
-        rdf_allocation.save()
+        rdf_or_hx2_allocation.status = allocation_inactive_status
+        rdf_or_hx2_allocation.save()
 
         remove_allocation_group_members_mock.assert_not_called()
 
@@ -477,6 +480,17 @@ class TestAllocationExpiryZeroQuota:
         )
         allocation.status = expired_status
         allocation.save()
+        zero_quota_mock.assert_not_called()
+
+    def test_hx2_allocation_does_not_trigger(
+        self,
+        hx2_allocation,
+        zero_quota_mock,
+        expired_status,
+    ):
+        """Test that expiring an HX2 allocation does not trigger the task."""
+        hx2_allocation.status = expired_status
+        hx2_allocation.save()
         zero_quota_mock.assert_not_called()
 
     def test_only_trigger_on_status_change_from_active_to_expired(

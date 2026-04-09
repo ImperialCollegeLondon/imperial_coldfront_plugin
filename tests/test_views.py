@@ -436,7 +436,7 @@ class TestAddDartID(LoginRequiredMixin):
         )
         assert response.status_code == 403
 
-    def test_get(self, rdf_allocation, allocation_user, user_client):
+    def test_get(self, rdf_allocation, user_client):
         """Test get method."""
         from imperial_coldfront_plugin.forms import DartIDForm
 
@@ -444,7 +444,7 @@ class TestAddDartID(LoginRequiredMixin):
         assert response.status_code == 200
         assert isinstance(response.context["form"], DartIDForm)
 
-    def test_post(self, rdf_allocation, allocation_user, user_client):
+    def test_post(self, rdf_allocation, user_client):
         """Test post method."""
         dart_id = "1001"
         allocation = "RDF Storage Allocation"
