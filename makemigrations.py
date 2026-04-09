@@ -35,6 +35,10 @@ settings.configure(
         "retry": 600,
     },
     GID_RANGES=dict(hx2=[], rdf=[]),
+    EMAIL_DIRECTOR_PENDING_PROJECT_REVIEW_EMAIL=False,
+    ALLOCATION_SHORTNAME_MIN_LENGTH=3,
+    ALLOCATION_SHORTNAME_MAX_LENGTH=12,
+    GPFS_API_TIMEOUT=4,
 )
 
 django.setup()

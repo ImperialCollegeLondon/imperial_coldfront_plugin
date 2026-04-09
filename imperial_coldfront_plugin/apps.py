@@ -17,10 +17,10 @@ class ImperialColdfrontPluginConfig(AppConfig):
         """Wire up signal handlers for app."""
         from django.conf import settings
 
+        django_stubs_ext.monkeypatch()
+
         from . import signals  # noqa: F401
         from .gid import validate_gid_range_overlap, validate_gid_ranges
-
-        django_stubs_ext.monkeypatch()
 
         # Ensure GID_RANGES setting is valid
         # do it here to avoid circular import issues

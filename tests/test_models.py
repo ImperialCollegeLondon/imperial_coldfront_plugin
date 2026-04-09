@@ -1,6 +1,18 @@
+import datetime
 from pathlib import Path
 
 import pytest
+from coldfront.core.allocation.models import (
+    Allocation,
+    AllocationAttribute,
+    AllocationAttributeType,
+    AllocationStatusChoice,
+    AllocationUserStatusChoice,
+)
+from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
+from django.utils import timezone
+
+from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
 
 
 class TestCreditTransaction:
@@ -86,11 +98,6 @@ class TestRDFAllocation:
 
     def test_storage_quota_tb_attr(self, rdf_allocation):
         """Test that storage_quota_tb_attr returns the correct attribute."""
-        from coldfront.core.allocation.models import (
-            AllocationAttribute,
-            AllocationAttributeType,
-        )
-
         attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
         AllocationAttribute.objects.create(
             allocation_attribute_type=attr_type, allocation=rdf_allocation, value=10
@@ -101,11 +108,6 @@ class TestRDFAllocation:
 
     def test_files_quota_attr(self, rdf_allocation):
         """Test that files_quota_attr returns the correct attribute."""
-        from coldfront.core.allocation.models import (
-            AllocationAttribute,
-            AllocationAttributeType,
-        )
-
         attr_type = AllocationAttributeType.objects.get(name="Files Quota")
         AllocationAttribute.objects.create(
             allocation_attribute_type=attr_type, allocation=rdf_allocation, value=1000
@@ -135,11 +137,6 @@ class TestRDFAllocation:
 
     def test_storage_quota_tb_bad_value(self, rdf_allocation):
         """Test that error is thrown when Storage Quota (TB) has a non-integer value."""
-        from coldfront.core.allocation.models import (
-            AllocationAttribute,
-            AllocationAttributeType,
-        )
-
         attr_type = AllocationAttributeType.objects.get(name="Storage Quota (TB)")
         AllocationAttribute.objects.create(
             allocation_attribute_type=attr_type,
@@ -148,6 +145,45 @@ class TestRDFAllocation:
         )
         with pytest.raises(ValueError):
             rdf_allocation.storage_quota_tb
+
+    def test_init_new_allocation(self, project):
+        """Test a new RDFAllocation can be initialized without a RDF resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        # should not raise an error
+        RDFAllocation(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+    def test_create(self, project):
+        """Test that RDFAllocation can be created without an RDF resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        RDFAllocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+    def test_init_for_saved_non_rdf_allocation(self, project):
+        """Test initialising RDFAllocation with saved nonRDF Allocation raises error."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+
+        # create a non-RDF allocation
+        allocation = Allocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+        with pytest.raises(ValueError):
+            RDFAllocation.objects.get(pk=allocation.pk)
+
+        with pytest.raises(ValueError):
+            RDFAllocation.from_allocation(allocation)
 
 
 class TestICLProject:
@@ -275,3 +311,177 @@ class TestICLProject:
             ValueError, match="ASK Ticket Reference attribute not found"
         ):
             project.ask_ticket_reference_attr
+
+
+@pytest.fixture
+def ldap_create_group_mock(mocker):
+    """Mock ldap_create_group."""
+    return mocker.patch("imperial_coldfront_plugin.models.ldap_create_group")
+
+
+@pytest.fixture
+def get_new_gid_mock(mocker):
+    """Mock get_new_gid."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.models.get_new_gid", return_value=99999
+    )
+
+
+@pytest.fixture
+def ldap_gid_in_use_mock(mocker):
+    """Mock ldap_gid_in_use."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+    )
+
+
+class TestHX2Allocation:
+    """Tests for the HX2Allocation model."""
+
+    def test_create_hx2allocation(
+        self, project, get_new_gid_mock, ldap_gid_in_use_mock, ldap_create_group_mock
+    ):
+        """Test that the manager correctly create the HX2 Allocation."""
+        user_status = AllocationUserStatusChoice.objects.create(name="Active")
+        allocation_status = AllocationStatusChoice.objects.create(name="Active")
+
+        start_date = datetime.date.today()
+        end_date = datetime.date.today() + datetime.timedelta(days=365)
+
+        allocation = HX2Allocation.objects.create_hx2allocation(
+            project=project,
+            status=allocation_status,
+            quantity=1,
+            start_date=start_date,
+            end_date=end_date,
+            justification="Test justification",
+            description="Test description",
+            is_locked=False,
+            is_changeable=True,
+        )
+
+        # Check that the HX2 Allocation was created with the correct inputs:
+        assert isinstance(allocation, HX2Allocation)
+        assert allocation.project == project
+        assert allocation.status == allocation_status
+        assert allocation.get_parent_resource.name == "HX2"
+        assert allocation.start_date == start_date
+        assert allocation.end_date == end_date
+        assert allocation.justification == "Test justification"
+        assert allocation.description == "Test description"
+        assert allocation.is_locked is False
+        assert allocation.is_changeable is True
+
+        # Check that the GID attribute was created with the correct value:
+        allocation.allocationattribute_set.get(
+            allocation_attribute_type__name="GID",
+            value=get_new_gid_mock.return_value,
+        )
+
+        # Check that the LDAP group creation was called with the correct inputs:
+        ldap_create_group_mock.assert_called_once_with(
+            group_name=allocation.ldap_shortname,
+            gid=get_new_gid_mock.return_value,
+        )
+
+        # Check that the AllocationUser was created with the correct inputs:
+        allocation.allocationuser_set.get(
+            user=project.pi,
+            status=user_status,
+        )
+
+    def test_create_hx2allocation_ldap_rollback(
+        self,
+        project,
+        get_new_gid_mock,
+        ldap_gid_in_use_mock,
+        ldap_create_group_mock,
+    ):
+        """Test that create_hx2allocation rolls back on LDAP error."""
+        status = AllocationStatusChoice.objects.create(name="Active")
+        ldap_create_group_mock.side_effect = RuntimeError("oh no!")
+
+        with pytest.raises(RuntimeError):
+            HX2Allocation.objects.create_hx2allocation(
+                project=project,
+                status=status,
+                quantity=1,
+                start_date=datetime.date.today(),
+                end_date=datetime.date.today() + datetime.timedelta(days=365),
+                justification="Test justification",
+                description="Test description",
+                is_locked=False,
+                is_changeable=True,
+            )
+
+        # Ensure that the runtime error came from the LDAP group creation:
+        ldap_create_group_mock.assert_called_once()
+
+        # Ensure that no allocation was created in the database:
+        assert not Allocation.objects.all()
+
+    def test_create(self, project):
+        """Test that HX2Allocation can be created without a HX2 resource."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        HX2Allocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+    def test_init_for_saved_non_hx2_allocation(self, project):
+        """Test initialising HX2Allocation with non-HX2 Allocation raises error."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+
+        # create a non-RDF allocation
+        allocation = Allocation.objects.create(
+            project=project,
+            status=active_status,
+            start_date=timezone.now(),
+            end_date=timezone.now(),
+        )
+
+        with pytest.raises(ValueError):
+            HX2Allocation.objects.get(pk=allocation.pk)
+
+        with pytest.raises(ValueError):
+            HX2Allocation.from_allocation(allocation)
+
+    def test_shortname(self, hx2_allocation, hx2_allocation_group_id):
+        """Test that shortname returns the correct value."""
+        assert hx2_allocation.shortname == hx2_allocation_group_id
+
+    def test_shortname_missing(self, project, hx2_allocation):
+        """Test that ValueError is raised when Shortname attribute is missing."""
+        ProjectAttribute.objects.filter(
+            project=project,
+            proj_attr_type__name="Group ID",
+        ).delete()
+
+        with pytest.raises(ValueError, match="Group ID attribute not found"):
+            hx2_allocation.shortname
+
+    def test_shortname_multiple(self, project, hx2_allocation):
+        """Test that ValueError is raised when multiple Shortname attributes exist."""
+        attr_type = ProjectAttributeType.objects.get(name="Group ID")
+        ProjectAttribute.objects.create(
+            proj_attr_type=attr_type,
+            project=project,
+            value="duplicate-short",
+        )
+
+        with pytest.raises(ValueError, match="Multiple Group ID attributes"):
+            hx2_allocation.shortname
+
+    def test_ldap_shortname(self, hx2_allocation, hx2_allocation_group_id, settings):
+        """Test that ldap_shortname returns shortname with LDAP prefix."""
+        settings.LDAP_HX2_SHORTNAME_PREFIX = "ldap-"
+        assert hx2_allocation.ldap_shortname == f"ldap-{hx2_allocation_group_id}"
+
+    def test_ldap_shortname_empty_prefix(
+        self, hx2_allocation, hx2_allocation_group_id, settings
+    ):
+        """Test that ldap_shortname works with an empty prefix."""
+        settings.LDAP_HX2_SHORTNAME_PREFIX = ""
+        assert hx2_allocation.ldap_shortname == hx2_allocation_group_id

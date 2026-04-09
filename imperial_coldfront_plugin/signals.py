@@ -23,10 +23,11 @@ from .ldap import (
     ldap_gid_in_use,
     ldap_remove_member_from_group,
 )
+from .tasks import remove_allocation_group_members
 
 
 @receiver(pre_save, sender=AllocationAttribute)
-def ensure_no_existing_gid(
+def allocation_attribute_ensure_no_existing_gid(
     sender: object, instance: AllocationAttribute, **kwargs: object
 ) -> None:
     """Prevent saving of GID attribute if it is already in use.
@@ -47,7 +48,7 @@ def ensure_no_existing_gid(
         return
     if AllocationAttribute.objects.filter(
         allocation_attribute_type__name="GID", value=instance.value
-    ):
+    ).exists():
         raise ValueError(
             f"GID {instance.value} is already assigned to another allocation."
         )
@@ -56,7 +57,7 @@ def ensure_no_existing_gid(
 
 
 @receiver(pre_save, sender=AllocationAttribute)
-def ensure_unique_shortname(
+def allocation_attribute_ensure_unique_shortname(
     sender: object, instance: AllocationAttribute, **kwargs: object
 ) -> None:
     """Prevent saving of shortname attribute if it is not unique.
@@ -70,13 +71,13 @@ def ensure_unique_shortname(
         instance.allocation_attribute_type.name == "Shortname"
         and AllocationAttribute.objects.filter(
             allocation_attribute_type__name="Shortname", value=instance.value
-        )
+        ).exists()
     ):
         raise ValueError(f"An allocation with {instance.value} already exists.")
 
 
 @receiver(pre_save, sender=ProjectAttribute)
-def ensure_unique_group_id(
+def project_attribute_ensure_unique_group_id(
     sender: object, instance: ProjectAttribute, **kwargs: object
 ) -> None:
     """Prevent saving of project group name if it is not unique.
@@ -86,14 +87,17 @@ def ensure_unique_group_id(
         instance: The instance being saved.
         **kwargs: Additional keyword arguments.
     """
-    if instance.proj_attr_type.name == "Group ID" and ProjectAttribute.objects.filter(
-        proj_attr_type__name="Group ID", value=instance.value
+    if (
+        instance.proj_attr_type.name == "Group ID"
+        and ProjectAttribute.objects.filter(
+            proj_attr_type__name="Group ID", value=instance.value
+        ).exists()
     ):
         raise ValueError(f"A project with {instance.value} already exists.")
 
 
 @receiver(post_save, sender=AllocationUser)
-def sync_ldap_group_membership(
+def allocation_user_sync_ldap_group_membership(
     sender: object, instance: AllocationUser, **kwargs: object
 ) -> None:
     """Add or remove members from an ldap group based on AllocationUser.status.
@@ -118,6 +122,10 @@ def sync_ldap_group_membership(
 
     shortname = rdf_allocation.ldap_shortname
 
+    if instance.allocation.status.name != "Active":
+        # Only manage LDAP group membership for Active allocations
+        return
+
     if instance.status.name == "Active":
         async_task(
             ldap_add_member_to_group,
@@ -135,7 +143,7 @@ def sync_ldap_group_membership(
 
 
 @receiver(post_delete, sender=AllocationUser)
-def remove_ldap_group_membership(
+def allocation_user_ldap_group_membership_deletion(
     sender: object, instance: AllocationUser, **kwargs: object
 ) -> None:
     """Remove an ldap group member if the associated AllocationUser is deleted.
@@ -163,6 +171,10 @@ def remove_ldap_group_membership(
 
     shortname = rdf_allocation.ldap_shortname
 
+    if instance.allocation.status.name != "Active":
+        # Only manage LDAP group membership for Active allocations
+        return
+
     async_task(
         ldap_remove_member_from_group,
         shortname,
@@ -173,15 +185,13 @@ def remove_ldap_group_membership(
 
 @receiver(post_save, sender=Allocation)
 @receiver(post_save, sender=RDFAllocation)
-def remove_ldap_group_members_if_allocation_inactive(
+def allocation_remove_ldap_group_members_if_inactive(
     sender: object, instance: Allocation | RDFAllocation, **kwargs: object
 ) -> None:
     """Remove all LDAP group members if allocation is not Active.
 
     The LDAP group itself is not deleted.
     """
-    from .tasks import remove_allocation_group_members
-
     if not settings.LDAP_ENABLED:
         return
     try:
@@ -193,17 +203,12 @@ def remove_ldap_group_members_if_allocation_inactive(
     if rdf_allocation.status.name == "Active":
         return
 
-    try:
-        rdf_allocation.ldap_shortname
-    except ValueError:
-        return
-
     async_task(remove_allocation_group_members, instance.pk)
 
 
 @receiver(pre_save, sender=RDFAllocation)
 @receiver(pre_save, sender=Allocation)
-def allocation_expired_handler(
+def allocation_expiry_zero_quota(
     sender: type[RDFAllocation],
     instance: Allocation | RDFAllocation,
     **kwargs: object,
@@ -213,9 +218,6 @@ def allocation_expired_handler(
         return
 
     if instance.status.name != "Expired":
-        return
-
-    if not instance.resources.filter(name="RDF Active").exists():
         return
 
     try:
@@ -228,7 +230,7 @@ def allocation_expired_handler(
     except RDFAllocation.DoesNotExist:
         return
 
-    if old_instance.status == instance.status:
+    if old_instance.status.name != "Active":
         return
 
     async_task(
