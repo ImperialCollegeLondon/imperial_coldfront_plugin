@@ -624,8 +624,8 @@ class TestAllocationReoveHX2AccessGroupIfInactive(_TestInactiveAllocationBase):
         rdf_allocation_user.allocation.save()
         assert (
             call(
+                [user.username],
                 settings.LDAP_HX2_ACCESS_GROUP_NAME,
-                user.username,
                 allow_missing=True,
             )
             not in remove_ldap_group_members_mock.call_args_list
