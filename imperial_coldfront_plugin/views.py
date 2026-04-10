@@ -423,6 +423,9 @@ def project_credit_transactions(
 @login_required
 def user_create_hx2_allocation(request: "AuthenticatedHttpRequest") -> HttpResponse:
     """Create an HX2 allocation for the user."""
+    if not settings.ENABLE_USER_GROUP_CREATION:
+        return HttpResponseForbidden()
+
     if Allocation.objects.filter(
         project__pi=request.user,
         status__name="Active",

@@ -1232,3 +1232,10 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         form = response.context["form"]
         assert form.fields["project"].queryset.get() == project
         assert not form.fields["accept_terms"].initial
+
+    def test_feature_flag(self, auth_client_factory, project, user_factory, settings):
+        """Test that the view is disabled when the feature flag is off."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 403
