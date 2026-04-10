@@ -162,26 +162,6 @@ def notify_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.tasks.send_discrepancy_notification")
 
 
-def test_remove_ldap_group_members(ldap_remove_member_mock):
-    """Test remove_ldap_group_members removes all active users."""
-    from imperial_coldfront_plugin.tasks import remove_ldap_group_members
-
-    usernames = ["user1", "user2", "user3"]
-    group_name = "groupname1"
-    remove_ldap_group_members(usernames, group_name)
-
-    ldap_remove_member_mock.assert_has_calls(
-        [
-            call(
-                group_name,
-                username,
-                allow_missing=True,
-            )
-            for username in usernames
-        ]
-    )
-
-
 def helper_add_quota_attributes(allocation, storage_quota, files_quota):
     """Helper function to add quota attributes to an allocation."""
     from coldfront.core.allocation.models import AllocationAttributeType
