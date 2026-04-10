@@ -455,7 +455,7 @@ def user_create_hx2_allocation(request: "AuthenticatedHttpRequest") -> HttpRespo
             quantity=1,
             start_date=timezone.now().date(),
             end_date=None,
-            justification="User self-allocated Hx2 allocation",
+            justification="User self-allocated HX2 allocation",
             description="Provides access to HX2 for all allocation users.",
             is_locked=False,
             is_changeable=True,

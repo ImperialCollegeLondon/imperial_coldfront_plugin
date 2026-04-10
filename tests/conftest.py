@@ -266,7 +266,8 @@ def project_factory(project_active_status, field_of_science_other):
 
     The factory takes the following arguments:
 
-    - user: The owner of the project. Default is `user` fixture.
+    - pi: The owner of the project.
+    - title: The title of the project.
     """
 
     def create_project(pi, title):
