@@ -2,5 +2,5 @@
 
 import pint
 
-ureg: pint.UnitRegistry = pint.UnitRegistry()
+ureg: pint.UnitRegistry[float] = pint.UnitRegistry()
 ureg.define("credit = [credit]")
