@@ -106,11 +106,24 @@ LDAP_HX2_ACCESS_GROUP_NAME = ENV.str(
 )
 """Name of the Active Directory group to add users to for HX2 access."""
 
-_GID_RANGES = ENV.str("GID_RANGE", default="1031386-1031435")
-GID_RANGES = [
-    range(int(start), int(end) + 1)
-    for start, end in [gid_range.split("-") for gid_range in _GID_RANGES.split(",")]
-]
+_GID_RANGES_RDF = ENV.str("GID_RANGE_RDF", default="1031386-1031405")
+_GID_RANGES_HX2 = ENV.str("GID_RANGE_HX2", default="1031406-1031425")
+
+
+def string_to_gid_ranges(gid_ranges_str: str) -> list[range]:
+    """Convert a string of comma-separated GID ranges into a list of range objects."""
+    return [
+        range(int(start), int(end) + 1)
+        for start, end in [
+            gid_range.split("-") for gid_range in gid_ranges_str.split(",")
+        ]
+    ]
+
+
+GID_RANGES = dict(
+    rdf=string_to_gid_ranges(_GID_RANGES_RDF),
+    hx2=string_to_gid_ranges(_GID_RANGES_HX2),
+)
 """List of ranges of GIDs available for allocation to groups."""
 
 LOGOUT_REDIRECT_URL = "/"
