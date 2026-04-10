@@ -17,6 +17,7 @@ from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
+    HXAllocationForm,
     RDFAllocationForm,
     UserProjectCreationForm,
 )
@@ -340,6 +341,70 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             )
             assert response.context["departments"] == ["Computer Science", "Mechanical"]
             mock_get_department_choices.assert_called_once_with(faculty)
+
+
+class TestAddHXAllocation(LoginRequiredMixin):
+    """Tests for the add_hx_allocation view."""
+
+    mock_task_id = 1
+
+    @pytest.fixture(autouse=True)
+    def async_task_mock(self, mocker):
+        """Mock out async_task in favour of direct task execution."""
+
+        def f(func, *args, **kwargs):
+            func(*args, **kwargs)
+            return self.mock_task_id
+
+        return mocker.patch("imperial_coldfront_plugin.views.async_task", f)
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:add_hx_allocation")
+
+    def test_non_admin_forbidden(self, user, auth_client_factory):
+        """Test non-admin users cannot access the page."""
+        client = auth_client_factory(user)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_get(self, superuser_client):
+        """Check form rendering."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], HXAllocationForm)
+
+    @patch("imperial_coldfront_plugin.views.create_hx_allocation")
+    def test_post(
+        self,
+        create_hx_allocation_mock,
+        superuser_client,
+        project,
+    ):
+        """Test successful project creation."""
+        # mock the chain to inject the group value to check the redirect later
+        group_id = project.group_id
+        resource_type = "hx2"
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                resource_type=resource_type,
+            ),
+        )
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:hx_allocation_task_result",
+                args=[resource_type, self.mock_task_id, group_id],
+            ),
+            fetch_redirect_response=False,
+        )
+        create_hx_allocation_mock.assert_called_once()
+        called_args, _ = create_hx_allocation_mock.call_args
+        form_data = called_args[0]
+        assert form_data["project"] == project
+        assert form_data["resource_type"] == "hx2"
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):
