@@ -374,3 +374,17 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Description of the transaction",
     )
+
+
+class HX2TermsAndConditionsForm(forms.Form):
+    """Form for accepting terms and conditions."""
+
+    project = forms.ModelChoiceField(
+        queryset=ICLProject.objects.none(),
+        widget=_js_select_widget(),
+        label="Please select which group you would like to grant access to.",
+    )
+    accept_terms = forms.BooleanField(
+        required=True,
+        label="I have read and accept the terms and conditions.",
+    )

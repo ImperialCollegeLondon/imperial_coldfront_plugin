@@ -245,31 +245,58 @@ def user_or_superuser(request):
 
 
 @pytest.fixture
-def project(user):
-    """Provides a Coldfront project owned by a user."""
+def project_active_status(db):
+    """Create a ProjectStatusChoice with name='Active'."""
+    from coldfront.core.project.models import ProjectStatusChoice
+
+    return ProjectStatusChoice.objects.get_or_create(name="Active")[0]
+
+
+@pytest.fixture
+def field_of_science_other(db):
+    """Create a FieldOfScience with description='Other'."""
     from coldfront.core.field_of_science.models import FieldOfScience
+
+    return FieldOfScience.objects.get_or_create(description="Other")[0]
+
+
+@pytest.fixture
+def project_factory(project_active_status, field_of_science_other):
+    """Provides a factory for Coldfront projects.
+
+    The factory takes the following arguments:
+
+    - user: The owner of the project. Default is `user` fixture.
+    """
+
+    def create_project(pi, title):
+        from imperial_coldfront_plugin.models import ICLProject
+
+        return ICLProject.objects.create(
+            pi=pi,
+            title=title,
+            status=project_active_status,
+            field_of_science=field_of_science_other,
+        )
+
+    return create_project
+
+
+@pytest.fixture
+def project(user, project_factory):
+    """Provides a Coldfront project owned by a user."""
     from coldfront.core.project.models import (
         ProjectAttribute,
         ProjectAttributeType,
-        ProjectStatusChoice,
         ProjectUser,
         ProjectUserRoleChoice,
         ProjectUserStatusChoice,
     )
 
-    from imperial_coldfront_plugin.models import ICLProject
-
-    project_active_status = ProjectStatusChoice.objects.create(name="Active")
-    field_of_science_other = FieldOfScience.objects.create(description="Other")
     project_user_active_status = ProjectUserStatusChoice.objects.create(name="Active")
     project_user_role_manager = ProjectUserRoleChoice.objects.create(name="Manager")
 
-    project = ICLProject.objects.create(
-        pi=user,
-        title=f"{user.get_full_name()}'s Research Group",
-        status=project_active_status,
-        field_of_science=field_of_science_other,
-    )
+    project = project_factory(pi=user, title=f"{user.get_full_name()}'s Research Group")
     department_attribute_type = ProjectAttributeType.objects.get(name="Department")
     faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
     group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
