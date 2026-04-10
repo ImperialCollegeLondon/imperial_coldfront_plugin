@@ -99,7 +99,7 @@ def project_attribute_ensure_unique_group_id(
 
 def _sync_membership_helper(
     allocation: RDFAllocation | HX2Allocation,
-    user: AllocationUser,
+    allocation_user: AllocationUser,
     ldap_groupname: str,
 ) -> None:
     """Helper function to sync LDAP group membership for an AllocationUser."""
@@ -107,18 +107,18 @@ def _sync_membership_helper(
         # Only manage LDAP group membership for Active allocations
         return
 
-    if user.status.name == "Active":
+    if allocation_user.status.name == "Active":
         async_task(
             ldap_add_member_to_group,
             ldap_groupname,
-            user.user.username,
+            allocation_user.user.username,
             allow_already_present=True,
         )
     else:
         async_task(
             ldap_remove_member_from_group,
             ldap_groupname,
-            user.user.username,
+            allocation_user.user.username,
             allow_missing=True,
         )
 
