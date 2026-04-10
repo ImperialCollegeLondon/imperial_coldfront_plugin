@@ -51,12 +51,6 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     return mock
 
 
-@pytest.fixture
-def allocation_active_status():
-    """Fixture for an active allocation status choice."""
-    return AllocationStatusChoice.objects.create(name="Active")
-
-
 class TestHomeView:
     """Test rendering of the home view.
 
