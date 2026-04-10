@@ -598,7 +598,7 @@ class TestAllocationRemoveLDAPGroupMembersIfInactive(_TestInactiveAllocationBase
         assert call_should_be_made == call_made
 
 
-class TestAllocationReoveHX2AccessGroupIfInactive(_TestInactiveAllocationBase):
+class TestAllocationRemoveHX2AccessGroupIfInactive(_TestInactiveAllocationBase):
     """Tests for allocation_remove_hx2_access_group_if_inactive signal handler."""
 
     @pytest.fixture
