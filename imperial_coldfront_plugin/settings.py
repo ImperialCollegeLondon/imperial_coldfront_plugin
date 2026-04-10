@@ -101,6 +101,10 @@ AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
 LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
 """Computed value of whether LDAP integration is enabled."""
 
+LDAP_HX2_ACCESS_GROUP_NAME = ENV.str(
+    "LDAP_HX2_ACCESS_GROUP_NAME", default="hx2dev-users"
+)
+"""Name of the Active Directory group to add users to for HX2 access."""
 
 _GID_RANGES = ENV.str("GID_RANGE", default="1031386-1031435")
 GID_RANGES = [

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from unittest.mock import call
 
 import pytest
 from coldfront.core.allocation.models import (
@@ -377,80 +378,23 @@ def test_check_ldap_consistency_extra_members(
     notify_mock.assert_called_once()
 
 
-def test_remove_allocation_group_members_feature_flag(
-    settings, rdf_or_hx2_allocation, ldap_remove_member_mock
-):
-    """Test task does nothing when feature flag is disabled."""
-    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
+def test_remove_ldap_group_members(ldap_remove_member_mock):
+    """Test remove_ldap_group_members removes all active users."""
+    from imperial_coldfront_plugin.tasks import remove_ldap_group_members
 
-    settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
+    usernames = ["user1", "user2", "user3"]
+    group_name = "groupname1"
+    remove_ldap_group_members(usernames, group_name)
 
-    remove_allocation_group_members(rdf_or_hx2_allocation.pk)
-
-    ldap_remove_member_mock.assert_not_called()
-
-
-def test_remove_allocation_group_members(
-    ldap_remove_member_mock, rdf_or_hx2_allocation_user
-):
-    """Test _remove_allocation_group_members removes all active users."""
-    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
-
-    allocation = rdf_or_hx2_allocation_user.allocation
-    remove_allocation_group_members(allocation.pk)
-
-    ldap_remove_member_mock.assert_called_once_with(
-        allocation.ldap_shortname,
-        rdf_or_hx2_allocation_user.user.username,
-        allow_missing=True,
-    )
-
-
-def test_remove_allocation_group_members_multiple_users(
-    ldap_remove_member_mock,
-    # rdf_allocation,
-    rdf_or_hx2_allocation_user,
-    allocation_user_active_status,
-    user_factory,
-    # rdf_allocation_ldap_name,
-):
-    """Test _remove_allocation_group_members removes multiple active users."""
-    from imperial_coldfront_plugin.tasks import remove_allocation_group_members
-
-    # Create additional active users
-    user2 = user_factory()
-    user3 = user_factory()
-
-    allocation = rdf_or_hx2_allocation_user.allocation
-    allocation_user2 = AllocationUser.objects.create(  # noqa F841
-        allocation=allocation,
-        user=user2,
-        status=allocation_user_active_status,
-    )
-    allocation_user3 = AllocationUser.objects.create(  # noqa F841
-        allocation=allocation,
-        user=user3,
-        status=allocation_user_active_status,
-    )
-
-    remove_allocation_group_members(allocation.pk)
-
-    ldap_name = allocation.ldap_shortname
-    assert ldap_remove_member_mock.call_count == 3
-    ldap_remove_member_mock.assert_any_call(
-        ldap_name,
-        rdf_or_hx2_allocation_user.user.username,
-        allow_missing=True,
-    )
-    ldap_remove_member_mock.assert_any_call(
-        ldap_name,
-        user2.username,
-        allow_missing=True,
-    )
-    ldap_remove_member_mock.assert_any_call(
-        ldap_name,
-        user3.username,
-        allow_missing=True,
+    ldap_remove_member_mock.assert_has_calls(
+        [
+            call(
+                group_name,
+                username,
+                allow_missing=True,
+            )
+            for username in usernames
+        ]
     )
 
 

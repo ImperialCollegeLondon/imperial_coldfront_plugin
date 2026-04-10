@@ -5,7 +5,6 @@ import time
 from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
-    Allocation,
     AllocationAttribute,
     AllocationAttributeType,
     AllocationAttributeUsage,
@@ -35,7 +34,6 @@ from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
-from .utils import rdf_or_hx2_allocation
 
 
 def create_rdf_allocation(form_data: AllocationFormData) -> int:
@@ -244,32 +242,20 @@ def update_quota_usages_task() -> None:
         files_attribute_usage.save()
 
 
-def remove_allocation_group_members(allocation_id: int) -> None:
+def remove_ldap_group_members(usernames: list[str], group_name: str) -> None:
     """Background task: remove all active members from an LDAP group.
 
     Args:
-        allocation_id: The primary key of the allocation.
+        usernames: The usernames to remove from the group
+        group_name: The name of the LDAP group to remove members from.
     """
     from .ldap import ldap_remove_member_from_group
 
-    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
-        return
-
-    try:
-        allocation = rdf_or_hx2_allocation(Allocation.objects.get(pk=allocation_id))
-    except ValueError:
-        return
-
-    # Get all active users from the database
-    active_users = AllocationUser.objects.filter(
-        allocation=allocation, status__name="Active"
-    )
-
     # Remove each user from the LDAP group
-    for allocation_user in active_users:
+    for username in usernames:
         ldap_remove_member_from_group(
-            allocation.ldap_shortname,
-            allocation_user.user.username,
+            group_name,
+            username,
             allow_missing=True,
         )
 

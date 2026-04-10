@@ -4,6 +4,7 @@ import datetime
 import pkgutil
 from random import choices
 from string import ascii_lowercase
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -371,9 +372,7 @@ def rdf_allocation(
         allocation=allocation,
         value=rdf_allocation_shortname,
     )
-    with mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
-    ):
+    with patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False):
         AllocationAttribute.objects.create(
             allocation_attribute_type=gid_attribute_type,
             allocation=allocation,
