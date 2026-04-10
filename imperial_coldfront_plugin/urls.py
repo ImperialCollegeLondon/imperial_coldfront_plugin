@@ -13,6 +13,16 @@ urlpatterns = [
         name="add_rdf_storage_allocation",
     ),
     path(
+        "create_hx_allocation/",
+        views.add_hx_allocation,
+        name="add_hx_allocation",
+    ),
+    path(
+        "hx_allocation_task_result/<str:resource_type>/<str:task_id>/<str:group_id>",
+        views.hx_allocation_task_result,
+        name="hx_allocation_task_result",
+    ),
+    path(
         "create_credit_transaction/",
         views.create_credit_transaction,
         name="create_credit_transaction",

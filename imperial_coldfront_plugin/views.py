@@ -28,6 +28,7 @@ from .forms import (
     AdminProjectCreationForm,
     CreditTransactionForm,
     DartIDForm,
+    HXAllocationForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
@@ -40,7 +41,7 @@ from .policy import (
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
 )
-from .tasks import create_rdf_allocation
+from .tasks import create_hx_allocation, create_rdf_allocation
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User as UserType
@@ -109,6 +110,61 @@ def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
         form = RDFAllocationForm()
     return render(
         request, "imperial_coldfront_plugin/rdf_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def add_hx_allocation(request: HttpRequest) -> HttpResponse:
+    """Create a new HX2 project allocation.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the allocation creation form or redirects to the task result page.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = HXAllocationForm(request.POST)
+        if form.is_valid():
+            task_id = async_task(create_hx_allocation, form.cleaned_data)
+            return redirect(
+                "imperial_coldfront_plugin:hx_allocation_task_result",
+                resource_type=form.cleaned_data["resource_type"],
+                task_id=task_id,
+                group_id=form.cleaned_data["project"].group_id,
+            )
+    else:
+        form = HXAllocationForm()
+    return render(
+        request, "imperial_coldfront_plugin/hx_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def hx_allocation_task_result(
+    request: HttpRequest, task_id: str, group_id: str, resource_type: str
+) -> HttpResponse:
+    """Display information about an hx allocation creation task.
+
+    Args:
+      request: The HTTP request object.
+      task_id: The ID of the task to fetch.
+      group_id: The ID of the group for which the allocation is being created.
+      resource_type: The type of the HX allocation being created (HX2 or HX3).
+
+    Returns:
+      The page displaying the task result.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+    task = fetch(task_id)
+    return render(
+        request,
+        "imperial_coldfront_plugin/hx_allocation_task_result.html",
+        context={"resource_type": resource_type, "task": task, "group_id": group_id},
     )
 
 

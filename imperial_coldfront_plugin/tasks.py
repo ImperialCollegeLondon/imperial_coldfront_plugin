@@ -31,7 +31,7 @@ from .emails import (
     send_fileset_not_found_notification,
     send_quota_discrepancy_notification,
 )
-from .forms import AllocationFormData
+from .forms import AllocationFormData, HXAllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
@@ -176,6 +176,43 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
                 ldap_delete_group(ldap_name, allow_missing=True)
                 raise
     return rdf_allocation.pk
+
+
+def create_hx_allocation(form_data: HXAllocationFormData) -> int:
+    """Create an HX allocation from a validated HXAllocationForm.
+
+    Note that this function interacts with external systems.
+
+    Returns:
+        The primary key of the created Allocation.
+    """
+    # As with create_rdf_allocation; slightly hacky but we're in the tasks module so
+    # assume we're running as a task and use django-q logger
+    logger = logging.getLogger("django-q")
+
+    resource_type = form_data["resource_type"]
+    project = form_data["project"]
+
+    if resource_type == "hx2":
+        logger.info("Creating initial database entries for HX2 allocation.")
+        hx_allocation = HX2Allocation.objects.create_hx2allocation(
+            project=project,
+            status=AllocationStatusChoice.objects.get(name="Active"),
+            quantity=1,
+            start_date=timezone.now(),
+            end_date=None,
+            justification="",
+            description="",
+            is_locked=False,
+            is_changeable=True,
+        )
+
+        logger.info(f"Created HX2 allocation with pk {hx_allocation.pk}")
+
+    else:
+        raise ValueError(f"Invalid HX resource type: {resource_type}")
+
+    return hx_allocation.pk
 
 
 def find_discrepancies_helper(
