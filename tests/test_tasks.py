@@ -20,6 +20,7 @@ from imperial_coldfront_plugin.tasks import (
     check_hx2_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
     check_rdf_ldap_consistency,
+    create_hx_allocation,
     create_rdf_allocation,
     unlink_expired_allocation_filesets,
 )
@@ -159,6 +160,14 @@ def ldap_group_search_mock(mocker):
 def notify_mock(mocker):
     """Mock the send_discrepancy_notification function in tasks.py."""
     return mocker.patch("imperial_coldfront_plugin.tasks.send_discrepancy_notification")
+
+
+@pytest.fixture
+def create_hx2_allocation_mock(mocker):
+    """Mock the create_hx2allocation method."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.HX2Allocation.objects.create_hx2allocation"
+    )
 
 
 def helper_add_quota_attributes(allocation, storage_quota, files_quota):
@@ -335,6 +344,50 @@ class TestCreateRDFAllocation:
         ldap_delete_group_mock.assert_called_once_with(
             rdf_allocation_ldap_name, allow_missing=True
         )
+
+
+class TestCreateHXAllocation:
+    """Tests for create_hx_allocation task."""
+
+    def _make_form_data(self, project, resource_type="hx2"):
+        return {
+            "resource_type": resource_type,
+            "project": project,
+        }
+
+    def test_hx2_calls_create_hx2allocation(
+        self,
+        project,
+        create_hx2_allocation_mock,
+        hx2_allocation,
+    ):
+        """create_hx_allocation calls create_hx2allocation with correct args."""
+        form_data = self._make_form_data(project)
+
+        create_hx_allocation(form_data)
+
+        create_hx2_allocation_mock.assert_called_once()
+        _, kwargs = create_hx2_allocation_mock.call_args
+        assert kwargs["project"] == form_data["project"]
+        assert kwargs["status"] == AllocationStatusChoice.objects.get(name="Active")
+        assert kwargs["quantity"] == 1
+        assert kwargs["end_date"] is None
+        assert kwargs["justification"] == ""
+        assert kwargs["description"] == ""
+        assert kwargs["is_locked"] is False
+        assert kwargs["is_changeable"] is True
+        assert kwargs["start_date"] is not None
+
+    def test_hx2_returns_pk(self, create_hx2_allocation_mock, project, hx2_allocation):
+        """create_hx_allocation returns the pk of the created allocation."""
+        create_hx2_allocation_mock.return_value.pk = 42
+        result = create_hx_allocation(self._make_form_data(project))
+        assert result == 42
+
+    def test_invalid_resource_type_raises(self, project):
+        """create_hx_allocation raises ValueError for unknown resource types."""
+        with pytest.raises(ValueError, match="Invalid HX resource type: hx99"):
+            create_hx_allocation(self._make_form_data(project, resource_type="hx99"))
 
 
 class TestCheckRDFLdapConsistency:
