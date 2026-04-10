@@ -446,7 +446,7 @@ class TestAllocationUserHX2AccessGroupDeletion(
 ):
     """Tests for allocation_user_hx2_access_group_deletion signal handler.
 
-    Inherits from TestAllocationUserLDAPGroupMembership to reuse tests, but
+    Inherits from TestAllocationUserLDAPGroupRemoveMembership to reuse tests, but
     overrides allocation and ldap_groupname fixtures to use HX2 only values.
     """
 

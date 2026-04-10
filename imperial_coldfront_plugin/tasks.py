@@ -269,7 +269,7 @@ def update_quota_usages_task() -> None:
 
 
 def remove_ldap_group_members(usernames: list[str], group_name: str) -> None:
-    """Background task: remove all active members from an LDAP group.
+    """Remove members from an LDAP group.
 
     Args:
         usernames: The usernames to remove from the group
