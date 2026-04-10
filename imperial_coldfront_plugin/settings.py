@@ -194,7 +194,7 @@ ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=Fals
 """Feature flag to enable or disable creation of user groups for allocations."""
 
 
-SERVICE_CHARGING_RATES: dict[str, pint.Quantity] = {
+SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
     "rdf_active": ENV.int("RDF_ACTIVE_CHARGING_RATE", default=50)
     * ureg.credit
     / (ureg.terabyte * ureg.year),
