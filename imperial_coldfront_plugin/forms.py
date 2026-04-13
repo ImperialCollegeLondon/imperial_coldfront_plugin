@@ -133,13 +133,6 @@ class AllocationFormData(TypedDict):
     allocation_shortname: str
 
 
-class HXAllocationFormData(TypedDict):
-    """Structure for holding cleaned HX allocation form data with types."""
-
-    project: ICLProject
-    resource_type: str
-
-
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 

@@ -3,6 +3,7 @@
 import logging
 import time
 from datetime import date, timedelta
+from typing import Any
 
 from coldfront.core.allocation.models import (
     AllocationAttribute,
@@ -31,7 +32,7 @@ from .emails import (
     send_fileset_not_found_notification,
     send_quota_discrepancy_notification,
 )
-from .forms import AllocationFormData, HXAllocationFormData
+from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
@@ -178,7 +179,7 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
     return rdf_allocation.pk
 
 
-def create_hx_allocation(form_data: HXAllocationFormData) -> int:
+def create_hx_allocation(form_data: dict[str, Any]) -> int:
     """Create an HX allocation from a validated HXAllocationForm.
 
     Note that this function interacts with external systems.
