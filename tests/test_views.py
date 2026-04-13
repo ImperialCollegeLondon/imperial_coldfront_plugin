@@ -460,7 +460,7 @@ class TestHXAllocationTaskResult(LoginRequiredMixin):
         allocation_pk: int = 1,
     ):
         return reverse(
-            "imperial_coldfront_plugin:allocation_task_result",
+            "imperial_coldfront_plugin:hx_allocation_task_result",
             kwargs={
                 "resource_type": resource_type,
                 "group_id": group_id,
@@ -468,7 +468,7 @@ class TestHXAllocationTaskResult(LoginRequiredMixin):
             },
         )
 
-    def test_success(self, superuser_client, rdf_allocation_shortname):
+    def test_success(self, superuser_client):
         """Test view when the task completed successfully."""
         response = superuser_client.get(self._get_url("hx2", "test-group", 1))
         assert response.status_code == HTTPStatus.OK
