@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
-from coldfront.core.allocation.models import AllocationStatusChoice
+from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
 from coldfront.core.project.models import ProjectStatusChoice
 from django.conf import settings
 from django.shortcuts import render
@@ -1164,3 +1164,72 @@ class TestAllocationDetailBanners:
         assert not soup.find("div", id="deleted-allocation")
         assert not soup.find("div", id="removed-allocation")
         assert not soup.find("div", id="archived-allocation")
+
+
+class TestUserCreateHX2AllocationView(LoginRequiredMixin):
+    """Tests for the user_create_hx2_allocation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:user_create_hx2_allocation")
+
+    def test_existing_allocation(self, auth_client_factory, hx2_allocation, project):
+        """Test that users with an existing allocation cannot create another."""
+        client = auth_client_factory(hx2_allocation.project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+        assert b"Unable to request HX2 Access" in response.content
+
+    @patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False)
+    @patch("imperial_coldfront_plugin.models.ldap_create_group")
+    def test_post(
+        self,
+        ldap_create_group_mock,
+        ldap_gid_in_use_mock,
+        auth_client_factory,
+        project,
+        rdf_allocation_dependencies,
+    ):
+        """Test that a user can create an HX2 allocation."""
+        client = auth_client_factory(project.pi)
+        response = client.post(
+            self._get_url(), data=dict(project=project.pk, accept_terms=True)
+        )
+        allocation = Allocation.objects.get(project=project, resources__name="HX2")
+        assertRedirects(
+            response,
+            reverse("allocation-detail", kwargs=dict(allocation_pk=allocation.pk)),
+            fetch_redirect_response=False,
+        )
+
+    def test_post_other_users_project(self, auth_client_factory, project, user_factory):
+        """Test that user cannot create an HX2 allocation for another user's project."""
+        other_user = user_factory()
+        client = auth_client_factory(other_user)
+        response = client.post(
+            self._get_url(), data=dict(project=project.pk, accept_terms=True)
+        )
+        assert response.status_code == 200
+        assert response.context["form"].errors["project"] == [
+            "Select a valid choice. That choice is not one of the available choices."
+        ]
+
+    def test_get(self, auth_client_factory, project, user_factory, project_factory):
+        """Test that the form is rendered on GET and has the correct choices."""
+        project_factory(pi=user_factory(), title="Other Project")
+
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/hx2_allocation_self_creation.html"
+        )
+        form = response.context["form"]
+        assert form.fields["project"].queryset.get() == project
+        assert not form.fields["accept_terms"].initial
+
+    def test_feature_flag(self, auth_client_factory, project, user_factory, settings):
+        """Test that the view is disabled when the feature flag is off."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 403

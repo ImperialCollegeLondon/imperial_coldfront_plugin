@@ -3,7 +3,7 @@
 import re
 from typing import TYPE_CHECKING
 
-from coldfront.core.allocation.models import Allocation
+from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
 from coldfront.core.project.forms import ProjectAddUserForm
 from coldfront.core.project.models import (
     Project,
@@ -17,10 +17,11 @@ from coldfront.core.user.utils import CombinedUserSearch, UserSearch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.forms import formset_factory
+from django.forms import ModelChoiceField, formset_factory
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django_q.tasks import async_task, fetch
 
 from .dart import create_dart_id_attribute
@@ -28,13 +29,14 @@ from .forms import (
     AdminProjectCreationForm,
     CreditTransactionForm,
     DartIDForm,
+    HX2TermsAndConditionsForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
 )
 from .microsoft_graph_client import get_graph_api_client
-from .models import CreditTransaction, ICLProject
+from .models import CreditTransaction, HX2Allocation, ICLProject
 from .policy import (
     check_project_pi_or_superuser,
     user_eligible_for_hpc_access,
@@ -415,4 +417,52 @@ def project_credit_transactions(
             "rows": rows,
             "total_balance": running,
         },
+    )
+
+
+@login_required
+def user_create_hx2_allocation(request: "AuthenticatedHttpRequest") -> HttpResponse:
+    """Create an HX2 allocation for the user."""
+    if not settings.ENABLE_USER_GROUP_CREATION:
+        return HttpResponseForbidden()
+
+    if Allocation.objects.filter(
+        project__pi=request.user,
+        status__name="Active",
+        resources__name="HX2",
+    ).exists():
+        # render info page saying user already has an active HX2 allocation
+        return render(request, "imperial_coldfront_plugin/existing_hx2_allocation.html")
+
+    form = HX2TermsAndConditionsForm(request.POST or None)
+
+    # set the project choices queryset to only the projects of the user
+    # this limits the selection to only the user's projects
+    # it is also used in form validation to ensure the user can only create
+    # allocations for their own projects
+    projects = Project.objects.filter(pi=request.user, status__name="Active")
+    project_field = form.fields["project"]
+    if not isinstance(project_field, ModelChoiceField):
+        # this keeps mypy happy as otherwise it won't allow setting the queryset on the
+        # field as it doesn't know which Field subclass it is.
+        raise TypeError("Expected 'project' field to be a ModelChoiceField.")
+    project_field.queryset = projects
+
+    if form.is_valid():
+        allocation = HX2Allocation.objects.create_hx2allocation(
+            project=form.cleaned_data["project"],
+            status=AllocationStatusChoice.objects.get(name="Active"),
+            quantity=1,
+            start_date=timezone.now().date(),
+            end_date=None,
+            justification="User self-allocated HX2 allocation",
+            description="Provides access to HX2 for all allocation users.",
+            is_locked=False,
+            is_changeable=True,
+        )
+        return redirect(reverse("allocation-detail", args=[allocation.pk]))
+    return render(
+        request,
+        "imperial_coldfront_plugin/hx2_allocation_self_creation.html",
+        context=dict(form=form),
     )

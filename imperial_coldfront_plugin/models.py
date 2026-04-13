@@ -157,7 +157,7 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
         status: AllocationStatusChoice,
         quantity: int,
         start_date: date,
-        end_date: date,
+        end_date: date | None,
         justification: str,
         description: str,
         is_locked: bool,

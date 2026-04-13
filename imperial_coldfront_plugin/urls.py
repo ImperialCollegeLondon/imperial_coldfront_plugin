@@ -44,4 +44,9 @@ urlpatterns = [
         views.project_credit_transactions,
         name="project-credit-transactions",
     ),
+    path(
+        "user_create_hx2_allocation/",
+        views.user_create_hx2_allocation,
+        name="user_create_hx2_allocation",
+    ),
 ]
