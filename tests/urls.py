@@ -19,6 +19,7 @@ urlpatterns = [
     path(
         "/allocation_detail/<int:allocation_pk>/", dummy_view, name="allocation-detail"
     ),
+    path("allocation_list/", dummy_view, name="allocation-list"),
     path("<int:pk>/", dummy_view, name="project-detail"),
     path("project/", dummy_view, name="project-list"),
     path(
@@ -32,4 +33,7 @@ urlpatterns = [
         name="project-note-add",
     ),
     path("resource/<int:resource_pk>", dummy_view, name="resource-detail"),
+    path("resource_list/", dummy_view, name="resource-list"),
+    path("user_profile/", dummy_view, name="user-profile"),
+    path("logout/", dummy_view, name="logout"),
 ]

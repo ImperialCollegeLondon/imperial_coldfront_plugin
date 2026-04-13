@@ -1,0 +1,8 @@
+<li id="navbar-request" class="nav-item dropdown">
+  <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">Request Access to RCS Resources</a>
+  <div class="dropdown-menu">
+    <a class="dropdown-item" href="{{ settings.RDF_ASK_TICKET_URL }}">Request RDF Allocation</a>
+    <a class="dropdown-item"
+       href="{% url 'imperial_coldfront_plugin:user_create_hx2_allocation' %}">Request HX2 Access</a>
+  </div>
+</li>

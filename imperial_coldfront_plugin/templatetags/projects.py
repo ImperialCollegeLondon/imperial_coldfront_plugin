@@ -46,6 +46,19 @@ def get_user_owned_projects(user: "User") -> QuerySet[ICLProject]:
 
 
 @register.simple_tag
+def user_owns_projects(user: "User") -> bool:
+    """Return whether a user owns any projects.
+
+    Args:
+      user: The user to check.
+
+    Returns:
+        True if the user owns at least one active project.
+    """
+    return get_user_owned_projects(user).exists()
+
+
+@register.simple_tag
 def user_can_self_create_project(user: "User") -> bool:
     """Return whether a user is eligible to self-create a project.
 
