@@ -68,7 +68,7 @@ class TestRequestNavbar:
         response = render(request_, self.template_path)
         assert response.status_code == 200
         soup = BeautifulSoup(response.content, "html.parser")
-        assert not soup.find("a", id="navbar-request")
+        assert not soup.find("li", id="navbar-request")
         assert not soup.find(
             "a", href=reverse("imperial_coldfront_plugin:user_create_group")
         )
