@@ -196,6 +196,5 @@ ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=Fals
 
 SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
     "rdf_active": ENV.int("RDF_ACTIVE_CHARGING_RATE", default=50)
-    * ureg.credit
     / (ureg.terabyte * ureg.year),
 }
