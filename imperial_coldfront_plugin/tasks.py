@@ -199,7 +199,7 @@ def create_hx_allocation(form_data: HXAllocationFormData) -> int:
             project=project,
             status=AllocationStatusChoice.objects.get(name="Active"),
             quantity=1,
-            start_date=timezone.now(),
+            start_date=timezone.now().date(),
             end_date=None,
             justification="",
             description="",

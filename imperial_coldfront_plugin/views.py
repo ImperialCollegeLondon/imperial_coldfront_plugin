@@ -129,12 +129,12 @@ def add_hx_allocation(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = HXAllocationForm(request.POST)
         if form.is_valid():
-            task_id = async_task(create_hx_allocation, form.cleaned_data)
+            allocation_pk = create_hx_allocation(form.cleaned_data)
             return redirect(
                 "imperial_coldfront_plugin:hx_allocation_task_result",
                 resource_type=form.cleaned_data["resource_type"],
-                task_id=task_id,
                 group_id=form.cleaned_data["project"].group_id,
+                allocation_pk=allocation_pk,
             )
     else:
         form = HXAllocationForm()
@@ -145,26 +145,29 @@ def add_hx_allocation(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def hx_allocation_task_result(
-    request: HttpRequest, task_id: str, group_id: str, resource_type: str
+    request: HttpRequest, group_id: str, resource_type: str, allocation_pk: int
 ) -> HttpResponse:
     """Display information about an hx allocation creation task.
 
     Args:
       request: The HTTP request object.
-      task_id: The ID of the task to fetch.
       group_id: The ID of the group for which the allocation is being created.
       resource_type: The type of the HX allocation being created (HX2 or HX3).
+      allocation_pk: The primary key of the allocation.
 
     Returns:
       The page displaying the task result.
     """
     if not request.user.is_superuser:
         return HttpResponseForbidden()
-    task = fetch(task_id)
     return render(
         request,
         "imperial_coldfront_plugin/hx_allocation_task_result.html",
-        context={"resource_type": resource_type, "task": task, "group_id": group_id},
+        context={
+            "resource_type": resource_type,
+            "group_id": group_id,
+            "allocation_pk": allocation_pk,
+        },
     )
 
 

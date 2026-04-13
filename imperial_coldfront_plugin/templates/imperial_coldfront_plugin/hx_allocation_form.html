@@ -4,12 +4,10 @@
   <div class="container mt-4">
     <div class="card">
       <div class="card-header">
-        <h2>HX Access Request</h2>
+        <h2>Grant Cluster Access</h2>
       </div>
       <div class="card-body">
-        <form method="post"
-              id="hx_allocation_form"
-              departments-url="{% url 'imperial_coldfront_plugin:load_departments' %}">
+        <form method="post" id="hx_allocation_form">
           {% csrf_token %}
           {{ form|crispy }}
           <div class="mt-4">

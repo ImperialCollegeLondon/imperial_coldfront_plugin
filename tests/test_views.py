@@ -346,18 +346,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
 class TestAddHXAllocation(LoginRequiredMixin):
     """Tests for the add_hx_allocation view."""
 
-    mock_task_id = 1
-
-    @pytest.fixture(autouse=True)
-    def async_task_mock(self, mocker):
-        """Mock out async_task in favour of direct task execution."""
-
-        def f(func, *args, **kwargs):
-            func(*args, **kwargs)
-            return self.mock_task_id
-
-        return mocker.patch("imperial_coldfront_plugin.views.async_task", f)
-
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:add_hx_allocation")
 
@@ -384,6 +372,8 @@ class TestAddHXAllocation(LoginRequiredMixin):
         # mock the chain to inject the group value to check the redirect later
         group_id = project.group_id
         resource_type = "hx2"
+        allocation_pk = 1
+        create_hx_allocation_mock.return_value = allocation_pk
 
         response = superuser_client.post(
             self._get_url(),
@@ -396,7 +386,7 @@ class TestAddHXAllocation(LoginRequiredMixin):
             response,
             reverse(
                 "imperial_coldfront_plugin:hx_allocation_task_result",
-                args=[resource_type, self.mock_task_id, group_id],
+                args=[resource_type, group_id, allocation_pk],
             ),
             fetch_redirect_response=False,
         )
@@ -458,6 +448,30 @@ class TestAllocationTaskResult(LoginRequiredMixin):
         )
         assert response.status_code == HTTPStatus.OK
         assert bytes(result, "utf-8") in response.content
+
+
+class TestHXAllocationTaskResult(LoginRequiredMixin):
+    """Tests for the allocation_task_result view."""
+
+    def _get_url(
+        self,
+        resource_type: str = "hx2",
+        group_id: str = "test-group",
+        allocation_pk: int = 1,
+    ):
+        return reverse(
+            "imperial_coldfront_plugin:allocation_task_result",
+            kwargs={
+                "resource_type": resource_type,
+                "group_id": group_id,
+                "allocation_pk": allocation_pk,
+            },
+        )
+
+    def test_success(self, superuser_client, rdf_allocation_shortname):
+        """Test view when the task completed successfully."""
+        response = superuser_client.get(self._get_url("hx2", "test-group", 1))
+        assert response.status_code == HTTPStatus.OK
 
 
 def test_get_or_create_project(user):

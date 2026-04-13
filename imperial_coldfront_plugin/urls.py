@@ -18,7 +18,7 @@ urlpatterns = [
         name="add_hx_allocation",
     ),
     path(
-        "hx_allocation_task_result/<str:resource_type>/<str:task_id>/<str:group_id>",
+        "hx_allocation_task_result/<str:resource_type>/<str:group_id>/<int:allocation_pk>/",
         views.hx_allocation_task_result,
         name="hx_allocation_task_result",
     ),
