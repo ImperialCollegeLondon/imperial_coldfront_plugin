@@ -90,6 +90,23 @@ class TestRequestNavbar:
             "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
         )
 
+    def test_feature_flag(self, request_, settings, project):
+        """Test that hx2 link is hidden when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        navbar = soup.find("li", id="navbar-request", class_="nav-item dropdown")
+        assert navbar
+        assert not navbar.find(
+            "a",
+            href=reverse("imperial_coldfront_plugin:user_create_hx2_allocation"),
+            class_="dropdown-item",
+        )
+        assert navbar.find(
+            "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
+        )
+
 
 class TestHomeView:
     """Test rendering of the home view.
