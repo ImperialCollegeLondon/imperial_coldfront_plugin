@@ -400,6 +400,13 @@ class HXAllocationForm(forms.Form):
         return resource_type
 
 
+class HXAllocationFormData(TypedDict):
+    """Structure for holding cleaned HX allocation form data with types."""
+
+    resource_type: str
+    project: ICLProject
+
+
 class HX2TermsAndConditionsForm(forms.Form):
     """Form for accepting terms and conditions."""
 

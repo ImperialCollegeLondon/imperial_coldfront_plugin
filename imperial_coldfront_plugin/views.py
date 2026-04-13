@@ -1,7 +1,7 @@
 """Plugin views."""
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
 from coldfront.core.project.forms import ProjectAddUserForm
@@ -31,6 +31,7 @@ from .forms import (
     DartIDForm,
     HX2TermsAndConditionsForm,
     HXAllocationForm,
+    HXAllocationFormData,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
@@ -131,7 +132,9 @@ def add_hx_allocation(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = HXAllocationForm(request.POST)
         if form.is_valid():
-            allocation_pk = create_hx_allocation(form.cleaned_data)
+            allocation_pk = create_hx_allocation(
+                cast(HXAllocationFormData, form.cleaned_data)
+            )
             return redirect(
                 "imperial_coldfront_plugin:hx_allocation_task_result",
                 resource_type=form.cleaned_data["resource_type"],
