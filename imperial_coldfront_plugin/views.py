@@ -1,7 +1,7 @@
 """Plugin views."""
 
 import re
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
 from coldfront.core.project.forms import ProjectAddUserForm
@@ -31,7 +31,6 @@ from .forms import (
     DartIDForm,
     HX2TermsAndConditionsForm,
     HXAllocationForm,
-    HXAllocationFormData,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
@@ -44,7 +43,7 @@ from .policy import (
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
 )
-from .tasks import create_hx_allocation, create_rdf_allocation
+from .tasks import create_rdf_allocation
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User as UserType
@@ -132,14 +131,31 @@ def add_hx_allocation(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = HXAllocationForm(request.POST)
         if form.is_valid():
-            allocation_pk = create_hx_allocation(
-                cast(HXAllocationFormData, form.cleaned_data)
-            )
+            form_data = form.cleaned_data
+            resource_type = form_data["resource_type"]
+            project = form_data["project"]
+
+            if resource_type == "hx2":
+                hx_allocation = HX2Allocation.objects.create_hx2allocation(
+                    project=project,
+                    status=AllocationStatusChoice.objects.get(name="Active"),
+                    quantity=1,
+                    start_date=timezone.now().date(),
+                    end_date=None,
+                    justification="",
+                    description="",
+                    is_locked=False,
+                    is_changeable=True,
+                )
+
+            else:
+                raise ValueError(f"Invalid HX resource type: {resource_type}")
+
             return redirect(
                 "imperial_coldfront_plugin:hx_allocation_task_result",
                 resource_type=form.cleaned_data["resource_type"],
                 group_id=form.cleaned_data["project"].group_id,
-                allocation_pk=allocation_pk,
+                allocation_pk=hx_allocation.pk,
             )
     else:
         form = HXAllocationForm()

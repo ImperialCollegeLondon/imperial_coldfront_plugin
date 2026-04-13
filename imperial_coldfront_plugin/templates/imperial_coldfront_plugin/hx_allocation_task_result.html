@@ -2,5 +2,9 @@
 {% block content %}
   <div class="mb-3">
     <h2 class="text-justify">{{ resource_type|upper }} Access Successfully Granted for {{ group_id }}</h2>
+    <p>
+      <a class="btn btn-primary"
+         href="{% url 'allocation-detail' allocation_pk %}">View allocation</a>
+    </p>
   </div>
 {% endblock content %}

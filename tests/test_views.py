@@ -235,6 +235,14 @@ def message_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.views.messages")
 
 
+@pytest.fixture
+def create_hx2allocation_mock(mocker):
+    """Mock the create_hx2allocation method."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.HX2Allocation.objects.create_hx2allocation"
+    )
+
+
 class TestAddRDFStorageAllocation(LoginRequiredMixin):
     """Tests for the add_rdf_storage_allocation view."""
 
@@ -349,6 +357,12 @@ class TestAddHXAllocation(LoginRequiredMixin):
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:add_hx_allocation")
 
+    def _make_form_data(self, project, resource_type="hx2"):
+        return {
+            "resource_type": resource_type,
+            "project": project,
+        }
+
     def test_non_admin_forbidden(self, user, auth_client_factory):
         """Test non-admin users cannot access the page."""
         client = auth_client_factory(user)
@@ -361,10 +375,9 @@ class TestAddHXAllocation(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], HXAllocationForm)
 
-    @patch("imperial_coldfront_plugin.views.create_hx_allocation")
     def test_post(
         self,
-        create_hx_allocation_mock,
+        create_hx2allocation_mock,
         superuser_client,
         project,
     ):
@@ -373,7 +386,8 @@ class TestAddHXAllocation(LoginRequiredMixin):
         group_id = project.group_id
         resource_type = "hx2"
         allocation_pk = 1
-        create_hx_allocation_mock.return_value = allocation_pk
+        create_hx2allocation_mock.return_value.pk = allocation_pk
+        AllocationStatusChoice.objects.get_or_create(name="Active")
 
         response = superuser_client.post(
             self._get_url(),
@@ -390,11 +404,29 @@ class TestAddHXAllocation(LoginRequiredMixin):
             ),
             fetch_redirect_response=False,
         )
-        create_hx_allocation_mock.assert_called_once()
-        called_args, _ = create_hx_allocation_mock.call_args
-        form_data = called_args[0]
-        assert form_data["project"] == project
-        assert form_data["resource_type"] == "hx2"
+        create_hx2allocation_mock.assert_called_once()
+        _, kwargs = create_hx2allocation_mock.call_args
+        assert kwargs["project"] == project
+        assert kwargs["quantity"] == 1
+        assert kwargs["end_date"] is None
+        assert kwargs["justification"] == ""
+        assert kwargs["description"] == ""
+        assert kwargs["is_locked"] is False
+        assert kwargs["is_changeable"] is True
+        assert kwargs["start_date"] is not None
+
+    def test_invalid_resource_type_raises(
+        self, superuser_client, project, create_hx2allocation_mock
+    ):
+        """create_hx_allocation raises ValueError for unknown resource types."""
+        with pytest.raises(ValueError, match="Invalid HX resource type: hx99"):
+            superuser_client.post(
+                self._get_url(),
+                data=dict(
+                    project=project.pk,
+                    resource_type="hx99",
+                ),
+            )
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):
