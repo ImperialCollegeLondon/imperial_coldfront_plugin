@@ -405,3 +405,17 @@ class HXAllocationForm(forms.Form):
         if resource_type == "hx3":
             raise ValidationError("HX3 allocations are not currently available.")
         return resource_type
+
+
+class HX2TermsAndConditionsForm(forms.Form):
+    """Form for accepting terms and conditions."""
+
+    project = forms.ModelChoiceField(
+        queryset=ICLProject.objects.none(),
+        widget=_js_select_widget(),
+        label="Please select which group you would like to grant access to.",
+    )
+    accept_terms = forms.BooleanField(
+        required=True,
+        label="I have read and accept the terms and conditions.",
+    )
