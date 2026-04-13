@@ -198,3 +198,4 @@ SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
     "rdf_active": ENV.int("RDF_ACTIVE_CHARGING_RATE", default=50)
     / (ureg.terabyte * ureg.year),
 }
+"""Charging rates for services as Pint Quantities in TB/year."""
