@@ -1,5 +1,6 @@
 {% include 'common/navbar_brand.html' %}
 {% load common_tags %}
+{% load projects %}
 
 <nav class="navbar navbar-expand-md navbar-dark bg-primary">
   <div class="container">
@@ -37,6 +38,10 @@
         {% endif %}
         {% if request.user.is_superuser or perms.allocation.can_manage_invoice %}
           {% include 'common/navbar_invoice.html' %}
+        {% endif %}
+        {% user_owns_projects request.user as show_request_navbar %}
+        {% if show_request_navbar %}
+          {% include 'imperial_coldfront_plugin/navbar_request.html' %}
         {% endif %}
         {% if settings.CENTER_HELP_URL %}
           {% include 'common/navbar_help.html' %}

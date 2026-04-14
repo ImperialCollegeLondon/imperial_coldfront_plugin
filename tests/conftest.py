@@ -2,6 +2,7 @@
 
 import datetime
 import pkgutil
+from pathlib import Path
 from random import choices
 from string import ascii_lowercase
 
@@ -12,8 +13,11 @@ from django.test import Client
 
 def pytest_configure():
     """Configure Django settings for standalone test suite execution."""
+    import coldfront
+
     from imperial_coldfront_plugin import settings as plugin_settings
 
+    coldfront_templates_path = Path(coldfront.__path__[0]) / "templates"
     settings.configure(
         DEBUG=True,
         DATABASES={
@@ -48,7 +52,7 @@ def pytest_configure():
         TEMPLATES=[
             {
                 "BACKEND": "django.template.backends.django.DjangoTemplates",
-                "DIRS": ["tests/templates"],
+                "DIRS": ["tests/templates", str(coldfront_templates_path)],
                 "APP_DIRS": True,
                 "OPTIONS": {
                     "context_processors": [
@@ -77,7 +81,15 @@ def pytest_configure():
         EMAIL_SIGNATURE="",
         CENTER_NAME="",
         CENTER_BASE_URL="",
-        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE", "ENABLE_USER_GROUP_CREATION"],
+        CENTER_HELP_URL="",
+        ALLOCATION_ACCOUNT_ENABLED=False,
+        SETTINGS_EXPORT=[
+            "SHOW_CREDIT_BALANCE",
+            "ENABLE_USER_GROUP_CREATION",
+            "ALLOCATION_ACCOUNT_ENABLED",
+            "CENTER_HELP_URL",
+            "RDF_ASK_TICKET_URL",
+        ],
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
@@ -100,6 +112,7 @@ def pytest_configure():
             GPFS_ALLOCATION_CREATION_SLEEP=0,
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
             ENABLE_USER_GROUP_CREATION=True,
+            RDF_ASK_TICKET_URL="http://example.com/ticket",
         ),  # override settings loaded by env var for tests
     )
 

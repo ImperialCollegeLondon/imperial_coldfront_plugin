@@ -52,6 +52,63 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     return mock
 
 
+class TestRequestNavbar:
+    """Test the rendering of the request navbar items."""
+
+    @pytest.fixture
+    def request_(self, rf, user):
+        """A request object with a user."""
+        request = rf.get("/")
+        request.user = user
+        return request
+
+    template_path = "imperial_coldfront_plugin/overrides/authorized_navbar.html"
+
+    def test_normal_user(self, request_, settings):
+        """Test that the navbar renders correctly for a normal user."""
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("li", id="navbar-request")
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+        assert not soup.find("a", href=settings.RDF_ASK_TICKET_URL)
+
+    def test_project_owner(self, request_, settings, project):
+        """Test that the navbar renders correctly for a project owner."""
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        navbar = soup.find("li", id="navbar-request", class_="nav-item dropdown")
+        assert navbar
+        assert navbar.find(
+            "a",
+            href=reverse("imperial_coldfront_plugin:user_create_hx2_allocation"),
+            class_="dropdown-item",
+        )
+        assert navbar.find(
+            "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
+        )
+
+    def test_feature_flag(self, request_, settings, project):
+        """Test that hx2 link is hidden when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        navbar = soup.find("li", id="navbar-request", class_="nav-item dropdown")
+        assert navbar
+        assert not navbar.find(
+            "a",
+            href=reverse("imperial_coldfront_plugin:user_create_hx2_allocation"),
+            class_="dropdown-item",
+        )
+        assert navbar.find(
+            "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
+        )
+
+
 class TestHomeView:
     """Test rendering of the home view.
 
