@@ -193,3 +193,6 @@ RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = 7
 
 ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=False)
 """Feature flag to enable or disable creation of user groups for allocations."""
+
+RDF_ASK_TICKET_URL = ENV.str("RDF_ASK_TICKET_URL", default="")
+"""URL of the form for users to request RDF access."""

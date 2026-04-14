@@ -2,6 +2,7 @@
 
 import datetime
 import pkgutil
+from pathlib import Path
 from random import choices
 from string import ascii_lowercase
 from unittest.mock import patch
@@ -13,8 +14,11 @@ from django.test import Client
 
 def pytest_configure():
     """Configure Django settings for standalone test suite execution."""
+    import coldfront
+
     from imperial_coldfront_plugin import settings as plugin_settings
 
+    coldfront_templates_path = Path(coldfront.__path__[0]) / "templates"
     settings.configure(
         DEBUG=True,
         DATABASES={
@@ -49,7 +53,7 @@ def pytest_configure():
         TEMPLATES=[
             {
                 "BACKEND": "django.template.backends.django.DjangoTemplates",
-                "DIRS": ["tests/templates"],
+                "DIRS": ["tests/templates", str(coldfront_templates_path)],
                 "APP_DIRS": True,
                 "OPTIONS": {
                     "context_processors": [
@@ -78,7 +82,15 @@ def pytest_configure():
         EMAIL_SIGNATURE="",
         CENTER_NAME="",
         CENTER_BASE_URL="",
-        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE", "ENABLE_USER_GROUP_CREATION"],
+        CENTER_HELP_URL="",
+        ALLOCATION_ACCOUNT_ENABLED=False,
+        SETTINGS_EXPORT=[
+            "SHOW_CREDIT_BALANCE",
+            "ENABLE_USER_GROUP_CREATION",
+            "ALLOCATION_ACCOUNT_ENABLED",
+            "CENTER_HELP_URL",
+            "RDF_ASK_TICKET_URL",
+        ],
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
@@ -101,6 +113,7 @@ def pytest_configure():
             GPFS_ALLOCATION_CREATION_SLEEP=0,
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
             ENABLE_USER_GROUP_CREATION=True,
+            RDF_ASK_TICKET_URL="http://example.com/ticket",
         ),  # override settings loaded by env var for tests
     )
 
@@ -246,31 +259,59 @@ def user_or_superuser(request):
 
 
 @pytest.fixture
-def project(user):
-    """Provides a Coldfront project owned by a user."""
+def project_active_status(db):
+    """Create a ProjectStatusChoice with name='Active'."""
+    from coldfront.core.project.models import ProjectStatusChoice
+
+    return ProjectStatusChoice.objects.get_or_create(name="Active")[0]
+
+
+@pytest.fixture
+def field_of_science_other(db):
+    """Create a FieldOfScience with description='Other'."""
     from coldfront.core.field_of_science.models import FieldOfScience
+
+    return FieldOfScience.objects.get_or_create(description="Other")[0]
+
+
+@pytest.fixture
+def project_factory(project_active_status, field_of_science_other):
+    """Provides a factory for Coldfront projects.
+
+    The factory takes the following arguments:
+
+    - pi: The owner of the project.
+    - title: The title of the project.
+    """
+
+    def create_project(pi, title):
+        from imperial_coldfront_plugin.models import ICLProject
+
+        return ICLProject.objects.create(
+            pi=pi,
+            title=title,
+            status=project_active_status,
+            field_of_science=field_of_science_other,
+        )
+
+    return create_project
+
+
+@pytest.fixture
+def project(user, project_factory):
+    """Provides a Coldfront project owned by a user."""
     from coldfront.core.project.models import (
         ProjectAttribute,
         ProjectAttributeType,
-        ProjectStatusChoice,
         ProjectUser,
         ProjectUserRoleChoice,
         ProjectUserStatusChoice,
     )
 
-    from imperial_coldfront_plugin.models import ICLProject
-
-    project_active_status = ProjectStatusChoice.objects.create(name="Active")
-    field_of_science_other = FieldOfScience.objects.create(description="Other")
     project_user_active_status = ProjectUserStatusChoice.objects.create(name="Active")
     project_user_role_manager = ProjectUserRoleChoice.objects.create(name="Manager")
 
-    project = ICLProject.objects.create(
-        pi=user,
-        title=f"{user.get_full_name()}'s Research Group",
-        status=project_active_status,
-        field_of_science=field_of_science_other,
-    )
+    project = project_factory(pi=user, title=f"{user.get_full_name()}'s Research Group")
     department_attribute_type = ProjectAttributeType.objects.get(name="Department")
     faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
     group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
