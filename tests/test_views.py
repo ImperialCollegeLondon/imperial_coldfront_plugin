@@ -605,7 +605,7 @@ class TestAddDartID(LoginRequiredMixin):
         )
         assert response.status_code == 403
 
-    def test_get(self, rdf_allocation, allocation_user, user_client):
+    def test_get(self, rdf_allocation, user_client):
         """Test get method."""
         from imperial_coldfront_plugin.forms import DartIDForm
 
@@ -613,7 +613,7 @@ class TestAddDartID(LoginRequiredMixin):
         assert response.status_code == 200
         assert isinstance(response.context["form"], DartIDForm)
 
-    def test_post(self, rdf_allocation, allocation_user, user_client):
+    def test_post(self, rdf_allocation, user_client):
         """Test post method."""
         dart_id = "1001"
         allocation = "RDF Storage Allocation"
@@ -1350,8 +1350,10 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
 
     @patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False)
     @patch("imperial_coldfront_plugin.models.ldap_create_group")
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
     def test_post(
         self,
+        ldap_add_member_to_group_mock,
         ldap_create_group_mock,
         ldap_gid_in_use_mock,
         auth_client_factory,

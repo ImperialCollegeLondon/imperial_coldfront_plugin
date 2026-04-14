@@ -268,29 +268,20 @@ def update_quota_usages_task() -> None:
         files_attribute_usage.save()
 
 
-def remove_allocation_group_members(allocation_id: int) -> None:
-    """Background task: remove all active members from an LDAP group.
+def remove_ldap_group_members(usernames: list[str], group_name: str) -> None:
+    """Remove members from an LDAP group.
 
     Args:
-        allocation_id: The primary key of the allocation.
+        usernames: The usernames to remove from the group
+        group_name: The name of the LDAP group to remove members from.
     """
     from .ldap import ldap_remove_member_from_group
 
-    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
-        return
-
-    allocation = RDFAllocation.objects.get(pk=allocation_id)
-
-    # Get all active users from the database
-    active_users = AllocationUser.objects.filter(
-        allocation=allocation, status__name="Active"
-    )
-
     # Remove each user from the LDAP group
-    for allocation_user in active_users:
+    for username in usernames:
         ldap_remove_member_from_group(
-            allocation.ldap_shortname,
-            allocation_user.user.username,
+            group_name,
+            username,
             allow_missing=True,
         )
 
