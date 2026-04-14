@@ -30,6 +30,7 @@ from .forms import (
     CreditTransactionForm,
     DartIDForm,
     HX2TermsAndConditionsForm,
+    HXAllocationForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
@@ -111,6 +112,83 @@ def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
         form = RDFAllocationForm()
     return render(
         request, "imperial_coldfront_plugin/rdf_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def add_hx_allocation(request: HttpRequest) -> HttpResponse:
+    """Create a new HX2 project allocation.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the allocation creation form or redirects to the task result page.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = HXAllocationForm(request.POST)
+        if form.is_valid():
+            form_data = form.cleaned_data
+            resource_type = form_data["resource_type"]
+            project = form_data["project"]
+
+            if resource_type == "hx2":
+                hx_allocation = HX2Allocation.objects.create_hx2allocation(
+                    project=project,
+                    status=AllocationStatusChoice.objects.get(name="Active"),
+                    quantity=1,
+                    start_date=timezone.now().date(),
+                    end_date=None,
+                    justification="",
+                    description="",
+                    is_locked=False,
+                    is_changeable=True,
+                )
+
+            else:
+                raise ValueError(f"Invalid HX resource type: {resource_type}")
+
+            return redirect(
+                "imperial_coldfront_plugin:hx_allocation_task_result",
+                resource_type=form.cleaned_data["resource_type"],
+                group_id=form.cleaned_data["project"].group_id,
+                allocation_pk=hx_allocation.pk,
+            )
+    else:
+        form = HXAllocationForm()
+    return render(
+        request, "imperial_coldfront_plugin/hx_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def hx_allocation_task_result(
+    request: HttpRequest, group_id: str, resource_type: str, allocation_pk: int
+) -> HttpResponse:
+    """Display information about an hx allocation creation task.
+
+    Args:
+      request: The HTTP request object.
+      group_id: The ID of the group for which the allocation is being created.
+      resource_type: The type of the HX allocation being created (HX2 or HX3).
+      allocation_pk: The primary key of the allocation.
+
+    Returns:
+      The page displaying the task result.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+    return render(
+        request,
+        "imperial_coldfront_plugin/hx_allocation_task_result.html",
+        context={
+            "resource_type": resource_type,
+            "group_id": group_id,
+            "allocation_pk": allocation_pk,
+        },
     )
 
 

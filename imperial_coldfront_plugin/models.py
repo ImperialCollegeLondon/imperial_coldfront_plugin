@@ -165,7 +165,7 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
     ) -> "HX2Allocation":
         """Create a new HX2Allocation from validated data."""
         with transaction.atomic():
-            allocation_obj = self.model(
+            allocation_obj = self.create(
                 project=project,
                 status=status,
                 quantity=quantity,
@@ -176,7 +176,6 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
                 is_locked=is_locked,
                 is_changeable=is_changeable,
             )
-            allocation_obj.save()
 
             hx2_resource = Resource.objects.get(name="HX2")
             allocation_obj.resources.add(hx2_resource)
