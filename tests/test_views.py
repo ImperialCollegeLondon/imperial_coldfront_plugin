@@ -22,6 +22,7 @@ from imperial_coldfront_plugin.forms import (
     UserProjectCreationForm,
 )
 from imperial_coldfront_plugin.models import CreditTransaction
+from imperial_coldfront_plugin.views import add_hx_allocation
 
 
 class LoginRequiredMixin:
@@ -415,7 +416,7 @@ class TestAddHXAllocation(LoginRequiredMixin):
         assert kwargs["is_changeable"] is True
         assert kwargs["start_date"] is not None
 
-    def test_invalid_resource_type_raises(
+    def test_form_validation_error(
         self, superuser_client, project, create_hx2allocation_mock
     ):
         """Invalid resource type raises ValueError."""
@@ -423,8 +424,23 @@ class TestAddHXAllocation(LoginRequiredMixin):
             self._get_url(),
             data=dict(project=project.pk, resource_type="hx99"),
         )
+
+        # Form validation error should not raise an exception, but should re-render
+        # the form (200 response)
         assert response.status_code == 200
-        assert response.cntext["forms"].errors
+        assert response.context["forms"].errors
+
+    def test_unimplemented_resource_type_raises(
+        self, project, create_hx2allocation_mock, rf, superuser
+    ):
+        """hx3 is a valid form choice but raises ValueError as not yet implemented."""
+        request = rf.post(
+            self._get_url(),
+            data=dict(project=project.pk, resource_type="hx3"),
+        )
+        request.user = superuser
+        with pytest.raises(ValueError, match="Invalid HX resource type: hx3"):
+            add_hx_allocation(request)
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):
