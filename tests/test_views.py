@@ -22,7 +22,6 @@ from imperial_coldfront_plugin.forms import (
     UserProjectCreationForm,
 )
 from imperial_coldfront_plugin.models import CreditTransaction
-from imperial_coldfront_plugin.views import add_hx_allocation
 
 
 class LoginRequiredMixin:
@@ -417,16 +416,15 @@ class TestAddHXAllocation(LoginRequiredMixin):
         assert kwargs["start_date"] is not None
 
     def test_invalid_resource_type_raises(
-        self, superuser_client, project, create_hx2allocation_mock, rf, superuser
+        self, superuser_client, project, create_hx2allocation_mock
     ):
         """Invalid resource type raises ValueError."""
-        request = rf.post(
+        response = superuser_client.post(
             self._get_url(),
             data=dict(project=project.pk, resource_type="hx99"),
         )
-        request.user = superuser
-        with pytest.raises(ValueError, match="Invalid HX resource type: hx99"):
-            add_hx_allocation(request)
+        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.cntext["forms"].errors
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):
