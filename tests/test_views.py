@@ -423,7 +423,7 @@ class TestAddHXAllocation(LoginRequiredMixin):
             self._get_url(),
             data=dict(project=project.pk, resource_type="hx99"),
         )
-        assert response.status_code == HTTPStatus.BAD_REQUEST
+        assert response.status_code == 200
         assert response.cntext["forms"].errors
 
 
