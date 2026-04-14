@@ -13,6 +13,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
 from django_q.models import Task
+from imperial_coldfront_plugin.imperial_coldfront_plugin.views import add_hx_allocation
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
@@ -416,17 +417,16 @@ class TestAddHXAllocation(LoginRequiredMixin):
         assert kwargs["start_date"] is not None
 
     def test_invalid_resource_type_raises(
-        self, superuser_client, project, create_hx2allocation_mock
+        self, superuser_client, project, create_hx2allocation_mock, rf, superuser
     ):
-        """create_hx_allocation raises ValueError for unknown resource types."""
+        """Invalid resource type raises ValueError."""
+        request = rf.post(
+            self._get_url(),
+            data=dict(project=project.pk, resource_type="hx99"),
+        )
+        request.user = superuser
         with pytest.raises(ValueError, match="Invalid HX resource type: hx99"):
-            superuser_client.post(
-                self._get_url(),
-                data=dict(
-                    project=project.pk,
-                    resource_type="hx99",
-                ),
-            )
+            add_hx_allocation(request)
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):
