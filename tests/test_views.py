@@ -13,7 +13,6 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
 from django_q.models import Task
-from imperial_coldfront_plugin.imperial_coldfront_plugin.views import add_hx_allocation
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
@@ -23,6 +22,7 @@ from imperial_coldfront_plugin.forms import (
     UserProjectCreationForm,
 )
 from imperial_coldfront_plugin.models import CreditTransaction
+from imperial_coldfront_plugin.views import add_hx_allocation
 
 
 class LoginRequiredMixin:
