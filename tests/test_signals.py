@@ -740,3 +740,54 @@ class TestPreventMultipleHX2AllocationsPerProject:
                 project=hx2_allocation.project,
                 status=allocation_active_status,
             )
+
+
+class TestAllocationUserPreventMultipleHX2:
+    """Tests for allocation_user_prevent_multiple_hx2 signal handler."""
+
+    def test_prevent(
+        self,
+        project,
+        hx2_allocation_user,
+        allocation_user_active_status,
+        allocation_active_status,
+    ):
+        """Test that a user cannot be added to multiple active HX2 allocations."""
+        new_allocation = Allocation.objects.create(
+            project=project,
+            status=allocation_active_status,
+        )
+        new_allocation.resources.add(Resource.objects.get(name="HX2"))
+
+        with pytest.raises(ValueError):
+            AllocationUser.objects.create(
+                allocation=new_allocation,
+                user=hx2_allocation_user,
+                status=allocation_user_active_status,
+            )
+
+    def test_inactive_allowed(
+        self,
+        project,
+        hx2_allocation_user,
+        allocation_user_active_status,
+        allocation_user_removed_status,
+        allocation_active_status,
+        ldap_remove_member_mock,
+    ):
+        """Test user can be added to multiple HX2 allocations if one is inactive."""
+        # create first HX2 allocation and add user
+        hx2_allocation_user.status = allocation_user_removed_status
+        hx2_allocation_user.save()
+
+        # should be able to add user to another active HX2 allocation
+        another_allocation = Allocation.objects.create(
+            project=project,
+            status=allocation_active_status,
+        )
+        another_allocation.resources.add(Resource.objects.get(name="HX2"))
+        AllocationUser.objects.create(
+            allocation=another_allocation,
+            user=hx2_allocation_user.user,
+            status=allocation_user_active_status,
+        )
