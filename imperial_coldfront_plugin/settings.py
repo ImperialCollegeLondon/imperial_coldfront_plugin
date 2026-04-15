@@ -9,8 +9,6 @@ from string import ascii_lowercase, digits
 import pint
 from coldfront.config.env import ENV
 
-from imperial_coldfront_plugin.units import ureg
-
 from .acl import ACL, ACLEntry
 
 MICROSOFT_TENANT_ID = ENV.str("MICROSOFT_TENANT_ID", default="")
@@ -193,9 +191,8 @@ RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = 7
 ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=False)
 """Feature flag to enable or disable creation of user groups for allocations."""
 
-
 SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
     "rdf_active": ENV.int("RDF_ACTIVE_CHARGING_RATE", default=50)
-    / (ureg.terabyte * ureg.year),
+    / (pint.Unit("terabyte") * pint.Unit("year")),
 }
 """Charging rates for services as Pint Quantities in TB/year."""
