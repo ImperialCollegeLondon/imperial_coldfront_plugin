@@ -5,7 +5,7 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
@@ -373,4 +373,49 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
     description = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Description of the transaction",
+    )
+
+
+class HXAllocationForm(forms.Form):
+    """Form for creating a new HX2 allocation."""
+
+    project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
+        queryset=ICLProject.objects.filter(status__name="Active"),
+        widget=_js_select_widget(),
+    )
+
+    HX_CHOICES: ClassVar[list[tuple[str, str]]] = [("hx2", "HX2"), ("hx3", "HX3")]
+    resource_type = forms.ChoiceField(
+        choices=HX_CHOICES,
+        # Remove the widget when HX3 is active, along with the javascript in the
+        # template and the clean function below.
+        widget=forms.Select(attrs={"data-disabled-options": "hx3"}),
+    )
+
+    def clean_resource_type(self) -> str:
+        """Validate that the selected HX type is available."""
+        resource_type = self.cleaned_data["resource_type"]
+        if resource_type == "hx3":
+            raise ValidationError("HX3 allocations are not currently available.")
+        return resource_type
+
+
+class HXAllocationFormData(TypedDict):
+    """Structure for holding cleaned HX allocation form data with types."""
+
+    resource_type: str
+    project: ICLProject
+
+
+class HX2TermsAndConditionsForm(forms.Form):
+    """Form for accepting terms and conditions."""
+
+    project = forms.ModelChoiceField(
+        queryset=ICLProject.objects.none(),
+        widget=_js_select_widget(),
+        label="Please select which group you would like to grant access to.",
+    )
+    accept_terms = forms.BooleanField(
+        required=True,
+        label="I have read and accept the terms and conditions.",
     )

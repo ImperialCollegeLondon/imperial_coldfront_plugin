@@ -25,6 +25,14 @@ def test_get_new_gid_no_existing_gids(db, settings):
     assert gid == 1000
 
 
+@pytest.fixture(autouse=True)
+def ldap_gid_in_use_mock(mocker):
+    """Mock the ldap_gid_in_use function to always return False."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+    )
+
+
 @pytest.mark.parametrize(
     "existing_gid, raised_error",
     [
@@ -35,7 +43,7 @@ def test_get_new_gid_no_existing_gids(db, settings):
     ],
 )
 def test_get_new_gid(
-    settings, allocation_attribute_factory, existing_gid, raised_error
+    settings, allocation_attribute_factory, existing_gid, raised_error, rdf_allocation
 ):
     """Test the get_new_gid function with various existing GID scenarios.
 
@@ -47,7 +55,9 @@ def test_get_new_gid(
     settings.GID_RANGES = dict(test=[range(1000, 2000)])
 
     # Create an existing GID at the end of the range
-    allocation_attribute_factory(name="GID", value=existing_gid)
+    allocation_attribute_factory(
+        name="GID", value=existing_gid, allocation=rdf_allocation
+    )
     if raised_error:
         # Assert that NoGIDAvailableError is raised
         with pytest.raises(NoGIDAvailableError):
@@ -59,13 +69,15 @@ def test_get_new_gid(
         assert gid == existing_gid + 1
 
 
-def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
+def test_when_smaller_than_min_range(
+    settings, allocation_attribute_factory, rdf_allocation
+):
     """Test when existing GID is smaller than the minimum of the range."""
     # Override the GID_RANGES setting using the fixture
     settings.GID_RANGES = dict(test=[range(1000, 2000)])
 
     # Create an existing GID outside the range
-    allocation_attribute_factory(name="GID", value=999)
+    allocation_attribute_factory(name="GID", value=999, allocation=rdf_allocation)
 
     # Call the get_new_gid function
     gid = get_new_gid("test")
@@ -74,13 +86,15 @@ def test_when_smaller_than_min_range(settings, allocation_attribute_factory):
     assert gid == 1000
 
 
-def test_multiple_gid_ranges_overflow(settings, allocation_attribute_factory):
+def test_multiple_gid_ranges_overflow(
+    settings, allocation_attribute_factory, rdf_allocation
+):
     """Test that gid selection moves to the next range if at the end of previous one."""
     # Override the GID_RANGES setting using the fixture
     settings.GID_RANGES = dict(test=[range(1000, 1100), range(2000, 2100)])
 
     # Create an existing GID at the end of the first range
-    allocation_attribute_factory(name="GID", value=1099)
+    allocation_attribute_factory(name="GID", value=1099, allocation=rdf_allocation)
 
     # Call the get_new_gid function
     gid = get_new_gid("test")
@@ -89,13 +103,13 @@ def test_multiple_gid_ranges_overflow(settings, allocation_attribute_factory):
     assert gid == 2000
 
 
-def test_multiple_gid_ranges(settings, allocation_attribute_factory):
+def test_multiple_gid_ranges(settings, allocation_attribute_factory, rdf_allocation):
     """Test when multiple GID ranges are configured."""
     # Override the GID_RANGES setting using the fixture
     settings.GID_RANGES = dict(test=[range(1000, 1100), range(2000, 2100)])
 
     # Create an existing GID in the second range
-    allocation_attribute_factory(name="GID", value=2005)
+    allocation_attribute_factory(name="GID", value=2005, allocation=rdf_allocation)
 
     # Call the get_new_gid function
     gid = get_new_gid("test")
@@ -172,7 +186,9 @@ def test_validate_gid_range_overlap_with_overlap():
         validate_gid_range_overlap(ranges)
 
 
-def test_new_id_multiple_named_ranges(settings, allocation_attribute_factory):
+def test_new_id_multiple_named_ranges(
+    settings, allocation_attribute_factory, rdf_allocation
+):
     """Test that get_new_gid correctly handles multiple named ranges."""
     # Override the GID_RANGES setting using the fixture
     settings.GID_RANGES = dict(
@@ -181,7 +197,7 @@ def test_new_id_multiple_named_ranges(settings, allocation_attribute_factory):
     )
 
     # Create existing GID in second range
-    allocation_attribute_factory(name="GID", value=2005)
+    allocation_attribute_factory(name="GID", value=2005, allocation=rdf_allocation)
 
     # Call the get_new_gid function for both range names
     gid1 = get_new_gid("test1")

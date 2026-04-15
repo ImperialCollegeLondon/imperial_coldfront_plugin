@@ -102,6 +102,10 @@ AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
 LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
 """Computed value of whether LDAP integration is enabled."""
 
+LDAP_HX2_ACCESS_GROUP_NAME = ENV.str(
+    "LDAP_HX2_ACCESS_GROUP_NAME", default="hx2dev-users"
+)
+"""Name of the Active Directory group to add users to for HX2 access."""
 
 _GID_RANGES_RDF = ENV.str("GID_RANGE_RDF", default="1031386-1031405")
 _GID_RANGES_HX2 = ENV.str("GID_RANGE_HX2", default="1031406-1031425")
@@ -196,3 +200,6 @@ SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
     / (pint.Unit("terabyte") * pint.Unit("year")),
 }
 """Charging rates for services as Pint Quantities in TB/year."""
+
+RDF_ASK_TICKET_URL = ENV.str("RDF_ASK_TICKET_URL", default="")
+"""URL of the form for users to request RDF access."""

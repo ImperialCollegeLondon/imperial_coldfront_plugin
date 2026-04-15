@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
-from coldfront.core.allocation.models import AllocationStatusChoice
+from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
 from coldfront.core.project.models import ProjectStatusChoice
 from django.conf import settings
 from django.shortcuts import render
@@ -17,6 +17,7 @@ from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
+    HXAllocationForm,
     RDFAllocationForm,
     UserProjectCreationForm,
 )
@@ -49,6 +50,63 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     mock().user_profile.return_value = parsed_profile
     mock().user_search_by.return_value = [parsed_profile]
     return mock
+
+
+class TestRequestNavbar:
+    """Test the rendering of the request navbar items."""
+
+    @pytest.fixture
+    def request_(self, rf, user):
+        """A request object with a user."""
+        request = rf.get("/")
+        request.user = user
+        return request
+
+    template_path = "imperial_coldfront_plugin/overrides/authorized_navbar.html"
+
+    def test_normal_user(self, request_, settings):
+        """Test that the navbar renders correctly for a normal user."""
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("li", id="navbar-request")
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+        assert not soup.find("a", href=settings.RDF_ASK_TICKET_URL)
+
+    def test_project_owner(self, request_, settings, project):
+        """Test that the navbar renders correctly for a project owner."""
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        navbar = soup.find("li", id="navbar-request", class_="nav-item dropdown")
+        assert navbar
+        assert navbar.find(
+            "a",
+            href=reverse("imperial_coldfront_plugin:user_create_hx2_allocation"),
+            class_="dropdown-item",
+        )
+        assert navbar.find(
+            "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
+        )
+
+    def test_feature_flag(self, request_, settings, project):
+        """Test that hx2 link is hidden when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        navbar = soup.find("li", id="navbar-request", class_="nav-item dropdown")
+        assert navbar
+        assert not navbar.find(
+            "a",
+            href=reverse("imperial_coldfront_plugin:user_create_hx2_allocation"),
+            class_="dropdown-item",
+        )
+        assert navbar.find(
+            "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
+        )
 
 
 class TestHomeView:
@@ -234,6 +292,14 @@ def message_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.views.messages")
 
 
+@pytest.fixture
+def create_hx2allocation_mock(mocker):
+    """Mock the create_hx2allocation method."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.HX2Allocation.objects.create_hx2allocation"
+    )
+
+
 class TestAddRDFStorageAllocation(LoginRequiredMixin):
     """Tests for the add_rdf_storage_allocation view."""
 
@@ -342,6 +408,85 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             mock_get_department_choices.assert_called_once_with(faculty)
 
 
+class TestAddHXAllocation(LoginRequiredMixin):
+    """Tests for the add_hx_allocation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:add_hx_allocation")
+
+    def _make_form_data(self, project, resource_type="hx2"):
+        return {
+            "resource_type": resource_type,
+            "project": project,
+        }
+
+    def test_non_admin_forbidden(self, user, auth_client_factory):
+        """Test non-admin users cannot access the page."""
+        client = auth_client_factory(user)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_get(self, superuser_client):
+        """Check form rendering."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], HXAllocationForm)
+
+    def test_post(
+        self,
+        create_hx2allocation_mock,
+        superuser_client,
+        project,
+    ):
+        """Test successful project creation."""
+        # mock the chain to inject the group value to check the redirect later
+        group_id = project.group_id
+        resource_type = "hx2"
+        allocation_pk = 1
+        create_hx2allocation_mock.return_value.pk = allocation_pk
+        AllocationStatusChoice.objects.get_or_create(name="Active")
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                resource_type=resource_type,
+            ),
+        )
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:hx_allocation_task_result",
+                args=[resource_type, group_id, allocation_pk],
+            ),
+            fetch_redirect_response=False,
+        )
+        create_hx2allocation_mock.assert_called_once()
+        _, kwargs = create_hx2allocation_mock.call_args
+        assert kwargs["project"] == project
+        assert kwargs["quantity"] == 1
+        assert kwargs["end_date"] is None
+        assert kwargs["justification"] == ""
+        assert kwargs["description"] == ""
+        assert kwargs["is_locked"] is False
+        assert kwargs["is_changeable"] is True
+        assert kwargs["start_date"] is not None
+
+    def test_form_validation_error(
+        self, superuser_client, project, create_hx2allocation_mock
+    ):
+        """Invalid resource type raises ValueError."""
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(project=project.pk, resource_type="hx99"),
+        )
+
+        # Form validation error should not raise an exception, but should re-render
+        # the form (200 response)
+        assert response.status_code == 200
+        assert response.context["form"].errors
+
+
 class TestAllocationTaskResult(LoginRequiredMixin):
     """Tests for the allocation_task_result view."""
 
@@ -395,6 +540,30 @@ class TestAllocationTaskResult(LoginRequiredMixin):
         assert bytes(result, "utf-8") in response.content
 
 
+class TestHXAllocationTaskResult(LoginRequiredMixin):
+    """Tests for the allocation_task_result view."""
+
+    def _get_url(
+        self,
+        resource_type: str = "hx2",
+        group_id: str = "test-group",
+        allocation_pk: int = 1,
+    ):
+        return reverse(
+            "imperial_coldfront_plugin:hx_allocation_task_result",
+            kwargs={
+                "resource_type": resource_type,
+                "group_id": group_id,
+                "allocation_pk": allocation_pk,
+            },
+        )
+
+    def test_success(self, superuser_client):
+        """Test view when the task completed successfully."""
+        response = superuser_client.get(self._get_url("hx2", "test-group", 1))
+        assert response.status_code == HTTPStatus.OK
+
+
 def test_get_or_create_project(user):
     """Test get_or_create_project function."""
     from coldfront.core.field_of_science.models import FieldOfScience
@@ -436,7 +605,7 @@ class TestAddDartID(LoginRequiredMixin):
         )
         assert response.status_code == 403
 
-    def test_get(self, rdf_allocation, allocation_user, user_client):
+    def test_get(self, rdf_allocation, user_client):
         """Test get method."""
         from imperial_coldfront_plugin.forms import DartIDForm
 
@@ -444,7 +613,7 @@ class TestAddDartID(LoginRequiredMixin):
         assert response.status_code == 200
         assert isinstance(response.context["form"], DartIDForm)
 
-    def test_post(self, rdf_allocation, allocation_user, user_client):
+    def test_post(self, rdf_allocation, user_client):
         """Test post method."""
         dart_id = "1001"
         allocation = "RDF Storage Allocation"
@@ -1164,3 +1333,74 @@ class TestAllocationDetailBanners:
         assert not soup.find("div", id="deleted-allocation")
         assert not soup.find("div", id="removed-allocation")
         assert not soup.find("div", id="archived-allocation")
+
+
+class TestUserCreateHX2AllocationView(LoginRequiredMixin):
+    """Tests for the user_create_hx2_allocation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:user_create_hx2_allocation")
+
+    def test_existing_allocation(self, auth_client_factory, hx2_allocation, project):
+        """Test that users with an existing allocation cannot create another."""
+        client = auth_client_factory(hx2_allocation.project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+        assert b"Unable to request HX2 Access" in response.content
+
+    @patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False)
+    @patch("imperial_coldfront_plugin.models.ldap_create_group")
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
+    def test_post(
+        self,
+        ldap_add_member_to_group_mock,
+        ldap_create_group_mock,
+        ldap_gid_in_use_mock,
+        auth_client_factory,
+        project,
+        rdf_allocation_dependencies,
+    ):
+        """Test that a user can create an HX2 allocation."""
+        client = auth_client_factory(project.pi)
+        response = client.post(
+            self._get_url(), data=dict(project=project.pk, accept_terms=True)
+        )
+        allocation = Allocation.objects.get(project=project, resources__name="HX2")
+        assertRedirects(
+            response,
+            reverse("allocation-detail", kwargs=dict(allocation_pk=allocation.pk)),
+            fetch_redirect_response=False,
+        )
+
+    def test_post_other_users_project(self, auth_client_factory, project, user_factory):
+        """Test that user cannot create an HX2 allocation for another user's project."""
+        other_user = user_factory()
+        client = auth_client_factory(other_user)
+        response = client.post(
+            self._get_url(), data=dict(project=project.pk, accept_terms=True)
+        )
+        assert response.status_code == 200
+        assert response.context["form"].errors["project"] == [
+            "Select a valid choice. That choice is not one of the available choices."
+        ]
+
+    def test_get(self, auth_client_factory, project, user_factory, project_factory):
+        """Test that the form is rendered on GET and has the correct choices."""
+        project_factory(pi=user_factory(), title="Other Project")
+
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/hx2_allocation_self_creation.html"
+        )
+        form = response.context["form"]
+        assert form.fields["project"].queryset.get() == project
+        assert not form.fields["accept_terms"].initial
+
+    def test_feature_flag(self, auth_client_factory, project, user_factory, settings):
+        """Test that the view is disabled when the feature flag is off."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 403
