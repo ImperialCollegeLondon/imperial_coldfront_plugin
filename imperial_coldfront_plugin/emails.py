@@ -167,13 +167,13 @@ def notify_platforms_to_manually_delete_allocation(
 
     For an allocation that has hit the 'Deleted' status.
     """
-    receipient_list = [
+    recipient_list = [
         email.strip()
         for email in settings.RCS_NOTIFICATION_EMAILS.split(",")
         if email.strip()
     ]
 
-    if not receipient_list:
+    if not recipient_list:
         return
 
     subject = (
@@ -192,7 +192,7 @@ def notify_platforms_to_manually_delete_allocation(
         subject=subject,
         message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=receipient_list,
+        recipient_list=recipient_list,
     )
 
 
