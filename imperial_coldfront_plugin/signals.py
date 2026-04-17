@@ -348,7 +348,10 @@ def prevent_multiple_hx2_allocations_per_project(
     **kwargs: object,
 ) -> None:
     """Prevent saving HX2Allocation if the project already has an HX2Allocation."""
-    existing_allocations = HX2Allocation.objects.filter(project=instance.project)
+    existing_allocations = HX2Allocation.objects.filter(
+        project=instance.project,
+        resources__name="HX2",
+    )
 
     if instance.pk is not None:
         existing_allocations = existing_allocations.exclude(pk=instance.pk)

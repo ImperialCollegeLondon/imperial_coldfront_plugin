@@ -8,8 +8,8 @@ from coldfront.core.allocation.models import (
     AllocationStatusChoice,
     AllocationUser,
     AllocationUserStatusChoice,
-    Resource,
 )
+from coldfront.core.resource.models import Resource
 
 from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
 
