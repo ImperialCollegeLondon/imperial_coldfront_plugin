@@ -1,10 +1,9 @@
 """Plugin views."""
 
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from coldfront.core.allocation.models import Allocation
+from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
 from coldfront.core.project.forms import ProjectAddUserForm
 from coldfront.core.project.models import (
     Project,
@@ -18,24 +17,32 @@ from coldfront.core.user.utils import CombinedUserSearch, UserSearch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.forms import formset_factory
+from django.forms import ModelChoiceField, formset_factory
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django_q.tasks import async_task, fetch
 
 from .dart import create_dart_id_attribute
 from .forms import (
+    AdminProjectCreationForm,
     CreditTransactionForm,
     DartIDForm,
+    HX2TermsAndConditionsForm,
+    HXAllocationForm,
     ProjectAddUsersToAllocationShortnameForm,
-    ProjectCreationForm,
     RDFAllocationForm,
+    UserProjectCreationForm,
     get_department_choices,
 )
 from .microsoft_graph_client import get_graph_api_client
-from .models import CreditTransaction
-from .policy import check_project_pi_or_superuser, user_eligible_for_hpc_access
+from .models import CreditTransaction, HX2Allocation, ICLProject
+from .policy import (
+    check_project_pi_or_superuser,
+    user_eligible_for_hpc_access,
+    user_eligible_to_be_pi,
+)
 from .tasks import create_rdf_allocation
 
 if TYPE_CHECKING:
@@ -105,6 +112,83 @@ def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
         form = RDFAllocationForm()
     return render(
         request, "imperial_coldfront_plugin/rdf_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def add_hx_allocation(request: HttpRequest) -> HttpResponse:
+    """Create a new HX2 project allocation.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the allocation creation form or redirects to the task result page.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = HXAllocationForm(request.POST)
+        if form.is_valid():
+            form_data = form.cleaned_data
+            resource_type = form_data["resource_type"]
+            project = form_data["project"]
+
+            if resource_type == "hx2":
+                hx_allocation = HX2Allocation.objects.create_hx2allocation(
+                    project=project,
+                    status=AllocationStatusChoice.objects.get(name="Active"),
+                    quantity=1,
+                    start_date=timezone.now().date(),
+                    end_date=None,
+                    justification="",
+                    description="",
+                    is_locked=False,
+                    is_changeable=True,
+                )
+
+            else:
+                raise ValueError(f"Invalid HX resource type: {resource_type}")
+
+            return redirect(
+                "imperial_coldfront_plugin:hx_allocation_task_result",
+                resource_type=form.cleaned_data["resource_type"],
+                group_id=form.cleaned_data["project"].group_id,
+                allocation_pk=hx_allocation.pk,
+            )
+    else:
+        form = HXAllocationForm()
+    return render(
+        request, "imperial_coldfront_plugin/hx_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def hx_allocation_task_result(
+    request: HttpRequest, group_id: str, resource_type: str, allocation_pk: int
+) -> HttpResponse:
+    """Display information about an hx allocation creation task.
+
+    Args:
+      request: The HTTP request object.
+      group_id: The ID of the group for which the allocation is being created.
+      resource_type: The type of the HX allocation being created (HX2 or HX3).
+      allocation_pk: The primary key of the allocation.
+
+    Returns:
+      The page displaying the task result.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+    return render(
+        request,
+        "imperial_coldfront_plugin/hx_allocation_task_result.html",
+        context={
+            "resource_type": resource_type,
+            "group_id": group_id,
+            "allocation_pk": allocation_pk,
+        },
     )
 
 
@@ -204,73 +288,6 @@ def add_dart_id_to_allocation(
     )
 
 
-def create_new_project(form: ProjectCreationForm) -> Project:
-    """Create a new project from the form data.
-
-    Args:
-      form: The validated project creation form.
-
-    Returns:
-        The newly created project.
-    """
-    from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
-
-    project_obj = form.save(commit=False)
-    project_obj.status = ProjectStatusChoice.objects.get(name="Active")
-    project_obj.pi = form.cleaned_data["user"]
-    project_obj.save()
-    ProjectUser.objects.create(
-        user=form.cleaned_data["user"],
-        project=project_obj,
-        role=ProjectUserRoleChoice.objects.get(name="Manager"),
-        status=ProjectUserStatusChoice.objects.get(name="Active"),
-    )
-    group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
-    location_attribute_type = ProjectAttributeType.objects.get(
-        name="Filesystem location"
-    )
-    department_attribute_type = ProjectAttributeType.objects.get(name="Department")
-    faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
-    ProjectAttribute.objects.create(
-        proj_attr_type=department_attribute_type,
-        project=project_obj,
-        value=form.cleaned_data["department"],
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=faculty_attribute_type,
-        project=project_obj,
-        value=form.cleaned_data["faculty"],
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=group_id_attribute_type,
-        project=project_obj,
-        value=form.cleaned_data["group_id"],
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=location_attribute_type,
-        project=project_obj,
-        value=str(
-            Path(
-                settings.GPFS_FILESYSTEM_MOUNT_PATH,
-                settings.GPFS_FILESYSTEM_NAME,
-                settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-                form.cleaned_data["faculty"],
-                form.cleaned_data["department"],
-                form.cleaned_data["group_id"],
-            )
-        ),
-    )
-    if ticket_id := form.cleaned_data.get("ticket_id"):
-        ticket_attribute_type = ProjectAttributeType.objects.get(
-            name="ASK Ticket Reference"
-        )
-        ProjectAttribute.objects.create(
-            proj_attr_type=ticket_attribute_type, project=project_obj, value=ticket_id
-        )
-
-    return project_obj
-
-
 @login_required
 def project_creation(request: HttpRequest) -> HttpResponse:
     """View to create a new project for any user.
@@ -285,12 +302,63 @@ def project_creation(request: HttpRequest) -> HttpResponse:
         return HttpResponseForbidden()
 
     if request.method == "POST":
-        form = ProjectCreationForm(request.POST)
+        form = AdminProjectCreationForm(request.POST)
         if form.is_valid():
-            project = create_new_project(form)
+            project = ICLProject.objects.create_iclproject(
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                field_of_science=form.cleaned_data["field_of_science"],
+                user=form.cleaned_data["user"],
+                faculty=form.cleaned_data["faculty"],
+                department=form.cleaned_data["department"],
+                group_id=form.cleaned_data["group_id"],
+                ticket_id=form.cleaned_data["ticket_id"],
+            )
             return redirect("project-detail", pk=project.pk)
     else:
-        form = ProjectCreationForm()
+        form = AdminProjectCreationForm()
+    return render(
+        request,
+        "imperial_coldfront_plugin/project_creation_form.html",
+        context=dict(form=form),
+    )
+
+
+@login_required
+def user_project_creation(request: "AuthenticatedHttpRequest") -> HttpResponse:
+    """View to create a new project for the logged in user.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the project creation form or redirects to the new project page.
+    """
+    if not settings.ENABLE_USER_GROUP_CREATION:
+        return HttpResponseForbidden()
+
+    if not request.user.is_superuser:
+        if Project.objects.filter(pi=request.user).exists():
+            return HttpResponseForbidden()
+        user_profile = get_graph_api_client().user_profile(request.user.username)
+        if not user_eligible_to_be_pi(user_profile):
+            return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = UserProjectCreationForm(request.POST)
+        if form.is_valid():
+            project = ICLProject.objects.create_iclproject(
+                title=form.cleaned_data["title"],
+                description=form.cleaned_data["description"],
+                field_of_science=form.cleaned_data["field_of_science"],
+                user=request.user,
+                faculty=form.cleaned_data["faculty"],
+                department=form.cleaned_data["department"],
+                group_id=request.user.username,
+            )
+            return redirect("project-detail", pk=project.pk)
+    else:
+        form = UserProjectCreationForm()
     return render(
         request,
         "imperial_coldfront_plugin/project_creation_form.html",
@@ -381,10 +449,13 @@ def create_credit_transaction(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = CreditTransactionForm(request.POST)
         if form.is_valid():
-            transaction = form.save()
+            transaction = form.save(commit=False)
+            transaction.authoriser = request.user.username
+            transaction.save()
             return redirect("project-detail", pk=transaction.project.pk)
     else:
         form = CreditTransactionForm()
+
     return render(
         request,
         "imperial_coldfront_plugin/credit_transaction_form.html",
@@ -405,10 +476,16 @@ def project_credit_transactions(
     )
 
     running = 0
-    rows: list[dict[str, int | CreditTransaction]] = []
+    rows: list[dict[str, int | str | CreditTransaction]] = []
     for transaction in transactions:
         running += transaction.amount
-        rows.append({"transaction": transaction, "running_balance": running})
+        rows.append(
+            {
+                "transaction": transaction,
+                "running_balance": running,
+                "authoriser": transaction.authoriser,
+            }
+        )
 
     return render(
         request,
@@ -418,4 +495,52 @@ def project_credit_transactions(
             "rows": rows,
             "total_balance": running,
         },
+    )
+
+
+@login_required
+def user_create_hx2_allocation(request: "AuthenticatedHttpRequest") -> HttpResponse:
+    """Create an HX2 allocation for the user."""
+    if not settings.ENABLE_USER_GROUP_CREATION:
+        return HttpResponseForbidden()
+
+    if Allocation.objects.filter(
+        project__pi=request.user,
+        status__name="Active",
+        resources__name="HX2",
+    ).exists():
+        # render info page saying user already has an active HX2 allocation
+        return render(request, "imperial_coldfront_plugin/existing_hx2_allocation.html")
+
+    form = HX2TermsAndConditionsForm(request.POST or None)
+
+    # set the project choices queryset to only the projects of the user
+    # this limits the selection to only the user's projects
+    # it is also used in form validation to ensure the user can only create
+    # allocations for their own projects
+    projects = Project.objects.filter(pi=request.user, status__name="Active")
+    project_field = form.fields["project"]
+    if not isinstance(project_field, ModelChoiceField):
+        # this keeps mypy happy as otherwise it won't allow setting the queryset on the
+        # field as it doesn't know which Field subclass it is.
+        raise TypeError("Expected 'project' field to be a ModelChoiceField.")
+    project_field.queryset = projects
+
+    if form.is_valid():
+        allocation = HX2Allocation.objects.create_hx2allocation(
+            project=form.cleaned_data["project"],
+            status=AllocationStatusChoice.objects.get(name="Active"),
+            quantity=1,
+            start_date=timezone.now().date(),
+            end_date=None,
+            justification="User self-allocated HX2 allocation",
+            description="Provides access to HX2 for all allocation users.",
+            is_locked=False,
+            is_changeable=True,
+        )
+        return redirect(reverse("allocation-detail", args=[allocation.pk]))
+    return render(
+        request,
+        "imperial_coldfront_plugin/hx2_allocation_self_creation.html",
+        context=dict(form=form),
     )

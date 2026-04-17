@@ -13,6 +13,16 @@ urlpatterns = [
         name="add_rdf_storage_allocation",
     ),
     path(
+        "create_hx_allocation/",
+        views.add_hx_allocation,
+        name="add_hx_allocation",
+    ),
+    path(
+        "hx_allocation_task_result/<str:resource_type>/<str:group_id>/<int:allocation_pk>/",
+        views.hx_allocation_task_result,
+        name="hx_allocation_task_result",
+    ),
+    path(
         "create_credit_transaction/",
         views.create_credit_transaction,
         name="create_credit_transaction",
@@ -33,6 +43,7 @@ urlpatterns = [
         name="add_dart_id",
     ),
     path("new_group/", views.project_creation, name="new_group"),
+    path("user_create_group/", views.user_project_creation, name="user_create_group"),
     path(
         "<int:pk>/add-users-search-results/",
         views.ProjectAddUsersSearchResultsShortnameView.as_view(),
@@ -42,5 +53,10 @@ urlpatterns = [
         "projects/<int:pk>/credits/",
         views.project_credit_transactions,
         name="project-credit-transactions",
+    ),
+    path(
+        "user_create_hx2_allocation/",
+        views.user_create_hx2_allocation,
+        name="user_create_hx2_allocation",
     ),
 ]

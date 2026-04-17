@@ -5,7 +5,6 @@ import time
 from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
-    Allocation,
     AllocationAttribute,
     AllocationAttributeType,
     AllocationAttributeUsage,
@@ -16,7 +15,10 @@ from coldfront.core.allocation.models import (
 from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.db import transaction
+from django.db.models import QuerySet
 from django.utils import timezone
+
+from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
 
 from .emails import (
     Discrepancy,
@@ -52,7 +54,7 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
     # dart_id = form_data["dart_id"]
     project = form_data["project"]
     shortname = form_data["allocation_shortname"]
-    ldap_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
+    ldap_name = f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
 
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     location_attribute_type = AllocationAttributeType.objects.get(
@@ -70,15 +72,13 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
         name="Active"
     )
 
-    faculty = project.projectattribute_set.get(proj_attr_type__name="Faculty").value
-    department = project.projectattribute_set.get(
-        proj_attr_type__name="Department"
-    ).value
-    group_id = project.projectattribute_set.get(proj_attr_type__name="Group ID").value
+    faculty = project.faculty
+    department = project.department
+    group_id = project.group_id
 
     logger.info("Creating initial database entries for RDF allocation.")
     with transaction.atomic():
-        rdf_allocation = Allocation.objects.create(
+        rdf_allocation = RDFAllocation.objects.create(
             project=project,
             status=allocation_active_status,
             start_date=form_data["start_date"],
@@ -112,7 +112,7 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
             value=shortname,
         )
 
-        gid = get_new_gid()
+        gid = get_new_gid("rdf")
         # create the gid attribute now so it is reserved in the database
         # uniqueness is enforced in both database and Active Directory
         AllocationAttribute.objects.create(
@@ -179,25 +179,14 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
     return rdf_allocation.pk
 
 
-def check_ldap_consistency() -> list[Discrepancy]:
-    """Check the consistency of LDAP groups with the database."""
-    if not settings.LDAP_ENABLED:
-        return []
-
+def find_discrepancies_helper(
+    allocations: QuerySet[RDFAllocation | HX2Allocation],
+    ldap_groups: dict[str, list[str]],
+) -> list[Discrepancy]:
+    """Finds discrepancies between LDAP groups and allocation users."""
     discrepancies: list[Discrepancy] = []
-    allocations = Allocation.objects.filter(
-        resources__name="RDF Active",
-        status__name="Active",
-        allocationattribute__allocation_attribute_type__name="Shortname",
-    ).distinct()
-
-    ldap_groups = ldap_group_member_search(f"{settings.LDAP_SHORTNAME_PREFIX}*")
-
     for allocation in allocations:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        group_name = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
+        group_name = allocation.ldap_shortname
 
         active_users = AllocationUser.objects.filter(
             allocation=allocation, status__name="Active"
@@ -211,16 +200,49 @@ def check_ldap_consistency() -> list[Discrepancy]:
         if missing_members or extra_members:
             discrepancies.append(
                 {
-                    "allocation_id": allocation.id,
                     "group_name": group_name,
                     "project_name": allocation.project.title,
                     "missing_members": list(missing_members),
                     "extra_members": list(extra_members),
                 }
             )
+    return discrepancies
+
+
+def check_rdf_ldap_consistency() -> list[Discrepancy]:
+    """Check the consistency of LDAP groups with the RDF Active allocations."""
+    if not settings.LDAP_ENABLED:
+        return []
+
+    allocations = RDFAllocation.objects.filter(
+        resources__name="RDF Active",
+        status__name="Active",
+    ).distinct()
+    ldap_groups = ldap_group_member_search(f"{settings.LDAP_RDF_SHORTNAME_PREFIX}*")
+
+    discrepancies = find_discrepancies_helper(allocations, ldap_groups)
 
     if discrepancies:
-        send_discrepancy_notification(discrepancies)
+        send_discrepancy_notification(discrepancies, source="RDF")
+
+    return discrepancies
+
+
+def check_hx2_ldap_consistency() -> list[Discrepancy]:
+    """Check the consistency of LDAP groups with the HX2 allocations in the database."""
+    if not settings.LDAP_ENABLED:
+        return []
+
+    allocations = HX2Allocation.objects.filter(
+        resources__name="HX2",
+        status__name="Active",
+    ).distinct()
+    ldap_groups = ldap_group_member_search(f"{settings.LDAP_HX2_SHORTNAME_PREFIX}*")
+
+    discrepancies = find_discrepancies_helper(allocations, ldap_groups)
+
+    if discrepancies:
+        send_discrepancy_notification(discrepancies, source="HX2")
 
     return discrepancies
 
@@ -231,58 +253,36 @@ def update_quota_usages_task() -> None:
     usages = client.retrieve_all_fileset_quotas(settings.GPFS_FILESYSTEM_NAME)
 
     # use prefetch_related to reduce number of database operations
-    allocations = Allocation.objects.filter(
+    allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active"
     ).prefetch_related("allocationattribute_set")
     # below could use some more error handling but is a reasonable first pass
     for allocation in allocations:
-        rdf_id = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        storage_attribute_usage = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Storage Quota (TB)"
-        ).allocationattributeusage
+        rdf_id = allocation.shortname
+        storage_attribute_usage = (
+            allocation.storage_quota_tb_attr.allocationattributeusage
+        )
         storage_attribute_usage.value = usages[rdf_id]["block_usage_tb"]
         storage_attribute_usage.save()
-        files_attribute_usage = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Files Quota"
-        ).allocationattributeusage
+        files_attribute_usage = allocation.files_quota_attr.allocationattributeusage
         files_attribute_usage.value = usages[rdf_id]["files_usage"]
         files_attribute_usage.save()
 
 
-def remove_allocation_group_members(allocation_id: int) -> None:
-    """Background task: remove all active members from an LDAP group.
+def remove_ldap_group_members(usernames: list[str], group_name: str) -> None:
+    """Remove members from an LDAP group.
 
     Args:
-        allocation_id: The primary key of the allocation.
+        usernames: The usernames to remove from the group
+        group_name: The name of the LDAP group to remove members from.
     """
     from .ldap import ldap_remove_member_from_group
 
-    if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
-        return
-
-    allocation = Allocation.objects.get(pk=allocation_id)
-
-    # Get the shortname/group_id from the allocation
-    try:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        group_id = f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-    except AllocationAttribute.DoesNotExist:
-        return
-
-    # Get all active users from the database
-    active_users = AllocationUser.objects.filter(
-        allocation=allocation, status__name="Active"
-    )
-
     # Remove each user from the LDAP group
-    for allocation_user in active_users:
+    for username in usernames:
         ldap_remove_member_from_group(
-            group_id,
-            allocation_user.user.username,
+            group_name,
+            username,
             allow_missing=True,
         )
 
@@ -300,7 +300,7 @@ def update_allocation_status() -> None:
     remove_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS)
     delete_limit = timedelta(days=settings.RDF_ALLOCATION_EXPIRY_DELETION_DAYS)
 
-    allocations_to_remove = Allocation.objects.filter(
+    allocations_to_remove = RDFAllocation.objects.filter(
         # current time - end date >= remove limit
         end_date__lte=(timezone.now() - remove_limit),
         # current time - end date < delete limit
@@ -311,7 +311,7 @@ def update_allocation_status() -> None:
     allocations_to_remove.update(status=removed_status)
 
     # Delete Allocations that end beyond deletion limit
-    allocations_to_delete = Allocation.objects.filter(
+    allocations_to_delete = RDFAllocation.objects.filter(
         # current time - expiry date > expiry limit
         end_date__lte=(timezone.now() - delete_limit),
         resources__name="RDF Active",
@@ -357,7 +357,7 @@ def check_rdf_allocation_expiry_notifications() -> None:
     ]
 
     # Query for expiry warnings
-    expiry_allocations = Allocation.objects.filter(
+    expiry_allocations = RDFAllocation.objects.filter(
         resources=rdf_resource, end_date__in=expiry_warning_dates
     ).select_related("project", "project__pi")
 
@@ -373,7 +373,7 @@ def check_rdf_allocation_expiry_notifications() -> None:
         )
 
     # Query for removal warnings
-    removal_allocations = Allocation.objects.filter(
+    removal_allocations = RDFAllocation.objects.filter(
         resources=rdf_resource, end_date__in=removal_warning_dates
     ).select_related("project", "project__pi")
 
@@ -389,7 +389,7 @@ def check_rdf_allocation_expiry_notifications() -> None:
         )
 
     # Query for deletion warnings
-    deletion_warning_allocations = Allocation.objects.filter(
+    deletion_warning_allocations = RDFAllocation.objects.filter(
         resources=rdf_resource, end_date__in=deletion_warning_dates
     ).select_related("project", "project__pi")
 
@@ -405,7 +405,7 @@ def check_rdf_allocation_expiry_notifications() -> None:
         )
 
     # Query for deletion notifications
-    deletion_notification_allocations = Allocation.objects.filter(
+    deletion_notification_allocations = RDFAllocation.objects.filter(
         resources=rdf_resource, end_date__in=deletion_notification_dates
     ).select_related("project", "project__pi")
 
@@ -436,14 +436,12 @@ def zero_allocation_gpfs_quota(allocation_id: int) -> None:
     if not settings.GPFS_ENABLED:
         return
 
-    allocation = Allocation.objects.get(pk=allocation_id)
+    allocation = RDFAllocation.objects.get(pk=allocation_id)
 
     client = GPFSClient()
 
     try:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
+        shortname = allocation.shortname
     except AllocationAttribute.DoesNotExist:
         logger.error(
             f"Could not find Shortname attribute for allocation {allocation_id}. "
@@ -465,15 +463,11 @@ def zero_allocation_gpfs_quota(allocation_id: int) -> None:
         return
 
     try:
-        storage_quota_attribute = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Storage Quota (TB)"
-        )
+        storage_quota_attribute = allocation.storage_quota_tb_attr
         storage_quota_attribute.value = "0"
         storage_quota_attribute.save()
 
-        files_quota_attribute = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Files Quota"
-        )
+        files_quota_attribute = allocation.files_quota_attr
         files_quota_attribute.value = "0"
         files_quota_attribute.save()
     except AllocationAttribute.DoesNotExist:
@@ -499,7 +493,7 @@ def check_quota_consistency() -> None:
     if not settings.GPFS_ENABLED:
         return
 
-    allocations = Allocation.objects.filter(
+    allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active",
         status__name="Active",
         allocationattribute__allocation_attribute_type__name="Shortname",
@@ -512,15 +506,9 @@ def check_quota_consistency() -> None:
     missing_filesets = []
 
     for allocation in allocations:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        storage_attribute_quota: int = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Storage Quota (TB)"
-        ).typed_value()
-        files_attribute_quota: int = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Files Quota"
-        ).typed_value()
+        shortname = allocation.shortname
+        storage_attribute_quota: int = allocation.storage_quota_tb
+        files_attribute_quota: int = allocation.files_quota
 
         if shortname in usages:
             # Check for discrepancies between the allocation and fileset for both
@@ -579,7 +567,7 @@ def unlink_expired_allocation_filesets() -> None:
         days=settings.RDF_ALLOCATION_EXPIRY_UNLINK_DAYS
     )
 
-    allocations = Allocation.objects.filter(
+    allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active",
         end_date=threshold_date,  # run once when it hits the configured day
     ).prefetch_related("allocationattribute_set")
@@ -588,10 +576,8 @@ def unlink_expired_allocation_filesets() -> None:
 
     for allocation in allocations:
         try:
-            shortname = allocation.allocationattribute_set.get(
-                allocation_attribute_type__name="Shortname"
-            ).value
-        except AllocationAttribute.DoesNotExist:
+            shortname = allocation.shortname
+        except ValueError:
             logger.error(
                 f"Could not find Shortname attribute for allocation {allocation.pk}. "
                 "Fileset unlink skipped."

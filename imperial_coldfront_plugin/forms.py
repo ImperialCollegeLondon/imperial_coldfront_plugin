@@ -5,11 +5,10 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
-from coldfront.core.project.models import Project
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -19,10 +18,14 @@ from django.http.request import QueryDict
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
+from imperial_coldfront_plugin.models import ICLProject
+from imperial_coldfront_plugin.utils import (
+    get_allocation_shortname,
+)
+
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
 from .models import CreditTransaction
-from .utils import get_allocation_shortname
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User as UserType
@@ -121,7 +124,7 @@ def _js_select_widget() -> forms.Select:
 class AllocationFormData(TypedDict):
     """Structure for holding cleaned RDF allocation form data with types."""
 
-    project: Project
+    project: ICLProject
     description: str
     start_date: date
     end_date: date
@@ -133,8 +136,8 @@ class AllocationFormData(TypedDict):
 class RDFAllocationForm(forms.Form):
     """Form for creating a new RDF allocation."""
 
-    project: forms.ModelChoiceField[Project] = forms.ModelChoiceField(
-        queryset=Project.objects.filter(status__name="Active"),
+    project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
+        queryset=ICLProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
     description = forms.CharField(widget=forms.Textarea())
@@ -207,20 +210,39 @@ class DartIDForm(forms.Form):
         return dart_id
 
 
-class ProjectCreationForm(forms.ModelForm[Project]):
-    """Form for creating a new research group (project)."""
+class UserProjectCreationForm(forms.ModelForm[ICLProject]):
+    """Form users to create their own project."""
 
     class Meta:
         """Meta class for the form."""
 
-        model = Project
+        model = ICLProject
         fields = ("title", "description", "field_of_science")
+
+    faculty = forms.ChoiceField(choices=get_faculty_choices)
+    department = forms.ChoiceField(choices=get_initial_department_choices)
+
+    def clean(self) -> dict[str, Any] | None:
+        """Check if the faculty and department combination is valid.
+
+        Raises:
+            ValidationError: If the combination is invalid.
+        """
+        cleaned_data = super().clean()
+        if cleaned_data:
+            faculty_id = cleaned_data["faculty"]
+            department_id = cleaned_data.get("department")
+            if department_id not in settings.DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
+                raise ValidationError("Invalid faculty and department combination.")
+        return cleaned_data
+
+
+class AdminProjectCreationForm(UserProjectCreationForm):
+    """Form for admins creating a new research group (project)."""
 
     username = forms.CharField(
         help_text="Username of group owner (must be a valid imperial username).",
     )
-    faculty = forms.ChoiceField(choices=get_faculty_choices)
-    department = forms.ChoiceField(choices=get_initial_department_choices)
     group_id = forms.CharField(
         required=False,
         min_length=3,
@@ -282,20 +304,6 @@ class ProjectCreationForm(forms.ModelForm[Project]):
             raise ValidationError("Name already in use.")
         return group_id
 
-    def clean(self) -> dict[str, Any] | None:
-        """Check if the faculty and department combination is valid.
-
-        Raises:
-            ValidationError: If the combination is invalid.
-        """
-        cleaned_data = super().clean()
-        if cleaned_data:
-            faculty_id = cleaned_data["faculty"]
-            department_id = cleaned_data.get("department")
-            if department_id not in settings.DEPARTMENTS_IN_FACULTY.get(faculty_id, []):
-                raise ValidationError("Invalid faculty and department combination.")
-        return cleaned_data
-
 
 class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
     """Form for adding users to allocations within a project.
@@ -309,7 +317,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
     ) -> None:
         """Initialize the form."""
         super().__init__(request_user, project_pk, *args, **kwargs)
-        project_obj = get_object_or_404(Project, pk=project_pk)
+        project_obj = get_object_or_404(ICLProject, pk=project_pk)
 
         allocation_query_set = project_obj.allocation_set.filter(
             resources__is_allocatable=True,
@@ -355,8 +363,8 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         model = CreditTransaction
         fields = ("project", "amount", "description")
 
-    project: forms.ModelChoiceField[Project] = forms.ModelChoiceField(
-        queryset=Project.objects.filter(status__name="Active"),
+    project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
+        queryset=ICLProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
     amount = forms.IntegerField(
@@ -365,4 +373,49 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
     description = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Description of the transaction",
+    )
+
+
+class HXAllocationForm(forms.Form):
+    """Form for creating a new HX2 allocation."""
+
+    project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
+        queryset=ICLProject.objects.filter(status__name="Active"),
+        widget=_js_select_widget(),
+    )
+
+    HX_CHOICES: ClassVar[list[tuple[str, str]]] = [("hx2", "HX2"), ("hx3", "HX3")]
+    resource_type = forms.ChoiceField(
+        choices=HX_CHOICES,
+        # Remove the widget when HX3 is active, along with the javascript in the
+        # template and the clean function below.
+        widget=forms.Select(attrs={"data-disabled-options": "hx3"}),
+    )
+
+    def clean_resource_type(self) -> str:
+        """Validate that the selected HX type is available."""
+        resource_type = self.cleaned_data["resource_type"]
+        if resource_type == "hx3":
+            raise ValidationError("HX3 allocations are not currently available.")
+        return resource_type
+
+
+class HXAllocationFormData(TypedDict):
+    """Structure for holding cleaned HX allocation form data with types."""
+
+    resource_type: str
+    project: ICLProject
+
+
+class HX2TermsAndConditionsForm(forms.Form):
+    """Form for accepting terms and conditions."""
+
+    project = forms.ModelChoiceField(
+        queryset=ICLProject.objects.none(),
+        widget=_js_select_widget(),
+        label="Please select which group you would like to grant access to.",
+    )
+    accept_terms = forms.BooleanField(
+        required=True,
+        label="I have read and accept the terms and conditions.",
     )

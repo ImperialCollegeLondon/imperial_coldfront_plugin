@@ -1,8 +1,11 @@
 """Pytest configuration."""
 
+import datetime
 import pkgutil
+from pathlib import Path
 from random import choices
 from string import ascii_lowercase
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -11,8 +14,11 @@ from django.test import Client
 
 def pytest_configure():
     """Configure Django settings for standalone test suite execution."""
+    import coldfront
+
     from imperial_coldfront_plugin import settings as plugin_settings
 
+    coldfront_templates_path = Path(coldfront.__path__[0]) / "templates"
     settings.configure(
         DEBUG=True,
         DATABASES={
@@ -47,7 +53,7 @@ def pytest_configure():
         TEMPLATES=[
             {
                 "BACKEND": "django.template.backends.django.DjangoTemplates",
-                "DIRS": ["tests/templates"],
+                "DIRS": ["tests/templates", str(coldfront_templates_path)],
                 "APP_DIRS": True,
                 "OPTIONS": {
                     "context_processors": [
@@ -76,14 +82,22 @@ def pytest_configure():
         EMAIL_SIGNATURE="",
         CENTER_NAME="",
         CENTER_BASE_URL="",
-        SETTINGS_EXPORT=["SHOW_CREDIT_BALANCE"],
+        CENTER_HELP_URL="",
+        ALLOCATION_ACCOUNT_ENABLED=False,
+        SETTINGS_EXPORT=[
+            "SHOW_CREDIT_BALANCE",
+            "ENABLE_USER_GROUP_CREATION",
+            "ALLOCATION_ACCOUNT_ENABLED",
+            "CENTER_HELP_URL",
+            "RDF_ASK_TICKET_URL",
+        ],
         **{
             key: getattr(plugin_settings, key)
             for key in dir(plugin_settings)
             if key.isupper()
         }
         | dict(
-            LDAP_ENABLED=False,
+            LDAP_ENABLED=True,
             LDAP_USERNAME="",
             LDAP_PASSWORD="",
             LDAP_URI="",
@@ -93,9 +107,13 @@ def pytest_configure():
             GPFS_API_URL="",
             GPFS_API_USERNAME="",
             GPFS_API_PASSWORD="",
-            GID_RANGES=[range(1031386, 1031435)],
+            GID_RANGES=dict(
+                rdf=[range(1031386, 1031405)], hx2=[range(1031406, 1031425)]
+            ),
             GPFS_ALLOCATION_CREATION_SLEEP=0,
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
+            ENABLE_USER_GROUP_CREATION=True,
+            RDF_ASK_TICKET_URL="http://example.com/ticket",
         ),  # override settings loaded by env var for tests
     )
 
@@ -241,30 +259,59 @@ def user_or_superuser(request):
 
 
 @pytest.fixture
-def project(user):
-    """Provides a Coldfront project owned by a user."""
+def project_active_status(db):
+    """Create a ProjectStatusChoice with name='Active'."""
+    from coldfront.core.project.models import ProjectStatusChoice
+
+    return ProjectStatusChoice.objects.get_or_create(name="Active")[0]
+
+
+@pytest.fixture
+def field_of_science_other(db):
+    """Create a FieldOfScience with description='Other'."""
     from coldfront.core.field_of_science.models import FieldOfScience
+
+    return FieldOfScience.objects.get_or_create(description="Other")[0]
+
+
+@pytest.fixture
+def project_factory(project_active_status, field_of_science_other):
+    """Provides a factory for Coldfront projects.
+
+    The factory takes the following arguments:
+
+    - pi: The owner of the project.
+    - title: The title of the project.
+    """
+
+    def create_project(pi, title):
+        from imperial_coldfront_plugin.models import ICLProject
+
+        return ICLProject.objects.create(
+            pi=pi,
+            title=title,
+            status=project_active_status,
+            field_of_science=field_of_science_other,
+        )
+
+    return create_project
+
+
+@pytest.fixture
+def project(user, project_factory):
+    """Provides a Coldfront project owned by a user."""
     from coldfront.core.project.models import (
-        Project,
         ProjectAttribute,
         ProjectAttributeType,
-        ProjectStatusChoice,
         ProjectUser,
         ProjectUserRoleChoice,
         ProjectUserStatusChoice,
     )
 
-    project_active_status = ProjectStatusChoice.objects.create(name="Active")
-    field_of_science_other = FieldOfScience.objects.create(description="Other")
     project_user_active_status = ProjectUserStatusChoice.objects.create(name="Active")
     project_user_role_manager = ProjectUserRoleChoice.objects.create(name="Manager")
 
-    project = Project.objects.create(
-        pi=user,
-        title=f"{user.get_full_name()}'s Research Group",
-        status=project_active_status,
-        field_of_science=field_of_science_other,
-    )
+    project = project_factory(pi=user, title=f"{user.get_full_name()}'s Research Group")
     department_attribute_type = ProjectAttributeType.objects.get(name="Department")
     faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
     group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
@@ -304,6 +351,19 @@ def rdf_allocation_dependencies(db):
     AllocationUserStatusChoice.objects.create(name="Active")
 
 
+@pytest.fixture(autouse=True)
+def ldap_connection_mock(mocker):
+    """Mock LDAP connection for tests that require it."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.ldap.Connection",
+        side_effect=RuntimeError(
+            "Un-mocked LDAP connection. If you see this error during a test, it means "
+            "that the test is trying to use the LDAP connection without mocking it. "
+            "Mock the interface to the LDAP module."
+        ),
+    )
+
+
 @pytest.fixture
 def rdf_allocation_shortname(settings):
     """Shortname applied to rdf_allocation fixture."""
@@ -313,7 +373,7 @@ def rdf_allocation_shortname(settings):
 @pytest.fixture
 def rdf_allocation_ldap_name(settings, rdf_allocation_shortname):
     """LDAP group name associated with rdf_allocation fixture."""
-    return f"{settings.LDAP_SHORTNAME_PREFIX}{rdf_allocation_shortname}"
+    return f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{rdf_allocation_shortname}"
 
 
 @pytest.fixture
@@ -324,23 +384,28 @@ def rdf_allocation_gid(settings):
 
 @pytest.fixture
 def rdf_allocation(
-    project, rdf_allocation_dependencies, rdf_allocation_shortname, rdf_allocation_gid
+    project,
+    rdf_allocation_dependencies,
+    rdf_allocation_shortname,
+    rdf_allocation_gid,
+    mocker,
 ):
     """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.allocation.models import (
-        Allocation,
         AllocationAttribute,
         AllocationAttributeType,
         AllocationStatusChoice,
     )
     from coldfront.core.resource.models import Resource
 
+    from imperial_coldfront_plugin.models import RDFAllocation
+
     rdf_resource = Resource.objects.get(name="RDF Active")
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
 
     allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-    allocation = Allocation.objects.create(
+    allocation = RDFAllocation.objects.create(
         project=project, status=allocation_active_status
     )
     allocation.resources.add(rdf_resource)
@@ -350,11 +415,12 @@ def rdf_allocation(
         allocation=allocation,
         value=rdf_allocation_shortname,
     )
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=gid_attribute_type,
-        allocation=allocation,
-        value=rdf_allocation_gid,
-    )
+    with patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False):
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=gid_attribute_type,
+            allocation=allocation,
+            value=rdf_allocation_gid,
+        )
     return allocation
 
 
@@ -367,19 +433,22 @@ def allocation_user_active_status(db):
 
 
 @pytest.fixture
-def allocation_user(allocation_user_active_status, rdf_allocation, user):
+def rdf_allocation_user(allocation_user_active_status, rdf_allocation, user, mocker):
     """Provides an active user for rdf_allocation fixture."""
     from coldfront.core.allocation.models import AllocationUser
 
-    return AllocationUser.objects.create(
-        allocation=rdf_allocation,
-        user=user,
-        status=allocation_user_active_status,
-    )
+    with mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_add_member_to_group",
+    ):
+        return AllocationUser.objects.create(
+            allocation=rdf_allocation,
+            user=user,
+            status=allocation_user_active_status,
+        )
 
 
 @pytest.fixture
-def allocation_attribute_factory(allocation_user):
+def allocation_attribute_factory(db):
     """Factory for creating AllocationAttribute instances for GID."""
     from coldfront.core.allocation.models import (
         AllocationAttribute,
@@ -392,8 +461,6 @@ def allocation_attribute_factory(allocation_user):
         value=None,
     ):
         """Create an AllocationAttribute instance."""
-        if allocation is None:
-            allocation = allocation_user.allocation
         name = name or random_string()
         return AllocationAttribute.objects.create(
             allocation=allocation,
@@ -429,6 +496,60 @@ def signals_async_task_mock(mocker):
 
 
 @pytest.fixture
-def enable_ldap(settings):
-    """Fixture to enable LDAP in settings."""
-    settings.LDAP_ENABLED = True
+def hx2_allocation_group_id():
+    """Shortname applied to hx2_allocation fixture."""
+    return "testuser"
+
+
+@pytest.fixture
+def hx2_allocation_ldap_name(settings, hx2_allocation_group_id):
+    """LDAP group name associated with hx2_allocation fixture."""
+    return f"{settings.LDAP_HX2_SHORTNAME_PREFIX}{hx2_allocation_group_id}"
+
+
+@pytest.fixture
+def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id):
+    """A Coldfront allocation representing an HX2 RDF storage allocation."""
+    from coldfront.core.allocation.models import AllocationStatusChoice
+    from coldfront.core.resource.models import Resource
+
+    from imperial_coldfront_plugin.models import HX2Allocation
+
+    hx2_resource = Resource.objects.get(name="HX2")
+
+    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+    allocation = HX2Allocation.objects.create(
+        project=project,
+        status=allocation_active_status,
+        start_date=datetime.date.today(),
+        end_date=datetime.date.today() + datetime.timedelta(days=365),
+    )
+    allocation.resources.add(hx2_resource)
+    return allocation
+
+
+@pytest.fixture
+def hx2_allocation_user(allocation_user_active_status, hx2_allocation, user, mocker):
+    """Provides an active user for hx2_allocation fixture."""
+    from coldfront.core.allocation.models import AllocationUser
+
+    with mocker.patch(
+        "imperial_coldfront_plugin.signals.ldap_add_member_to_group",
+    ):
+        return AllocationUser.objects.create(
+            allocation=hx2_allocation,
+            user=user,
+            status=allocation_user_active_status,
+        )
+
+
+@pytest.fixture(params=["rdf_allocation", "hx2_allocation"])
+def rdf_or_hx2_allocation(request):
+    """Fixture to provide either an RDF or HX2 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["rdf_allocation_user", "hx2_allocation_user"])
+def rdf_or_hx2_allocation_user(request):
+    """Fixture to provide an AllocationUser for either an RDF or HX2 allocation."""
+    return request.getfixturevalue(request.param)

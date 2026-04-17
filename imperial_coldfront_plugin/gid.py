@@ -16,12 +16,15 @@ class NoGIDAvailableError(Exception):
     """Error when no available GID found in the configured ranges."""
 
 
-def get_new_gid() -> int:
+def get_new_gid(range_name: str) -> int:
     """Get a new GID value.
 
     This function checks the existing GID values in the database and returns
     the next available GID within the specified ranges. If no GID is
-    available, it raises a ValueError.
+    available, it raises a NoGIDAvailableError.
+
+    Arguments:
+        range_name: The name of the GID range to use (e.g., "hx2" or "rdf").
 
     Returns:
         int: The next available GID value.
@@ -30,27 +33,37 @@ def get_new_gid() -> int:
         allocation_attribute_type__name="GID"
     )
 
-    # Get the maximum GID value already assigned
+    gid_ranges = settings.GID_RANGES[range_name]
+    range_limits = gid_ranges[0].start, gid_ranges[-1].stop + 1
+
+    # Get the maximum GID value already assigned in the selected_range
     try:
-        max_gid = max(eg.typed_value() for eg in existing_gids)
+        max_gid = max(
+            (
+                val
+                if range_limits[0] <= (val := eg.typed_value()) <= range_limits[1]
+                else 0
+            )
+            for eg in existing_gids
+        )
     except ValueError:
         # if there are no existing gids
         max_gid = None
 
     # Check each range to find the first available GID
-    for index, range in enumerate(settings.GID_RANGES):
-        if max_gid is None or max_gid < range[0]:
+    for index, gid_range in enumerate(gid_ranges):
+        if max_gid is None or max_gid < gid_range[0]:
             # If no existing GIDs, return the first GID in the range
-            return range[0]
+            return gid_range[0]
 
-        elif max_gid in range:
-            if max_gid != range[-1]:  # If max_gid is not the last in the range
+        elif max_gid in gid_range:
+            if max_gid != gid_range[-1]:  # If max_gid is not the last in the range
                 return max_gid + 1
             else:
                 if index + 1 < len(
-                    settings.GID_RANGES
+                    gid_ranges
                 ):  # if at the end of the range, get the next range
-                    return settings.GID_RANGES[index + 1][0]
+                    return gid_ranges[index + 1][0]
     raise NoGIDAvailableError("No available GID found in the configured ranges.")
 
 
@@ -79,3 +92,23 @@ def validate_gid_ranges(ranges: list[range]) -> None:
     for r1, r2 in pairwise(ranges):
         if r1.stop > r2.start:
             raise ValueError("GID ranges must not overlap and be in ascending order.")
+
+
+def validate_gid_range_overlap(ranges_by_type: dict[str, list[range]]) -> None:
+    """Validate that GID ranges across different named types do not overlap.
+
+    Args:
+        ranges_by_type: Mapping of range name -> list of validated ranges.
+
+    Raises:
+        ValueError: If any ranges overlap between different range names.
+    """
+    entries: list[range] = [r for ranges in ranges_by_type.values() for r in ranges]
+    # Sort by start so we only have to check adjacent intervals for overlap
+    entries.sort(key=lambda r: r.start)
+
+    for r1, r2 in pairwise(entries):
+        if r1.stop > r2.start:
+            raise ValueError(
+                "Overlapping GID ranges detected between different range names."
+            )

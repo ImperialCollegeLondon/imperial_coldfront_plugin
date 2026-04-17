@@ -16,27 +16,19 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django_q.tasks import async_task
 
+from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
+
 from .ldap import (
     ldap_add_member_to_group,
     ldap_gid_in_use,
     ldap_remove_member_from_group,
 )
-
-
-def _get_shortname_from_allocation(allocation: Allocation) -> str | None:
-    try:
-        shortname = allocation.allocationattribute_set.get(
-            allocation_attribute_type__name="Shortname"
-        ).value
-        return f"{settings.LDAP_SHORTNAME_PREFIX}{shortname}"
-    except AllocationAttribute.MultipleObjectsReturned:
-        raise ValueError(f"Multiple shortnames found for allocation - {allocation}")
-    except AllocationAttribute.DoesNotExist:
-        return None
+from .tasks import remove_ldap_group_members
+from .utils import rdf_or_hx2_allocation
 
 
 @receiver(pre_save, sender=AllocationAttribute)
-def ensure_no_existing_gid(
+def allocation_attribute_ensure_no_existing_gid(
     sender: object, instance: AllocationAttribute, **kwargs: object
 ) -> None:
     """Prevent saving of GID attribute if it is already in use.
@@ -57,7 +49,7 @@ def ensure_no_existing_gid(
         return
     if AllocationAttribute.objects.filter(
         allocation_attribute_type__name="GID", value=instance.value
-    ):
+    ).exists():
         raise ValueError(
             f"GID {instance.value} is already assigned to another allocation."
         )
@@ -66,7 +58,7 @@ def ensure_no_existing_gid(
 
 
 @receiver(pre_save, sender=AllocationAttribute)
-def ensure_unique_shortname(
+def allocation_attribute_ensure_unique_shortname(
     sender: object, instance: AllocationAttribute, **kwargs: object
 ) -> None:
     """Prevent saving of shortname attribute if it is not unique.
@@ -80,13 +72,13 @@ def ensure_unique_shortname(
         instance.allocation_attribute_type.name == "Shortname"
         and AllocationAttribute.objects.filter(
             allocation_attribute_type__name="Shortname", value=instance.value
-        )
+        ).exists()
     ):
         raise ValueError(f"An allocation with {instance.value} already exists.")
 
 
 @receiver(pre_save, sender=ProjectAttribute)
-def ensure_unique_group_id(
+def project_attribute_ensure_unique_group_id(
     sender: object, instance: ProjectAttribute, **kwargs: object
 ) -> None:
     """Prevent saving of project group name if it is not unique.
@@ -96,14 +88,43 @@ def ensure_unique_group_id(
         instance: The instance being saved.
         **kwargs: Additional keyword arguments.
     """
-    if instance.proj_attr_type.name == "Group ID" and ProjectAttribute.objects.filter(
-        proj_attr_type__name="Group ID", value=instance.value
+    if (
+        instance.proj_attr_type.name == "Group ID"
+        and ProjectAttribute.objects.filter(
+            proj_attr_type__name="Group ID", value=instance.value
+        ).exists()
     ):
         raise ValueError(f"A project with {instance.value} already exists.")
 
 
+def _sync_membership_helper(
+    allocation: RDFAllocation | HX2Allocation,
+    allocation_user: AllocationUser,
+    ldap_groupname: str,
+) -> None:
+    """Helper function to sync LDAP group membership for an AllocationUser."""
+    if allocation.status.name != "Active":
+        # Only manage LDAP group membership for Active allocations
+        return
+
+    if allocation_user.status.name == "Active":
+        async_task(
+            ldap_add_member_to_group,
+            ldap_groupname,
+            allocation_user.user.username,
+            allow_already_present=True,
+        )
+    else:
+        async_task(
+            ldap_remove_member_from_group,
+            ldap_groupname,
+            allocation_user.user.username,
+            allow_missing=True,
+        )
+
+
 @receiver(post_save, sender=AllocationUser)
-def sync_ldap_group_membership(
+def allocation_user_sync_ldap_group_membership(
     sender: object, instance: AllocationUser, **kwargs: object
 ) -> None:
     """Add or remove members from an ldap group based on AllocationUser.status.
@@ -120,27 +141,35 @@ def sync_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
+    try:
+        allocation = rdf_or_hx2_allocation(instance.allocation)
+    except ValueError:
+        # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
 
-    if instance.status.name == "Active":
-        async_task(
-            ldap_add_member_to_group,
-            group_id,
-            instance.user.username,
-            allow_already_present=True,
-        )
-    else:
-        async_task(
-            ldap_remove_member_from_group,
-            group_id,
-            instance.user.username,
-            allow_missing=True,
-        )
+    _sync_membership_helper(allocation, instance, allocation.ldap_shortname)
+
+
+def _delete_ldap_group_membership_helper(
+    allocation: RDFAllocation | HX2Allocation,
+    user: AllocationUser,
+    ldap_groupname: str,
+) -> None:
+    """Helper function to remove LDAP group membership for an AllocationUser."""
+    if allocation.status.name != "Active":
+        # Only manage LDAP group membership for Active allocations
+        return
+
+    async_task(
+        ldap_remove_member_from_group,
+        ldap_groupname,
+        user.user.username,
+        allow_missing=True,
+    )
 
 
 @receiver(post_delete, sender=AllocationUser)
-def remove_ldap_group_membership(
+def allocation_user_ldap_group_membership_deletion(
     sender: object, instance: AllocationUser, **kwargs: object
 ) -> None:
     """Remove an ldap group member if the associated AllocationUser is deleted.
@@ -160,43 +189,130 @@ def remove_ldap_group_membership(
     if not settings.LDAP_ENABLED:
         return
 
-    if (group_id := _get_shortname_from_allocation(instance.allocation)) is None:
+    try:
+        allocation = rdf_or_hx2_allocation(instance.allocation)
+    except ValueError:
+        # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
 
-    async_task(
-        ldap_remove_member_from_group,
-        group_id,
-        instance.user.username,
-        allow_missing=True,
+    _delete_ldap_group_membership_helper(
+        allocation, instance, allocation.ldap_shortname
     )
 
 
+@receiver(post_save, sender=AllocationUser)
+def allocation_user_sync_hx2_access_group(
+    sender: object,
+    instance: AllocationUser,
+    **kwargs: object,
+) -> None:
+    """Add or remove members from the HX2 access group based on allocation status."""
+    if not settings.LDAP_ENABLED:
+        return
+
+    try:
+        allocation = HX2Allocation.from_allocation(instance.allocation)
+    except ValueError:
+        # Signal applies only to HX2Allocations
+        return
+
+    _sync_membership_helper(allocation, instance, settings.LDAP_HX2_ACCESS_GROUP_NAME)
+
+
+@receiver(post_delete, sender=AllocationUser)
+def allocation_user_hx2_access_group_deletion(
+    sender: object,
+    instance: AllocationUser,
+    **kwargs: object,
+) -> None:
+    """Remove a user from the HX2 access group if the AllocationUser is deleted.
+
+    This isn't expected to come up in the usual course of things as removing a user via
+    the UI does not delete the AllocationUser object. Just covering it for completeness.
+    """
+    if not settings.LDAP_ENABLED:
+        return
+
+    try:
+        allocation = HX2Allocation.from_allocation(instance.allocation)
+    except ValueError:
+        # Signal applies only to HX2Allocations
+        return
+
+    _delete_ldap_group_membership_helper(
+        allocation, instance, settings.LDAP_HX2_ACCESS_GROUP_NAME
+    )
+
+
+def _remove_ldap_group_members_if_inactive_helper(
+    allocation: RDFAllocation | HX2Allocation,
+    group_name: str,
+) -> None:
+    """Helper function to remove all LDAP group members if allocation is not Active."""
+    if allocation.status.name == "Active":
+        return
+
+    usernames = allocation.allocationuser_set.filter(status__name="Active").values_list(
+        "user__username", flat=True
+    )
+
+    async_task(remove_ldap_group_members, list(usernames), group_name)
+
+
 @receiver(post_save, sender=Allocation)
-def remove_ldap_group_members_if_allocation_inactive(
-    sender: object, instance: Allocation, **kwargs: object
+@receiver(post_save, sender=RDFAllocation)
+@receiver(post_save, sender=HX2Allocation)
+def allocation_remove_ldap_group_members_if_inactive(
+    sender: object,
+    instance: Allocation | RDFAllocation | HX2Allocation,
+    **kwargs: object,
 ) -> None:
     """Remove all LDAP group members if allocation is not Active.
 
     The LDAP group itself is not deleted.
     """
-    from .tasks import remove_allocation_group_members
-
     if not settings.LDAP_ENABLED:
         return
-
-    if instance.status.name == "Active":
+    try:
+        allocation = rdf_or_hx2_allocation(instance)
+    except ValueError:
         return
 
-    if _get_shortname_from_allocation(instance) is None:
+    if (
+        isinstance(allocation, RDFAllocation)
+        and not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE
+    ):
         return
 
-    async_task(remove_allocation_group_members, instance.pk)
+    _remove_ldap_group_members_if_inactive_helper(allocation, allocation.ldap_shortname)
 
 
+@receiver(post_save, sender=Allocation)
+@receiver(post_save, sender=HX2Allocation)
+def allocation_remove_hx2_access_group_if_inactive(
+    sender: object,
+    instance: Allocation | HX2Allocation,
+    **kwargs: object,
+) -> None:
+    """Remove all members from the HX2 access group if allocation is not Active."""
+    if not settings.LDAP_ENABLED:
+        return
+    try:
+        allocation = HX2Allocation.from_allocation(instance)
+    except ValueError:
+        # Signal applies only to HX2Allocations
+        return
+
+    _remove_ldap_group_members_if_inactive_helper(
+        allocation, settings.LDAP_HX2_ACCESS_GROUP_NAME
+    )
+
+
+@receiver(pre_save, sender=RDFAllocation)
 @receiver(pre_save, sender=Allocation)
-def allocation_expired_handler(
-    sender: type[Allocation],
-    instance: Allocation,
+def allocation_expiry_zero_quota(
+    sender: type[RDFAllocation],
+    instance: Allocation | RDFAllocation,
     **kwargs: object,
 ) -> None:
     """Spawn a background task to zero GPFS quota when an RDF Active allocation has expired."""  # noqa E501
@@ -206,15 +322,17 @@ def allocation_expired_handler(
     if instance.status.name != "Expired":
         return
 
-    if not instance.resources.filter(name="RDF Active").exists():
+    try:
+        RDFAllocation.from_allocation(instance)
+    except ValueError:
         return
 
     try:
-        old_instance = Allocation.objects.get(pk=instance.pk)
-    except Allocation.DoesNotExist:
+        old_instance = RDFAllocation.objects.get(pk=instance.pk)
+    except RDFAllocation.DoesNotExist:
         return
 
-    if old_instance.status == instance.status:
+    if old_instance.status.name != "Active":
         return
 
     async_task(

@@ -2,12 +2,11 @@
 
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
-from coldfront.core.allocation.models import AllocationStatusChoice
+from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
 from coldfront.core.project.models import ProjectStatusChoice
 from django.conf import settings
 from django.shortcuts import render
@@ -16,7 +15,12 @@ from django.utils import timezone
 from django_q.models import Task
 from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
-from imperial_coldfront_plugin.forms import ProjectCreationForm, RDFAllocationForm
+from imperial_coldfront_plugin.forms import (
+    AdminProjectCreationForm,
+    HXAllocationForm,
+    RDFAllocationForm,
+    UserProjectCreationForm,
+)
 from imperial_coldfront_plugin.models import CreditTransaction
 
 
@@ -48,13 +52,8 @@ def get_graph_api_client_mock(mocker, parsed_profile):
     return mock
 
 
-class TestHomeView:
-    """Test rendering of the home view.
-
-    This set of tests does not call the view function for the home page directly as
-    that is a Coldfront view. Instead, it checks the rendering logic of the template
-    that we override from the plugin.
-    """
+class TestRequestNavbar:
+    """Test the rendering of the request navbar items."""
 
     @pytest.fixture
     def request_(self, rf, user):
@@ -63,25 +62,219 @@ class TestHomeView:
         request.user = user
         return request
 
-    def test_get_standard_user(self, request_):
+    template_path = "imperial_coldfront_plugin/overrides/authorized_navbar.html"
+
+    def test_normal_user(self, request_, settings):
+        """Test that the navbar renders correctly for a normal user."""
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("li", id="navbar-request")
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+        assert not soup.find("a", href=settings.RDF_ASK_TICKET_URL)
+
+    def test_project_owner(self, request_, settings, project):
+        """Test that the navbar renders correctly for a project owner."""
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        navbar = soup.find("li", id="navbar-request", class_="nav-item dropdown")
+        assert navbar
+        assert navbar.find(
+            "a",
+            href=reverse("imperial_coldfront_plugin:user_create_hx2_allocation"),
+            class_="dropdown-item",
+        )
+        assert navbar.find(
+            "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
+        )
+
+    def test_feature_flag(self, request_, settings, project):
+        """Test that hx2 link is hidden when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = render(request_, self.template_path)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        navbar = soup.find("li", id="navbar-request", class_="nav-item dropdown")
+        assert navbar
+        assert not navbar.find(
+            "a",
+            href=reverse("imperial_coldfront_plugin:user_create_hx2_allocation"),
+            class_="dropdown-item",
+        )
+        assert navbar.find(
+            "a", href=settings.RDF_ASK_TICKET_URL, class_="dropdown-item"
+        )
+
+
+class TestHomeView:
+    """Test rendering of the home view.
+
+    This set of tests does not call the view function for the home page directly as
+    that is a Coldfront view. Instead, it checks the rendering logic of the template
+    that we override from the plugin.
+    """
+
+    @pytest.fixture(autouse=True)
+    def get_graph_api_client_mock(self, mocker, parsed_profile):
+        """Mock out get_graph_api_client."""
+        mock = mocker.patch(
+            "imperial_coldfront_plugin.templatetags.projects.get_graph_api_client"
+        )
+        mock().user_profile.return_value = parsed_profile
+        return mock
+
+    @pytest.fixture(autouse=True)
+    def user_eligible_to_be_pi_mock(self, mocker):
+        """Mock out user_eligible_to_be_pi to return True by default."""
+        return mocker.patch(
+            "imperial_coldfront_plugin.templatetags.projects.user_eligible_to_be_pi",
+            return_value=True,
+        )
+
+    @pytest.fixture
+    def request_(self, rf, user):
+        """A request object with a user."""
+        request = rf.get("/")
+        request.user = user
+        return request
+
+    def test_get_standard_user(self, request_, mocker, user_eligible_to_be_pi_mock):
         """Test that the home view renders correctly for a standard user."""
+        user_eligible_to_be_pi_mock.return_value = False
+
         response = render(
             request_, "imperial_coldfront_plugin/overrides/authorized_home.html"
         )
 
         assert response.status_code == 200
+        user_eligible_to_be_pi_mock.assert_called_once()
+
         soup = BeautifulSoup(response.content, "html.parser")
         assert not soup.find("a", href=reverse("project-list"))
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
 
-    def test_group_member(self, request_, project):
+    def test_group_member(
+        self,
+        request_,
+        project,
+        mocker,
+        get_graph_api_client_mock,
+        user_eligible_to_be_pi_mock,
+    ):
         """Test that the home view renders correctly for a group member/owner."""
+        user_eligible_to_be_pi_mock.return_value = False
         response = render(
             request_,
             "imperial_coldfront_plugin/overrides/authorized_home.html",
         )
         assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_not_called()
+
         soup = BeautifulSoup(response.content, "html.parser")
         assert soup.find("a", href=reverse("project-list"))
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
+    def test_feature_flag(self, request_, settings, get_graph_api_client_mock):
+        """Test home view renders correctly when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_not_called()
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
+    def test_eligible_user_without_projects(
+        self, request_, mocker, get_graph_api_client_mock
+    ):
+        """Test that PI-eligible users without projects see the self-service link."""
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_called_once_with(
+            request_.user.username
+        )
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("a", href=reverse("project-list"))
+        assert soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
+    def test_eligible_user_with_project(
+        self, request_, project, mocker, get_graph_api_client_mock
+    ):
+        """Test that PI-eligible users with projects see the self-service link."""
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_not_called()
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("a", href=reverse("project-list"))
+        assert not soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
+
+    def test_eligible_user_with_existing_project_membership(
+        self,
+        request_,
+        project,
+        mocker,
+        get_graph_api_client_mock,
+        user_factory,
+    ):
+        """Test PI eligible users with project membership see the self-service link."""
+        user = user_factory()
+        request_.user = user
+        from coldfront.core.project.models import (
+            ProjectUser,
+            ProjectUserRoleChoice,
+            ProjectUserStatusChoice,
+        )
+
+        project_user_active_status, _ = ProjectUserStatusChoice.objects.get_or_create(
+            name="Active"
+        )
+        project_user_role_manager, _ = ProjectUserRoleChoice.objects.get_or_create(
+            name="Manager"
+        )
+        ProjectUser.objects.create(
+            user=user,
+            project=project,
+            role=project_user_role_manager,
+            status=project_user_active_status,
+        )
+        response = render(
+            request_,
+            "imperial_coldfront_plugin/overrides/authorized_home.html",
+        )
+
+        assert response.status_code == 200
+        get_graph_api_client_mock().user_profile.assert_called_once_with(user.username)
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("a", href=reverse("project-list"))
+        assert soup.find(
+            "a", href=reverse("imperial_coldfront_plugin:user_create_group")
+        )
 
 
 @pytest.fixture
@@ -97,6 +290,14 @@ def message_mock(mocker):
     See https://stackoverflow.com/a/27300365/3778792 and other answers.
     """
     return mocker.patch("imperial_coldfront_plugin.views.messages")
+
+
+@pytest.fixture
+def create_hx2allocation_mock(mocker):
+    """Mock the create_hx2allocation method."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.HX2Allocation.objects.create_hx2allocation"
+    )
 
 
 class TestAddRDFStorageAllocation(LoginRequiredMixin):
@@ -207,6 +408,85 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             mock_get_department_choices.assert_called_once_with(faculty)
 
 
+class TestAddHXAllocation(LoginRequiredMixin):
+    """Tests for the add_hx_allocation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:add_hx_allocation")
+
+    def _make_form_data(self, project, resource_type="hx2"):
+        return {
+            "resource_type": resource_type,
+            "project": project,
+        }
+
+    def test_non_admin_forbidden(self, user, auth_client_factory):
+        """Test non-admin users cannot access the page."""
+        client = auth_client_factory(user)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_get(self, superuser_client):
+        """Check form rendering."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], HXAllocationForm)
+
+    def test_post(
+        self,
+        create_hx2allocation_mock,
+        superuser_client,
+        project,
+    ):
+        """Test successful project creation."""
+        # mock the chain to inject the group value to check the redirect later
+        group_id = project.group_id
+        resource_type = "hx2"
+        allocation_pk = 1
+        create_hx2allocation_mock.return_value.pk = allocation_pk
+        AllocationStatusChoice.objects.get_or_create(name="Active")
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                resource_type=resource_type,
+            ),
+        )
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:hx_allocation_task_result",
+                args=[resource_type, group_id, allocation_pk],
+            ),
+            fetch_redirect_response=False,
+        )
+        create_hx2allocation_mock.assert_called_once()
+        _, kwargs = create_hx2allocation_mock.call_args
+        assert kwargs["project"] == project
+        assert kwargs["quantity"] == 1
+        assert kwargs["end_date"] is None
+        assert kwargs["justification"] == ""
+        assert kwargs["description"] == ""
+        assert kwargs["is_locked"] is False
+        assert kwargs["is_changeable"] is True
+        assert kwargs["start_date"] is not None
+
+    def test_form_validation_error(
+        self, superuser_client, project, create_hx2allocation_mock
+    ):
+        """Invalid resource type raises ValueError."""
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(project=project.pk, resource_type="hx99"),
+        )
+
+        # Form validation error should not raise an exception, but should re-render
+        # the form (200 response)
+        assert response.status_code == 200
+        assert response.context["form"].errors
+
+
 class TestAllocationTaskResult(LoginRequiredMixin):
     """Tests for the allocation_task_result view."""
 
@@ -260,6 +540,30 @@ class TestAllocationTaskResult(LoginRequiredMixin):
         assert bytes(result, "utf-8") in response.content
 
 
+class TestHXAllocationTaskResult(LoginRequiredMixin):
+    """Tests for the allocation_task_result view."""
+
+    def _get_url(
+        self,
+        resource_type: str = "hx2",
+        group_id: str = "test-group",
+        allocation_pk: int = 1,
+    ):
+        return reverse(
+            "imperial_coldfront_plugin:hx_allocation_task_result",
+            kwargs={
+                "resource_type": resource_type,
+                "group_id": group_id,
+                "allocation_pk": allocation_pk,
+            },
+        )
+
+    def test_success(self, superuser_client):
+        """Test view when the task completed successfully."""
+        response = superuser_client.get(self._get_url("hx2", "test-group", 1))
+        assert response.status_code == HTTPStatus.OK
+
+
 def test_get_or_create_project(user):
     """Test get_or_create_project function."""
     from coldfront.core.field_of_science.models import FieldOfScience
@@ -301,7 +605,7 @@ class TestAddDartID(LoginRequiredMixin):
         )
         assert response.status_code == 403
 
-    def test_get(self, rdf_allocation, allocation_user, user_client):
+    def test_get(self, rdf_allocation, user_client):
         """Test get method."""
         from imperial_coldfront_plugin.forms import DartIDForm
 
@@ -309,7 +613,7 @@ class TestAddDartID(LoginRequiredMixin):
         assert response.status_code == 200
         assert isinstance(response.context["form"], DartIDForm)
 
-    def test_post(self, rdf_allocation, allocation_user, user_client):
+    def test_post(self, rdf_allocation, user_client):
         """Test post method."""
         dart_id = "1001"
         allocation = "RDF Storage Allocation"
@@ -356,25 +660,19 @@ class TestProjectCreation(LoginRequiredMixin):
         """Test get method."""
         response = superuser_client.get(self._get_url())
         assert response.status_code == 200
-        assert isinstance(response.context["form"], ProjectCreationForm)
+        assert isinstance(response.context["form"], AdminProjectCreationForm)
 
-    def test_post(self, superuser_client, user, settings):
+    def test_post(self, superuser_client, user, mocker):
         """Test posting with valid data."""
         from coldfront.core.field_of_science.models import FieldOfScience
-        from coldfront.core.project.models import (
-            Project,
-            ProjectUserRoleChoice,
-            ProjectUserStatusChoice,
-        )
 
-        ProjectStatusChoice.objects.create(name="Active")
-        project_user_status = ProjectUserStatusChoice.objects.create(name="Active")
-        project_user_role = ProjectUserRoleChoice.objects.create(name="Manager")
         FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+        mock_pk = 123
+        mock_create_iclproject.return_value.pk = mock_pk
 
-        settings.GPFS_FILESYSTEM_NAME = "fsname"
-        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
-        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
         faculty = "foe"
         department = "dsde"
 
@@ -394,46 +692,20 @@ class TestProjectCreation(LoginRequiredMixin):
             ),
         )
 
-        project = Project.objects.get()
         assertRedirects(
             response,
-            reverse(
-                "project-detail",
-                args=[project.pk],
-            ),
+            reverse("project-detail", args=[mock_pk]),
             fetch_redirect_response=False,
         )
-
-        assert project.title == title
-        assert project.pi == user
-        assert project.description == description
-
-        project_user = project.projectuser_set.get()
-        assert project_user.status == project_user_status
-        assert project_user.role == project_user_role
-        project.projectattribute_set.get
-        project.projectattribute_set.get(proj_attr_type__name="Faculty", value=faculty)
-        project.projectattribute_set.get(
-            proj_attr_type__name="Department", value=department
-        )
-        group_id = project.projectattribute_set.get(
-            proj_attr_type__name="Group ID", value=project.pi.username
-        ).value
-        project.projectattribute_set.get(
-            proj_attr_type__name="Filesystem location",
-            value=str(
-                Path(
-                    settings.GPFS_FILESYSTEM_MOUNT_PATH,
-                    settings.GPFS_FILESYSTEM_NAME,
-                    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
-                    faculty,
-                    department,
-                    group_id,
-                )
-            ),
-        )
-        project.projectattribute_set.get(
-            proj_attr_type__name="ASK Ticket Reference", value=ticket_id
+        mock_create_iclproject.assert_called_once_with(
+            title=title,
+            description=description,
+            field_of_science=FieldOfScience.objects.get(pk=FieldOfScience.DEFAULT_PK),
+            user=user,
+            faculty=faculty,
+            department=department,
+            group_id=user.username,
+            ticket_id=ticket_id,
         )
 
     def test_post_existing_username_group_id(self, superuser_client, user, project):
@@ -470,6 +742,165 @@ class TestProjectCreation(LoginRequiredMixin):
         )
 
 
+class TestUserProjectCreation(LoginRequiredMixin):
+    """Tests for the user_project_creation view."""
+
+    @pytest.fixture(autouse=True)
+    def get_graph_api_client_mock(self, mocker, parsed_profile):
+        """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
+        mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
+        mock().user_profile.return_value = parsed_profile
+        return mock
+
+    @pytest.fixture(autouse=True)
+    def eligible_pi_mock(self, mocker):
+        """Mock the PI eligibility filter."""
+        mock = mocker.patch("imperial_coldfront_plugin.views.user_eligible_to_be_pi")
+        mock.return_value = True
+        return mock
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:user_create_group")
+
+    def test_get(self, user_client, eligible_pi_mock):
+        """Test get method."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == 200
+        assert isinstance(response.context["form"], UserProjectCreationForm)
+        eligible_pi_mock.assert_called_once()
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        form = soup.find("form")
+        assert form
+        assert form.find("input", attrs={"name": "title"})
+        assert form.find("textarea", attrs={"name": "description"})
+        assert form.find("select", attrs={"name": "field_of_science"})
+        assert form.find("select", attrs={"name": "faculty"})
+        assert form.find("select", attrs={"name": "department"})
+        assert not form.find("input", attrs={"name": "username"})
+        assert not form.find("input", attrs={"name": "group_id"})
+        assert not form.find("input", attrs={"name": "ticket_id"})
+
+    def test_feature_flag(self, user_client, settings, eligible_pi_mock):
+        """Test that the view is inaccessible when the feature flag is disabled."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        response = user_client.get(self._get_url())
+        assert response.status_code == 403
+        eligible_pi_mock.assert_not_called()
+
+    def test_get_ineligible_user_returns_forbidden(self, user_client, eligible_pi_mock):
+        """Test that ineligible users cannot access the view."""
+        eligible_pi_mock.return_value = False
+        response = user_client.get(self._get_url())
+        assert response.status_code == 403
+
+    def test_get_existing_pi_returns_forbidden(
+        self, user_client, project, eligible_pi_mock
+    ):
+        """Test that existing PIs cannot access the view."""
+        response = user_client.get(self._get_url())
+        assert response.status_code == 403
+        eligible_pi_mock.assert_not_called()
+
+    def test_post(self, user_client, user, mocker, eligible_pi_mock):
+        """Test posting with valid data."""
+        from coldfront.core.field_of_science.models import FieldOfScience
+
+        FieldOfScience.objects.create(pk=FieldOfScience.DEFAULT_PK)
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+        mock_pk = 123
+        mock_create_iclproject.return_value.pk = mock_pk
+
+        faculty = "foe"
+        department = "dsde"
+        title = "group title"
+        description = "group_description"
+
+        response = user_client.post(
+            self._get_url(),
+            data=dict(
+                title=title,
+                description=description,
+                field_of_science=FieldOfScience.DEFAULT_PK,
+                department=department,
+                faculty=faculty,
+            ),
+        )
+
+        assertRedirects(
+            response,
+            reverse("project-detail", args=[mock_pk]),
+            fetch_redirect_response=False,
+        )
+        eligible_pi_mock.assert_called_once()
+        mock_create_iclproject.assert_called_once_with(
+            title=title,
+            description=description,
+            field_of_science=FieldOfScience.objects.get(pk=FieldOfScience.DEFAULT_PK),
+            user=user,
+            faculty=faculty,
+            department=department,
+            group_id=user.username,
+        )
+
+    def test_post_ineligible_user_returns_forbidden(
+        self, user_client, mocker, eligible_pi_mock
+    ):
+        """Test that ineligible users cannot create a project."""
+        eligible_pi_mock.return_value = False
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+
+        response = user_client.post(
+            self._get_url(),
+            data=dict(
+                title="group title",
+                description="group_description",
+                faculty="foe",
+                department="dsde",
+            ),
+        )
+
+        assert response.status_code == 403
+        mock_create_iclproject.assert_not_called()
+
+    def test_post_existing_pi_returns_forbidden(
+        self, user_client, project, mocker, eligible_pi_mock
+    ):
+        """Test that existing PIs cannot create another project."""
+        mock_create_iclproject = mocker.patch(
+            "imperial_coldfront_plugin.views.ICLProject.objects.create_iclproject"
+        )
+
+        response = user_client.post(
+            self._get_url(),
+            data=dict(
+                title="group title",
+                description="group_description",
+                faculty="foe",
+                department="dsde",
+            ),
+        )
+
+        assert response.status_code == 403
+        eligible_pi_mock.assert_not_called()
+        mock_create_iclproject.assert_not_called()
+
+    def test_get_superuser_bypasses_profile_and_existing_pi_checks(
+        self, superuser_client, project, eligible_pi_mock, get_graph_api_client_mock
+    ):
+        """Test that superusers can access the view without eligibility checks."""
+        response = superuser_client.get(self._get_url())
+
+        assert response.status_code == 200
+        assert isinstance(response.context["form"], UserProjectCreationForm)
+        eligible_pi_mock.assert_not_called()
+        get_graph_api_client_mock().user_profile.assert_not_called()
+
+
 class TestCreateCreditTransaction(LoginRequiredMixin):
     """Tests for the create_credit_transaction view."""
 
@@ -493,7 +924,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
             response, "imperial_coldfront_plugin/credit_transaction_form.html"
         )
 
-    def test_post_valid(self, superuser_client, project):
+    def test_post_valid(self, superuser_client, project, superuser):
         """Test successful credit transaction creation."""
         amount = 100
         description = "Test credit transaction"
@@ -518,6 +949,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
         assert transaction.amount == amount
         assert transaction.description == description
         assert transaction.timestamp is not None
+        assert transaction.authoriser == superuser.username
 
     def test_post_missing_project(self, superuser_client):
         """Test form validation failure when project is missing."""
@@ -726,13 +1158,13 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         settings.SHOW_CREDIT_BALANCE = True
         transactions = [
             CreditTransaction.objects.create(
-                project=project, amount=100, description="First"
+                project=project, amount=100, description="First", authoriser="Admin"
             ),
             CreditTransaction.objects.create(
-                project=project, amount=50, description="Second"
+                project=project, amount=50, description="Second", authoriser="Admin"
             ),
             CreditTransaction.objects.create(
-                project=project, amount=-30, description="Third"
+                project=project, amount=-30, description="Third", authoriser="Admin"
             ),
         ]
         now = timezone.now()
@@ -746,7 +1178,6 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert response.status_code == 200
 
         soup = BeautifulSoup(response.content, "html.parser")
-        # check link back to project detail
         assert soup.find(
             "a",
             class_="btn",
@@ -757,15 +1188,15 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
 
         rows = table.tbody.findChildren("tr")
         assert len(rows) == len(transactions)
-        # check ordering of table rows is chronological
+
         total = 0
         for row, transaction in zip(rows, transactions):
             cells = row.findChildren("td")
-            assert cells[2].span.text.strip() == str(transaction.amount)
+            assert cells[2].text.strip() == transaction.authoriser
+            assert cells[3].span.text.strip() == str(transaction.amount)
             total += transaction.amount
-            assert cells[3].text.strip() == str(total)
+            assert cells[4].text.strip() == str(total)
 
-        # check total in footer
         footer = table.tfoot.tr
         assert footer.find(tag_with_text_filter("th", str(total)))
 
@@ -902,3 +1333,74 @@ class TestAllocationDetailBanners:
         assert not soup.find("div", id="deleted-allocation")
         assert not soup.find("div", id="removed-allocation")
         assert not soup.find("div", id="archived-allocation")
+
+
+class TestUserCreateHX2AllocationView(LoginRequiredMixin):
+    """Tests for the user_create_hx2_allocation view."""
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:user_create_hx2_allocation")
+
+    def test_existing_allocation(self, auth_client_factory, hx2_allocation, project):
+        """Test that users with an existing allocation cannot create another."""
+        client = auth_client_factory(hx2_allocation.project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+        assert b"Unable to request HX2 Access" in response.content
+
+    @patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False)
+    @patch("imperial_coldfront_plugin.models.ldap_create_group")
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
+    def test_post(
+        self,
+        ldap_add_member_to_group_mock,
+        ldap_create_group_mock,
+        ldap_gid_in_use_mock,
+        auth_client_factory,
+        project,
+        rdf_allocation_dependencies,
+    ):
+        """Test that a user can create an HX2 allocation."""
+        client = auth_client_factory(project.pi)
+        response = client.post(
+            self._get_url(), data=dict(project=project.pk, accept_terms=True)
+        )
+        allocation = Allocation.objects.get(project=project, resources__name="HX2")
+        assertRedirects(
+            response,
+            reverse("allocation-detail", kwargs=dict(allocation_pk=allocation.pk)),
+            fetch_redirect_response=False,
+        )
+
+    def test_post_other_users_project(self, auth_client_factory, project, user_factory):
+        """Test that user cannot create an HX2 allocation for another user's project."""
+        other_user = user_factory()
+        client = auth_client_factory(other_user)
+        response = client.post(
+            self._get_url(), data=dict(project=project.pk, accept_terms=True)
+        )
+        assert response.status_code == 200
+        assert response.context["form"].errors["project"] == [
+            "Select a valid choice. That choice is not one of the available choices."
+        ]
+
+    def test_get(self, auth_client_factory, project, user_factory, project_factory):
+        """Test that the form is rendered on GET and has the correct choices."""
+        project_factory(pi=user_factory(), title="Other Project")
+
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 200
+        assertTemplateUsed(
+            response, "imperial_coldfront_plugin/hx2_allocation_self_creation.html"
+        )
+        form = response.context["form"]
+        assert form.fields["project"].queryset.get() == project
+        assert not form.fields["accept_terms"].initial
+
+    def test_feature_flag(self, auth_client_factory, project, user_factory, settings):
+        """Test that the view is disabled when the feature flag is off."""
+        settings.ENABLE_USER_GROUP_CREATION = False
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url())
+        assert response.status_code == 403

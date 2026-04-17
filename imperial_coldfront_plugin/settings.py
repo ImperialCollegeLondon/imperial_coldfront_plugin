@@ -6,6 +6,7 @@ These are imported into the project level settings by the Coldfront plugin mecha
 from pathlib import Path
 from string import ascii_lowercase, digits
 
+import pint
 from coldfront.config.env import ENV
 
 from .acl import ACL, ACLEntry
@@ -90,8 +91,10 @@ LDAP_GROUP_OU = ENV.str(
     default="OU=RCS,OU=Groups,OU=Imperial College (London),DC=ic,DC=ac,DC=uk",
 )
 """The organisational unit containing RDF access groups."""
-LDAP_SHORTNAME_PREFIX = "rdf-"
-"""Prefix added to allocation shortname for corresponding Active Directory group."""
+LDAP_RDF_SHORTNAME_PREFIX = ENV.str("LDAP_RDF_SHORTNAME_PREFIX", default="rdfdev-")
+"""Prefix added to allocation shortname for RDF Active Directory group."""
+LDAP_HX2_SHORTNAME_PREFIX = ENV.str("LDAP_HX2_SHORTNAME_PREFIX", default="hx2dev-")
+"""Prefix added to allocation shortname for HX2 Active Directory group."""
 
 AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
 """The Active Directory domain."""
@@ -99,12 +102,29 @@ AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
 LDAP_ENABLED = bool(LDAP_USERNAME and LDAP_PASSWORD and LDAP_URI)
 """Computed value of whether LDAP integration is enabled."""
 
+LDAP_HX2_ACCESS_GROUP_NAME = ENV.str(
+    "LDAP_HX2_ACCESS_GROUP_NAME", default="hx2dev-users"
+)
+"""Name of the Active Directory group to add users to for HX2 access."""
 
-_GID_RANGES = ENV.str("GID_RANGE", default="1031386-1031435")
-GID_RANGES = [
-    range(int(start), int(end) + 1)
-    for start, end in [gid_range.split("-") for gid_range in _GID_RANGES.split(",")]
-]
+_GID_RANGES_RDF = ENV.str("GID_RANGE_RDF", default="1031386-1031405")
+_GID_RANGES_HX2 = ENV.str("GID_RANGE_HX2", default="1031406-1031425")
+
+
+def string_to_gid_ranges(gid_ranges_str: str) -> list[range]:
+    """Convert a string of comma-separated GID ranges into a list of range objects."""
+    return [
+        range(int(start), int(end) + 1)
+        for start, end in [
+            gid_range.split("-") for gid_range in gid_ranges_str.split(",")
+        ]
+    ]
+
+
+GID_RANGES = dict(
+    rdf=string_to_gid_ranges(_GID_RANGES_RDF),
+    hx2=string_to_gid_ranges(_GID_RANGES_HX2),
+)
 """List of ranges of GIDs available for allocation to groups."""
 
 LOGOUT_REDIRECT_URL = "/"
@@ -171,6 +191,18 @@ GPFS_ALLOCATION_CREATION_SLEEP = ENV.int("GPFS_ALLOCATION_CREATION_SLEEP", defau
 
 RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = 7
 """Number of days after an allocation expires to unlink from project."""
+
+ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=False)
+"""Feature flag to enable or disable creation of user groups for allocations."""
+
+SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
+    "rdf_active": ENV.int("RDF_ACTIVE_CHARGING_RATE", default=50)
+    / (pint.Unit("terabyte") * pint.Unit("year")),
+}
+"""Charging rates for services as Pint Quantities in TB/year."""
+
+RDF_ASK_TICKET_URL = ENV.str("RDF_ASK_TICKET_URL", default="")
+"""URL of the form for users to request RDF access."""
 
 RCS_NOTIFICATION_EMAILS = ENV.str("RCS_NOTIFICATION_EMAILS", default="")
 """Email addresses to send RCS notifications to."""

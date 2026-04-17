@@ -4,9 +4,10 @@ from django.core import mail
 from django.test import override_settings
 
 from imperial_coldfront_plugin.emails import (
-    notify_platforms_to_manually_delete_allocation,
+    send_discrepancy_notification,
     send_fileset_not_found_notification,
     send_quota_discrepancy_notification,
+    notify_platforms_to_manually_delete_allocation,
 )
 
 
@@ -87,6 +88,44 @@ The following allocation(s) in Coldfront had no corresponding fileset in GPFS:
 
     assert actual_message == expected_message
 
+
+@override_settings(ADMINS=[("Name", "admin@email.com")])
+def test_send_discrepancy_notification_rdf():
+    """Test that the discrepancy email references RDF by default."""
+    discrepancies = [
+        {
+            "project_name": "Test Project",
+            "group_name": "rdfdev-testgroup",
+            "missing_members": ["alice"],
+            "extra_members": [],
+        }
+    ]
+
+    # Default with no source uses RDF:
+    send_discrepancy_notification(discrepancies, source="RDF")
+
+    assert len(mail.outbox) == 1
+    assert "RDF" in mail.outbox[0].subject
+    assert "RDF" in mail.outbox[0].body
+
+
+@override_settings(ADMINS=[("Name", "admin@email.com")])
+def test_send_discrepancy_notification_hx2():
+    """Test that the discrepancy email references HX2 when source is HX2."""
+    discrepancies = [
+        {
+            "project_name": "Test Project",
+            "group_name": "hx2dev-testgroup",
+            "missing_members": ["alice"],
+            "extra_members": [],
+        }
+    ]
+
+    send_discrepancy_notification(discrepancies, source="HX2")
+
+    assert len(mail.outbox) == 1
+    assert "HX2" in mail.outbox[0].subject
+    assert "HX2" in mail.outbox[0].body
 
 def test_notify_platforms_to_manually_delete_allocation():
     """Test the notify platforms to manually delete allocation email."""
