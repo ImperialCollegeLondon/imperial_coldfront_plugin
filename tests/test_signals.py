@@ -728,6 +728,7 @@ class TestPreventMultipleHX2AllocationsPerProject:
 
         assert allocation.pk is not None
         assert allocation.resources.filter(pk=hx2_resource.pk).exists()
+
     def test_duplicate_allocation_raises(
         self, hx2_allocation, rdf_allocation_dependencies
     ):
