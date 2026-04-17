@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.db.models import Subquery
 from django.http.request import QueryDict
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -25,7 +26,7 @@ from imperial_coldfront_plugin.utils import (
 
 from .dart import DartIDValidationError, validate_dart_id
 from .microsoft_graph_client import get_graph_api_client
-from .models import CreditTransaction
+from .models import CreditTransaction, HX2Allocation
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User as UserType
@@ -379,8 +380,13 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
 class HXAllocationForm(forms.Form):
     """Form for creating a new HX2 allocation."""
 
+    # This filters for projects that don't currently have a HX2 allocation.
+    # When functionality for HX3 is added, this filter may need to be removed
+    # or amended to allow projects with HX2 but not HX3 allocations to be selected.
     project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
-        queryset=ICLProject.objects.filter(status__name="Active"),
+        queryset=ICLProject.objects.filter(status__name="Active").exclude(
+            id__in=Subquery(HX2Allocation.objects.values("project_id"))
+        ),
         widget=_js_select_widget(),
     )
 
