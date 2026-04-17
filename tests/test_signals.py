@@ -726,13 +726,15 @@ class TestPreventMultipleHX2AllocationsPerProject:
         )
         allocation.resources.add(hx2_resource)
 
+        assert allocation.pk is not None
+        assert allocation.resources.filter(pk=hx2_resource.pk).exists()
     def test_duplicate_allocation_raises(
         self, hx2_allocation, rdf_allocation_dependencies
     ):
         """Test that creating a second HX2 allocation for the same project raises."""
         allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
 
-        # Since the hx2_allocation fixuture creates an HX2 allocation for the project,
+        # Since the hx2_allocation fixture creates an HX2 allocation for the project,
         # trying to create another one should raise a ValueError.
         with pytest.raises(ValueError, match="already has an HX2 allocation"):
             HX2Allocation.objects.create(
