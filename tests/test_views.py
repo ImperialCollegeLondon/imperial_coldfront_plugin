@@ -762,7 +762,7 @@ class TestUserProjectCreation(LoginRequiredMixin):
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:user_create_group")
 
-    def test_get(self, user_client, eligible_pi_mock):
+    def test_get(self, user, user_client, eligible_pi_mock):
         """Test get method."""
         response = user_client.get(self._get_url())
         assert response.status_code == 200
@@ -780,6 +780,10 @@ class TestUserProjectCreation(LoginRequiredMixin):
         assert not form.find("input", attrs={"name": "username"})
         assert not form.find("input", attrs={"name": "group_id"})
         assert not form.find("input", attrs={"name": "ticket_id"})
+
+        assert response.context["form"].initial == dict(
+            title=f"{user.get_full_name()}'s Research Group"
+        )
 
     def test_feature_flag(self, user_client, settings, eligible_pi_mock):
         """Test that the view is inaccessible when the feature flag is disabled."""
