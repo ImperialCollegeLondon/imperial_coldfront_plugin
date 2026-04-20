@@ -7,7 +7,7 @@
 This is a allocation from an archived group! You cannot make any changes.
 </div>
 {% endif %}
-{% if settings.ENABLE_RDF_ALLOCATION_LIFECYCLE %}
+{% if settings.ENABLE_RDF_ALLOCATION_LIFECYCLE and allocation.get_parent_resource.name == "RDF Active" %}
     {% if allocation.status.name == 'Deleted' %}
     <div class="alert alert-danger" role="alert" id="deleted-allocation">
         <i class="fas fa-trash" aria-hidden="true"></i>

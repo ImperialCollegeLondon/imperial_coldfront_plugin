@@ -1243,6 +1243,19 @@ class TestAllocationDetailBanners:
             },
         )
 
+    def test_banner_not_displayed_for_non_rdf_allocations(
+        self, request_, settings, hx2_allocation
+    ):
+        """Test that no banner is displayed for non-RDF allocations."""
+        expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+        hx2_allocation.status = expired_status
+        response = self._render_allocation_detail(request_, hx2_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("div", id="expired-allocation")
+        assert not soup.find("div", id="deleted-allocation")
+        assert not soup.find("div", id="removed-allocation")
+        assert not soup.find("div", id="archived-allocation")
+
     def test_banner_displayed_for_expired_allocations(
         self, request_, rdf_allocation, settings
     ):
