@@ -8,6 +8,7 @@ from django.conf import settings
 from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
     CreditTransactionForm,
+    HXAllocationForm,
     RDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
@@ -380,3 +381,17 @@ def test_credit_transaction_form_missing_description(project):
     form = CreditTransactionForm(data=form_data)
     assert not form.is_valid()
     assert "description" in form.errors
+
+
+class TestHXAllocationForm:
+    """Tests for HXAllocationForm."""
+
+    def test_project_queryset(self, project):
+        """Test that the project queryset is limited to projects with a PI."""
+        form = HXAllocationForm()
+        assert list(form.fields["project"].queryset.all()) == [project]
+
+    def test_project_queryset_existing_hx2_allocation(self, hx2_allocation):
+        """Test project queryset excludes projects with existing HX2 allocation."""
+        form = HXAllocationForm()
+        assert not form.fields["project"].queryset.exists()

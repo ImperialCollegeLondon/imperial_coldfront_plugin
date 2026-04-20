@@ -9,8 +9,9 @@ from coldfront.core.allocation.models import (
     AllocationUser,
     AllocationUserStatusChoice,
 )
+from coldfront.core.resource.models import Resource
 
-from imperial_coldfront_plugin.models import RDFAllocation
+from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
 
 
 @pytest.fixture
@@ -711,3 +712,31 @@ class TestAllocationExpiryZeroQuota:
         rdf_allocation.status = expired_status
         rdf_allocation.save()
         zero_quota_mock.assert_not_called()
+
+
+class TestPreventMultipleHX2AllocationsPerProject:
+    """Tests for prevent_multiple_hx2_allocations_per_project signal handler."""
+
+    def test_new_allocation_passes(self, project, rdf_allocation_dependencies):
+        """Test that creating a first HX2 allocation for a project passes."""
+        hx2_resource = Resource.objects.get(name="HX2")
+        allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+        allocation = HX2Allocation.objects.create(
+            project=project, status=allocation_active_status
+        )
+        allocation.resources.add(hx2_resource)
+
+        assert allocation.pk is not None
+        assert allocation.resources.filter(pk=hx2_resource.pk).exists()
+
+    def test_duplicate_allocation_raises(
+        self, hx2_allocation, rdf_allocation_dependencies, allocation_active_status
+    ):
+        """Test that creating a second HX2 allocation for the same project raises."""
+        # Since the hx2_allocation fixture creates an HX2 allocation for the project,
+        # trying to create another one should raise a ValueError.
+        with pytest.raises(ValueError, match="already has an HX2 allocation"):
+            HX2Allocation.objects.create(
+                project=hx2_allocation.project,
+                status=allocation_active_status,
+            )
