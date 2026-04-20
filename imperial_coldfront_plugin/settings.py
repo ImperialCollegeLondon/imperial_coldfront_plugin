@@ -6,10 +6,13 @@ These are imported into the project level settings by the Coldfront plugin mecha
 from pathlib import Path
 from string import ascii_lowercase, digits
 
+import django_stubs_ext
 import pint
 from coldfront.config.env import ENV
 
 from .acl import ACL, ACLEntry
+
+django_stubs_ext.monkeypatch()
 
 MICROSOFT_TENANT_ID = ENV.str("MICROSOFT_TENANT_ID", default="")
 ADDITIONAL_USER_SEARCH_CLASSES = ["imperial_coldfront_plugin.views.GraphAPISearch"]
