@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Fieldset, Layout
+from crispy_forms.layout import HTML, Fieldset, Layout, Submit
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -242,6 +242,7 @@ class UserProjectCreationForm(forms.ModelForm[ICLProject]):
                     f"href='{settings.GENERIC_ASK_REQUEST_URL}'>raise a request.</a>."
                     "</p>"
                 ),
+                Submit("submit", "Create", css_class="btn btn-primary"),
             ),
         )
 

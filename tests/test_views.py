@@ -772,6 +772,8 @@ class TestUserProjectCreation(LoginRequiredMixin):
         soup = BeautifulSoup(response.content, "html.parser")
         form = soup.find("form")
         assert form
+        assert form["method"] == "post"
+        assert form.get("action") is None
         assert form.find("input", attrs={"name": "title"})
         assert form.find("textarea", attrs={"name": "description"})
         assert form.find("select", attrs={"name": "field_of_science"})
@@ -780,6 +782,8 @@ class TestUserProjectCreation(LoginRequiredMixin):
         assert not form.find("input", attrs={"name": "username"})
         assert not form.find("input", attrs={"name": "group_id"})
         assert not form.find("input", attrs={"name": "ticket_id"})
+
+        assert form.find("button", type="submit", class_="btn btn-primary")
 
         message_paragraph = form.find("p", class_="text-muted", id="message-para")
         assert (
