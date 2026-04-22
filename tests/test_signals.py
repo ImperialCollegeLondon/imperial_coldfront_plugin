@@ -9,6 +9,7 @@ from coldfront.core.allocation.models import (
     AllocationUser,
     AllocationUserStatusChoice,
 )
+from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
 from coldfront.core.resource.models import Resource
 
 from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
@@ -745,16 +746,21 @@ class TestPreventMultipleHX2AllocationsPerProject:
 class TestAllocationUserPreventMultipleHX2:
     """Tests for allocation_user_prevent_multiple_hx2 signal handler."""
 
+    @pytest.fixture
+    def new_project(self, project_factory, user_factory):
+        """Fixture to create a new project for testing."""
+        return project_factory(user_factory(), "New Project")
+
     def test_prevent(
         self,
-        project,
+        new_project,
         hx2_allocation_user,
         allocation_user_active_status,
         allocation_active_status,
     ):
         """Test that a user cannot be added to multiple active HX2 allocations."""
         new_allocation = Allocation.objects.create(
-            project=project,
+            project=new_project,
             status=allocation_active_status,
         )
         new_allocation.resources.add(Resource.objects.get(name="HX2"))
@@ -768,7 +774,7 @@ class TestAllocationUserPreventMultipleHX2:
 
     def test_inactive_allowed(
         self,
-        project,
+        new_project,
         hx2_allocation_user,
         allocation_user_active_status,
         allocation_user_removed_status,
@@ -776,13 +782,20 @@ class TestAllocationUserPreventMultipleHX2:
         ldap_remove_member_mock,
     ):
         """Test user can be added to multiple HX2 allocations if one is inactive."""
+        group_id_attr = ProjectAttributeType.objects.get(name="Group ID")
+        ProjectAttribute.objects.create(
+            proj_attr_type=group_id_attr,
+            project=new_project,
+            value=f"{new_project.pi.username}_new",
+        )
+
         # create first HX2 allocation and add user
         hx2_allocation_user.status = allocation_user_removed_status
         hx2_allocation_user.save()
 
         # should be able to add user to another active HX2 allocation
         another_allocation = Allocation.objects.create(
-            project=project,
+            project=new_project,
             status=allocation_active_status,
         )
         another_allocation.resources.add(Resource.objects.get(name="HX2"))
