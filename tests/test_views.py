@@ -783,7 +783,7 @@ class TestUserProjectCreation(LoginRequiredMixin):
         assert not form.find("input", attrs={"name": "group_id"})
         assert not form.find("input", attrs={"name": "ticket_id"})
 
-        assert form.find("button", type="submit", class_="btn btn-primary")
+        assert form.find("input", type="submit", class_="btn btn-primary")
 
         message_paragraph = form.find("p", class_="text-muted", id="message-para")
         assert (

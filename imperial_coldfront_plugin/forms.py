@@ -242,7 +242,7 @@ class UserProjectCreationForm(forms.ModelForm[ICLProject]):
                     f"href='{settings.GENERIC_ASK_REQUEST_URL}'>raise a request.</a>."
                     "</p>"
                 ),
-                Submit("submit", "Create", css_class="btn btn-primary"),
+                Submit("submit", "Create"),
             ),
         )
 
