@@ -341,10 +341,11 @@ def allocation_expiry_zero_quota(
     )
 
 
+@receiver(pre_save, sender=Allocation)
 @receiver(pre_save, sender=HX2Allocation)
-def prevent_multiple_hx2_allocations_per_project(
+def allocation_prevent_multiple_hx2_allocations_per_project(
     sender: type[HX2Allocation],
-    instance: HX2Allocation,
+    instance: HX2Allocation | Allocation,
     **kwargs: object,
 ) -> None:
     """Prevent saving HX2Allocation if the project already has an HX2Allocation."""
