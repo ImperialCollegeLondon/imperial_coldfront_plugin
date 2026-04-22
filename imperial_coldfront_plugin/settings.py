@@ -206,3 +206,6 @@ SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
 
 RDF_ASK_TICKET_URL = ENV.str("RDF_ASK_TICKET_URL", default="")
 """URL of the form for users to request RDF access."""
+
+RCS_NOTIFICATION_EMAILS = ENV.str("RCS_NOTIFICATION_EMAILS", default="")
+"""Email addresses to send RCS notifications to."""

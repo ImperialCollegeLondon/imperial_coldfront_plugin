@@ -151,6 +151,14 @@ def retrieve_all_fileset_quotas_mock(mocker):
 
 
 @pytest.fixture
+def notify_platforms_to_manually_delete_allocation_mock(mocker):
+    """Mock notify_platforms_to_manually_delete_allocation."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.notify_platforms_to_manually_delete_allocation"
+    )
+
+
+@pytest.fixture
 def ldap_group_search_mock(mocker):
     """Mock the ldap Connection search method."""
     return mocker.patch("imperial_coldfront_plugin.tasks.ldap_group_member_search")
