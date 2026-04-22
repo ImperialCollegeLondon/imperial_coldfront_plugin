@@ -379,8 +379,13 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
 class HXAllocationForm(forms.Form):
     """Form for creating a new HX2 allocation."""
 
+    # This filters for projects that don't currently have a HX2 allocation.
+    # When functionality for HX3 is added, this filter may need to be removed
+    # or amended to allow projects with HX2 but not HX3 allocations to be selected.
     project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
-        queryset=ICLProject.objects.filter(status__name="Active"),
+        queryset=ICLProject.objects.filter(status__name="Active").exclude(
+            allocation__resources__name="HX2"
+        ),
         widget=_js_select_widget(),
     )
 

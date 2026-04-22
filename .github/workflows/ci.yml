@@ -24,7 +24,7 @@ jobs:
           python-version: ${{matrix.python-version}}
           cache: pip
       - name: Install dependencies
-        run: pip install -r dev-requirements.txt && pip install -e .
+        run: pip install -r dev-requirements.txt && pip install --no-deps -e .
 
       # simple check that the makemigrations script doesn't encounter errors
       # when loading and validating its internal settings

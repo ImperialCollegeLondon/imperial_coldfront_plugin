@@ -339,3 +339,22 @@ def allocation_expiry_zero_quota(
         "imperial_coldfront_plugin.tasks.zero_allocation_gpfs_quota",
         instance.pk,
     )
+
+
+@receiver(pre_save, sender=HX2Allocation)
+def prevent_multiple_hx2_allocations_per_project(
+    sender: type[HX2Allocation],
+    instance: HX2Allocation,
+    **kwargs: object,
+) -> None:
+    """Prevent saving HX2Allocation if the project already has an HX2Allocation."""
+    existing_allocations = HX2Allocation.objects.filter(
+        project=instance.project,
+        resources__name="HX2",
+    )
+
+    if instance.pk is not None:
+        existing_allocations = existing_allocations.exclude(pk=instance.pk)
+
+    if existing_allocations.exists():
+        raise ValueError(f"Project {instance.project} already has an HX2 allocation.")
