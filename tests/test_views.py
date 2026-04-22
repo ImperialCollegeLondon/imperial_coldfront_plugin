@@ -762,7 +762,7 @@ class TestUserProjectCreation(LoginRequiredMixin):
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:user_create_group")
 
-    def test_get(self, user, user_client, eligible_pi_mock):
+    def test_get(self, user, user_client, eligible_pi_mock, settings):
         """Test get method."""
         response = user_client.get(self._get_url())
         assert response.status_code == 200
@@ -780,6 +780,12 @@ class TestUserProjectCreation(LoginRequiredMixin):
         assert not form.find("input", attrs={"name": "username"})
         assert not form.find("input", attrs={"name": "group_id"})
         assert not form.find("input", attrs={"name": "ticket_id"})
+
+        message_paragraph = form.find("p", class_="text-muted", id="message-para")
+        assert (
+            message_paragraph
+            and message_paragraph.a["href"] == settings.GENERIC_ASK_REQUEST_URL
+        )
 
         assert response.context["form"].initial == dict(
             title=f"{user.get_full_name()}'s Research Group"
