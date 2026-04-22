@@ -1397,8 +1397,11 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
             "Select a valid choice. That choice is not one of the available choices."
         ]
 
-    def test_get(self, auth_client_factory, project, user_factory, project_factory):
+    def test_get(
+        self, auth_client_factory, project, user_factory, project_factory, settings
+    ):
         """Test that the form is rendered on GET and has the correct choices."""
+        settings.RCS_ACCESS_POLICY_URL = "https://example.com/rcs-policy"
         project_factory(pi=user_factory(), title="Other Project")
 
         client = auth_client_factory(project.pi)
@@ -1410,6 +1413,11 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         form = response.context["form"]
         assert form.fields["project"].queryset.get() == project
         assert not form.fields["accept_terms"].initial
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find(
+            "a", href=settings.RCS_ACCESS_POLICY_URL, text="RCS Access Policy"
+        )
 
     def test_feature_flag(self, auth_client_factory, project, user_factory, settings):
         """Test that the view is disabled when the feature flag is off."""

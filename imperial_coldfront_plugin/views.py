@@ -542,5 +542,5 @@ def user_create_hx2_allocation(request: "AuthenticatedHttpRequest") -> HttpRespo
     return render(
         request,
         "imperial_coldfront_plugin/hx2_allocation_self_creation.html",
-        context=dict(form=form),
+        context=dict(form=form, access_policy_url=settings.RCS_ACCESS_POLICY_URL),
     )

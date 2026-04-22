@@ -7,7 +7,9 @@
         <h2>HX2 Access Terms and Conditions</h2>
       </div>
       <div class="card-body">
-        <p>You must agree to...</p>
+        <p>
+          Terms and conditions of access are given by the <a href="{{ access_policy_url }}">RCS Access Policy</a>.
+        </p>
         <form method="post">
           {% csrf_token %} {{ form|crispy }}
           <div class="mt-4">
