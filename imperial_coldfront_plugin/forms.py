@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Fieldset, Layout, Submit
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -221,30 +220,10 @@ class UserProjectCreationForm(forms.ModelForm[ICLProject]):
         model = ICLProject
         fields = ("title", "description", "field_of_science")
 
+    helper: FormHelper
+
     faculty = forms.ChoiceField(choices=get_faculty_choices)
     department = forms.ChoiceField(choices=get_initial_department_choices)
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialise new form instance and set up crispy forms layout."""
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-        self.helper.layout = Layout(
-            Fieldset(
-                "",
-                "title",
-                "description",
-                "field_of_science",
-                "faculty",
-                "department",
-                HTML(
-                    "<p id='message-para' class='text-muted'>If your faculty or "
-                    "department are not available please <a "
-                    f"href='{settings.GENERIC_ASK_REQUEST_URL}'>raise a request.</a>."
-                    "</p>"
-                ),
-                Submit("submit", "Create"),
-            ),
-        )
 
     def clean(self) -> dict[str, Any] | None:
         """Check if the faculty and department combination is valid.
