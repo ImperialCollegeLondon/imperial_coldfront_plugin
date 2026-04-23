@@ -446,5 +446,5 @@ class HX2TermsAndConditionsForm(forms.Form):
     )
     accept_terms = forms.BooleanField(
         required=True,
-        label="I have read and accept the terms and conditions.",
+        label="I accept the terms and conditions of the RCS Access Policy.",
     )
