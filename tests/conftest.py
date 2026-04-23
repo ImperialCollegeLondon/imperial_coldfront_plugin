@@ -433,6 +433,14 @@ def allocation_user_active_status(db):
 
 
 @pytest.fixture
+def allocation_user_removed_status(db):
+    """Create an AllocationUserStatusChoice with name='Removed'."""
+    from coldfront.core.allocation.models import AllocationUserStatusChoice
+
+    return AllocationUserStatusChoice.objects.get_or_create(name="Removed")[0]
+
+
+@pytest.fixture
 def rdf_allocation_user(allocation_user_active_status, rdf_allocation, user, mocker):
     """Provides an active user for rdf_allocation fixture."""
     from coldfront.core.allocation.models import AllocationUser
