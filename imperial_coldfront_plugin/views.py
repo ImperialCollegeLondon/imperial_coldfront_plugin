@@ -358,7 +358,9 @@ def user_project_creation(request: "AuthenticatedHttpRequest") -> HttpResponse:
             )
             return redirect("project-detail", pk=project.pk)
     else:
-        form = UserProjectCreationForm()
+        form = UserProjectCreationForm(
+            initial=dict(title=(f"{request.user.get_full_name()}'s Research Group"))
+        )
     return render(
         request,
         "imperial_coldfront_plugin/project_creation_form.html",
