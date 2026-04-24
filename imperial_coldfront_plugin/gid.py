@@ -16,6 +16,26 @@ class NoGIDAvailableError(Exception):
     """Error when no available GID found in the configured ranges."""
 
 
+def _get_max_gid_in_range(
+    existing_gids: list[AllocationAttribute], gid_range: range
+) -> int | None:
+    max_gid = None
+    # Get the maximum GID value already assigned in the selected_range
+    try:
+        max_gid = max(
+            (
+                val
+                if gid_range.start <= (val := eg.typed_value()) < gid_range.stop
+                else 0
+            )
+            for eg in existing_gids
+        )
+    except ValueError:
+        # if there are no existing gids
+        max_gid = None
+    return max_gid or None
+
+
 def get_new_gid(range_name: str) -> int:
     """Get a new GID value.
 
@@ -29,41 +49,21 @@ def get_new_gid(range_name: str) -> int:
     Returns:
         int: The next available GID value.
     """
+    gid_ranges = settings.GID_RANGES[range_name]
     existing_gids = AllocationAttribute.objects.filter(
         allocation_attribute_type__name="GID"
     )
-
-    gid_ranges = settings.GID_RANGES[range_name]
-    range_limits = gid_ranges[0].start, gid_ranges[-1].stop - 1
-
-    # Get the maximum GID value already assigned in the selected_range
-    try:
-        max_gid = max(
-            (
-                val
-                if range_limits[0] <= (val := eg.typed_value()) <= range_limits[1]
-                else 0
-            )
-            for eg in existing_gids
-        )
-    except ValueError:
-        # if there are no existing gids
-        max_gid = None
-
-    # Check each range to find the first available GID
-    for index, gid_range in enumerate(gid_ranges):
-        if max_gid is None or max_gid < gid_range[0]:
+    for gid_range in gid_ranges:
+        max_gid = _get_max_gid_in_range(existing_gids, gid_range)
+        if max_gid is None:
             # If no existing GIDs, return the first GID in the range
             return gid_range[0]
-
-        elif max_gid in gid_range:
-            if max_gid != gid_range[-1]:  # If max_gid is not the last in the range
-                return max_gid + 1
-            else:
-                if index + 1 < len(
-                    gid_ranges
-                ):  # if at the end of the range, get the next range
-                    return gid_ranges[index + 1][0]
+        elif max_gid == gid_range.stop - 1:
+            # If max_gid is at the end of the range, continue to the next range
+            continue
+        else:
+            # If max_gid is within the range and not at the end, return the next GID
+            return max_gid + 1
     raise NoGIDAvailableError("No available GID found in the configured ranges.")
 
 
