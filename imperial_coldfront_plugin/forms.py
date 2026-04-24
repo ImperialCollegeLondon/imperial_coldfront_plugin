@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
-from coldfront.core.allocation.models import AllocationAttribute
+from coldfront.core.allocation.models import AllocationAttribute, AllocationUser
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Fieldset, Layout, Submit
@@ -340,7 +340,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
         self, request_user: "UserType", project_pk: int, *args: Any, **kwargs: Any
     ) -> None:
         """Initialize the form."""
-        super().__init__(request_user, project_pk, *args, **kwargs)
+        forms.Form.__init__(self, *args, **kwargs)
         project_obj = get_object_or_404(ICLProject, pk=project_pk)
 
         allocation_query_set = project_obj.allocation_set.filter(
@@ -355,6 +355,13 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
                 "Paid",
             ],
         )
+        if AllocationUser.objects.filter(
+            user=request_user, allocation__resources__name="HX2"
+        ):
+            # if user is already in ANY other HX2 allocation they shouldn't be
+            # able to be added to another, so filter them out
+            allocation_query_set = allocation_query_set.exclude(resources__name="HX2")
+
         allocation_choices = [
             (
                 allocation.id,

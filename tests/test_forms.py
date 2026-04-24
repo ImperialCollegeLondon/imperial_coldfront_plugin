@@ -9,6 +9,7 @@ from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
     CreditTransactionForm,
     HXAllocationForm,
+    ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
@@ -395,3 +396,52 @@ class TestHXAllocationForm:
         """Test project queryset excludes projects with existing HX2 allocation."""
         form = HXAllocationForm()
         assert not form.fields["project"].queryset.exists()
+
+
+class TestProjectAddUsersToAllocationShortnameForm:
+    """Tests for ProjectAddUsersToAllocationShortnameForm."""
+
+    def test_allocation_shortname_queryset(self, project, rdf_allocation_user):
+        """Test form correctly formats choices."""
+        form = ProjectAddUsersToAllocationShortnameForm(
+            rdf_allocation_user.user, project.pk
+        )
+        allocation = rdf_allocation_user.allocation
+        resource = allocation.get_parent_resource
+        assert form.fields["allocation"].choices == [
+            (
+                allocation.pk,
+                f"{resource.name} ({resource.resource_type.name}) "
+                f"{allocation.shortname}",
+            )
+        ]
+
+    def test_hx2_allocation_filter_existing(
+        self,
+        project,
+        hx2_allocation_user,
+        project_factory,
+        hx2_allocation_factory,
+        allocation_active_status,
+        rdf_allocation_factory,
+    ):
+        """Test that hx2 allocations are excluded if user is already in another."""
+        other_project = project_factory(
+            title="Other project", pi=project.pi, group_id="other_id"
+        )
+        hx2_allocation_factory(project=other_project)
+        rdf_allocation = rdf_allocation_factory(
+            project=other_project, shortname="other_shortname", gid="1"
+        )
+
+        form = ProjectAddUsersToAllocationShortnameForm(
+            hx2_allocation_user.user, other_project.pk
+        )
+
+        # the hx2_allocation fixture is not present because its in another project
+        # the new hx2 allocation is not present because the user is already
+        # a member of another one
+        # the rdf allocation is present because it's in the project
+        assert [pk for pk, _ in form.fields["allocation"].choices] == [
+            rdf_allocation.pk
+        ]
