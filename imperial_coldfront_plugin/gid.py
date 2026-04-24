@@ -34,7 +34,7 @@ def get_new_gid(range_name: str) -> int:
     )
 
     gid_ranges = settings.GID_RANGES[range_name]
-    range_limits = gid_ranges[0].start, gid_ranges[-1].stop + 1
+    range_limits = gid_ranges[0].start, gid_ranges[-1].stop - 1
 
     # Get the maximum GID value already assigned in the selected_range
     try:
