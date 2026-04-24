@@ -448,7 +448,7 @@ def allocation_attribute_factory(db):
 
 
 @pytest.fixture
-def rdf_allocation(
+def rdf_allocation_factory(
     project,
     allocation_active_status,
     rdf_allocation_shortname,
@@ -463,19 +463,32 @@ def rdf_allocation(
 
     rdf_resource = Resource.objects.get(name="RDF Active")
 
-    allocation = RDFAllocation.objects.create(
-        project=project, status=allocation_active_status
-    )
-    allocation.resources.add(rdf_resource)
-
-    allocation_attribute_factory(
-        allocation=allocation, name="Shortname", value=rdf_allocation_shortname
-    )
-    with patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False):
-        allocation_attribute_factory(
-            allocation=allocation, name="GID", value=rdf_allocation_gid
+    def _factory(project, shortname, gid):
+        allocation = RDFAllocation.objects.create(
+            project=project, status=allocation_active_status
         )
-    return allocation
+        allocation.resources.add(rdf_resource)
+
+        allocation_attribute_factory(
+            allocation=allocation, name="Shortname", value=shortname
+        )
+        with patch(
+            "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+        ):
+            allocation_attribute_factory(allocation=allocation, name="GID", value=gid)
+        return allocation
+
+    return _factory
+
+
+@pytest.fixture
+def rdf_allocation(
+    rdf_allocation_factory, project, rdf_allocation_shortname, rdf_allocation_gid
+):
+    """A Coldfront allocation representing a rdf storage allocation."""
+    return rdf_allocation_factory(
+        project=project, shortname=rdf_allocation_shortname, gid=rdf_allocation_gid
+    )
 
 
 @pytest.fixture
