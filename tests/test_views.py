@@ -43,15 +43,6 @@ def tag_with_text_filter(tag_name, text):
     return _match
 
 
-@pytest.fixture
-def get_graph_api_client_mock(mocker, parsed_profile):
-    """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
-    mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
-    mock().user_profile.return_value = parsed_profile
-    mock().user_search_by.return_value = [parsed_profile]
-    return mock
-
-
 class TestRequestNavbar:
     """Test the rendering of the request navbar items."""
 
@@ -275,21 +266,6 @@ class TestHomeView:
         assert soup.find(
             "a", href=reverse("imperial_coldfront_plugin:user_create_group")
         )
-
-
-@pytest.fixture
-def eligible_pi_mock(mocker):
-    """Mock the user_eligible_to_be_pi function."""
-    return mocker.patch("imperial_coldfront_plugin.views.user_eligible_to_be_pi")
-
-
-@pytest.fixture
-def message_mock(mocker):
-    """Mock the message system, as it is not available in tests.
-
-    See https://stackoverflow.com/a/27300365/3778792 and other answers.
-    """
-    return mocker.patch("imperial_coldfront_plugin.views.messages")
 
 
 @pytest.fixture
