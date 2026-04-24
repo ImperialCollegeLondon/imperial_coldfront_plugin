@@ -252,12 +252,6 @@ def _get_user_fixture(request):
     return request.getfixturevalue(request.param)
 
 
-@pytest.fixture(params=["user", "superuser"])
-def user_or_superuser(request):
-    """Parametrized fixture providing a user or member."""
-    return _get_user_fixture(request)
-
-
 @pytest.fixture
 def project_active_status(db):
     """Create a ProjectStatusChoice with name='Active'."""
