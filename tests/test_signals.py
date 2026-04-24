@@ -4,14 +4,12 @@ import pytest
 from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
-    AllocationAttributeType,
     AllocationStatusChoice,
     AllocationUser,
-    AllocationUserStatusChoice,
 )
-from coldfront.core.resource.models import Resource
+from coldfront.core.project.models import ProjectAttribute
 
-from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
+from imperial_coldfront_plugin.models import RDFAllocation
 
 
 @pytest.fixture
@@ -51,35 +49,33 @@ def remove_ldap_group_members_mock(mocker):
 class TestAllocationAttributeEnsureNoExistingGID:
     """Tests for allocation_attribute_ensure_no_existing_gid signal handler."""
 
-    @pytest.fixture
-    def gid_attribute_type(self, db):
-        """Fixture to create a GID AllocationAttributeType."""
-        return AllocationAttributeType.objects.get(name="GID")
-
     def test_success(self, rdf_allocation):
         """Test creating a project with a unique GID succeeds."""
         # signal is triggered by rdf_allocation fixture creation
 
     def test_ldap_disabled(
-        self, settings, gid_attribute_type, rdf_allocation, ldap_gid_in_use_mock
+        self,
+        settings,
+        rdf_allocation,
+        ldap_gid_in_use_mock,
+        allocation_attribute_factory,
     ):
         """Test that LDAP is not checked when disabled."""
         settings.LDAP_ENABLED = False
         ldap_gid_in_use_mock.return_value = True
-        # should not raise an error because LDAP is disabled
-        AllocationAttribute.objects.create(
-            allocation_attribute_type=gid_attribute_type,
+        allocation_attribute_factory(
+            name="GID",
             allocation=rdf_allocation,
             value=123,
         )
 
     def test_existing_gid_database(
-        self, rdf_allocation, rdf_allocation_gid, gid_attribute_type
+        self, rdf_allocation, rdf_allocation_gid, allocation_attribute_factory
     ):
         """Test creating a project with GID existing in the database raises an error."""
         with pytest.raises(ValueError):
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=gid_attribute_type,
+            allocation_attribute_factory(
+                name="GID",
                 allocation=rdf_allocation,
                 value=rdf_allocation_gid,
             )
@@ -89,13 +85,13 @@ class TestAllocationAttributeEnsureNoExistingGID:
         rdf_allocation,
         rdf_allocation_gid,
         ldap_gid_in_use_mock,
-        gid_attribute_type,
+        allocation_attribute_factory,
     ):
         """Test creating a project with an existing GID in LDAP raises an error."""
         ldap_gid_in_use_mock.return_value = True
         with pytest.raises(ValueError):
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=gid_attribute_type,
+            allocation_attribute_factory(
+                name="GID",
                 allocation=rdf_allocation,
                 value=rdf_allocation_gid,
             )
@@ -108,18 +104,19 @@ class TestAllocationAttributeEnsureUniqueShortname:
         """Test creating a project with a unique shortname succeeds."""
         # signal is triggered by rdf_allocation fixture creation
 
-    def test_ensure_unique_shortname(self, rdf_allocation, rdf_allocation_shortname):
+    def test_ensure_unique_shortname(
+        self, rdf_allocation, rdf_allocation_shortname, allocation_attribute_factory
+    ):
         """Test creating a second allocation with the same shortname raises an error."""
-        shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
         with pytest.raises(ValueError):
-            AllocationAttribute.objects.create(
-                allocation_attribute_type=shortname_attribute_type,
+            allocation_attribute_factory(
+                name="Shortname",
                 allocation=rdf_allocation,
                 value=rdf_allocation_shortname,
             )
         # check there is still only one allocation with the shortname
         assert AllocationAttribute.objects.get(
-            allocation_attribute_type=shortname_attribute_type,
+            allocation_attribute_type__name="Shortname",
             value=rdf_allocation_shortname,
         )
 
@@ -131,37 +128,19 @@ class TestProjectAttributeEnsureUniqueGroupID:
         """Test creating a project with a unique group ID succeeds."""
         # signal is triggered by project fixture creation
 
-    def test_ensure_unique_group_id(self, project, user):
+    def test_ensure_unique_group_id(self, project, user, project_attribute_factory):
         """Test creating a second project with the same Group ID raises an error."""
-        from coldfront.core.project.models import (
-            ProjectAttribute,
-            ProjectAttributeType,
-        )
-
-        group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
         with pytest.raises(ValueError):
-            ProjectAttribute.objects.create(
-                proj_attr_type=group_id_attribute_type,
+            project_attribute_factory(
+                name="Group ID",
                 project=project,
                 value=project.pi.username,
             )
         # check there is still only one group id with the value
         assert ProjectAttribute.objects.get(
-            proj_attr_type=group_id_attribute_type,
+            proj_attr_type__name="Group ID",
             value=project.pi.username,
         )
-
-
-@pytest.fixture
-def allocation_active_status(db):
-    """Fixture to create an Active AllocationStatusChoice."""
-    return AllocationStatusChoice.objects.get_or_create(name="Active")[0]
-
-
-@pytest.fixture
-def allocation_inactive_status(db):
-    """Fixture to create an Inactive AllocationStatusChoice."""
-    return AllocationStatusChoice.objects.get_or_create(name="Inactive")[0]
 
 
 class TestAllocationUserSyncLDAPGroupMembership:
@@ -176,11 +155,6 @@ class TestAllocationUserSyncLDAPGroupMembership:
     def allocation_user(self, rdf_or_hx2_allocation_user):
         """Fixture to return an RDF or HX2 allocation user."""
         return rdf_or_hx2_allocation_user
-
-    @pytest.fixture
-    def allocation_user_inactive_status(self, db):
-        """Fixture to create an Inactive AllocationUserStatusChoice."""
-        return AllocationUserStatusChoice.objects.create(name="Inactive")
 
     @pytest.fixture
     def ldap_groupname(self, allocation):
@@ -717,26 +691,15 @@ class TestAllocationExpiryZeroQuota:
 class TestPreventMultipleHX2AllocationsPerProject:
     """Tests for prevent_multiple_hx2_allocations_per_project signal handler."""
 
-    def test_new_allocation_passes(self, project, rdf_allocation_dependencies):
+    def test_new_allocation_passes(self, project, hx2_allocation_factory):
         """Test that creating a first HX2 allocation for a project passes."""
-        hx2_resource = Resource.objects.get(name="HX2")
-        allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-        allocation = HX2Allocation.objects.create(
-            project=project, status=allocation_active_status
-        )
-        allocation.resources.add(hx2_resource)
-
+        allocation = hx2_allocation_factory(project=project)
         assert allocation.pk is not None
-        assert allocation.resources.filter(pk=hx2_resource.pk).exists()
+        assert allocation.get_parent_resource.name == "HX2"
 
-    def test_duplicate_allocation_raises(
-        self, hx2_allocation, rdf_allocation_dependencies, allocation_active_status
-    ):
+    def test_duplicate_allocation_raises(self, hx2_allocation, hx2_allocation_factory):
         """Test that creating a second HX2 allocation for the same project raises."""
         # Since the hx2_allocation fixture creates an HX2 allocation for the project,
         # trying to create another one should raise a ValueError.
         with pytest.raises(ValueError, match="already has an HX2 allocation"):
-            HX2Allocation.objects.create(
-                project=hx2_allocation.project,
-                status=allocation_active_status,
-            )
+            hx2_allocation_factory(project=hx2_allocation.project)

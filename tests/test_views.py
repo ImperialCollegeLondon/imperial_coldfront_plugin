@@ -1385,7 +1385,7 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         ldap_gid_in_use_mock,
         auth_client_factory,
         project,
-        rdf_allocation_dependencies,
+        allocation_dependencies,
     ):
         """Test that a user can create an HX2 allocation."""
         client = auth_client_factory(project.pi)
