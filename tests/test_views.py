@@ -1527,9 +1527,8 @@ class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
         client = auth_client_factory(project.pi)
         response = client.get(self._get_url(hx2_allocation.pk))
         assert response.status_code == 200
-        soup = BeautifulSoup(response.content, "html.parser")
-        soup = BeautifulSoup(response.content, "html.parser")
 
+        soup = BeautifulSoup(response.content, "html.parser")
         table_body = soup.find("tbody")
         table_body.find("td", text=new_user.first_name)
         table_body.find("td", text=new_user.last_name)
