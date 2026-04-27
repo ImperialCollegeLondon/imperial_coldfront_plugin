@@ -7,7 +7,12 @@ from unittest.mock import patch
 import pytest
 from bs4 import BeautifulSoup
 from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
-from coldfront.core.project.models import ProjectStatusChoice
+from coldfront.core.project.models import (
+    ProjectStatusChoice,
+    ProjectUser,
+    ProjectUserRoleChoice,
+    ProjectUserStatusChoice,
+)
 from django.conf import settings
 from django.shortcuts import render
 from django.urls import reverse
@@ -1415,3 +1420,121 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         client = auth_client_factory(project.pi)
         response = client.get(self._get_url())
         assert response.status_code == 403
+
+
+class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
+    """Tests the AllocationAddUsersViewHX2Filter class."""
+
+    def _get_url(self, allocation_pk=1):
+        return reverse(
+            "imperial_coldfront_plugin:allocation-add-users",
+            kwargs={"pk": allocation_pk},
+        )
+
+    def test_login_required(self, client, hx2_allocation):
+        """Test that login is required to access the view."""
+        # need to provide an allocation before running the login required test
+        # to avoid the view returning a 404 before the login required check is reached
+        super().test_login_required(client)
+
+    def test_hx2_allocation(
+        self, auth_client_factory, project, hx2_allocation, user_factory
+    ):
+        """Test that the view returns 200 for HX2 allocations."""
+        new_user = user_factory()
+        project_active_user_status, _ = ProjectUserStatusChoice.objects.get_or_create(
+            name="Active"
+        )
+        manager_role, _ = ProjectUserRoleChoice.objects.get_or_create(name="Manager")
+        ProjectUser.objects.create(
+            project=project,
+            user=new_user,
+            status=project_active_user_status,
+            role=manager_role,
+        )
+        client = auth_client_factory(project.pi)
+
+        response = client.get(self._get_url(hx2_allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        table_body = soup.find("tbody")
+        table_body.find("td", text=new_user.first_name)
+        table_body.find("td", text=new_user.last_name)
+        table_body.find("td", text=new_user.username)
+        table_body.find("td", text=new_user.email)
+
+    def test_existing_hx2_allocation(
+        self,
+        user_factory,
+        auth_client_factory,
+        project,
+        project_factory,
+        hx2_allocation_user,
+        hx2_allocation_factory,
+    ):
+        """Test user eligibility with an existing HX2 allocation."""
+        new_project = project_factory(
+            pi=hx2_allocation_user.user, group_id="new_project", title="new_project"
+        )
+        new_hx2_allocation = hx2_allocation_factory(project=new_project)
+
+        client = auth_client_factory(hx2_allocation_user.user)
+        response = client.get(self._get_url(new_hx2_allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        div = soup.find("div", class_="alert alert-info")
+
+        assert "All eligible users in group are already in this allocation!" in div.text
+        assert "already a member of another HX2 Allocation." in div.text.replace(
+            "\n", " "
+        )
+
+    def test_non_hx2_allocation(
+        self,
+        project,
+        rdf_allocation_user,
+        hx2_allocation,
+        user_factory,
+        auth_client_factory,
+    ):
+        """Test that being a member of a non-hx2 allocation does not exclude a user."""
+        new_user = user_factory()
+        project_active_user_status, _ = ProjectUserStatusChoice.objects.get_or_create(
+            name="Active"
+        )
+        manager_role, _ = ProjectUserRoleChoice.objects.get_or_create(name="Manager")
+        ProjectUser.objects.create(
+            project=project,
+            user=new_user,
+            status=project_active_user_status,
+            role=manager_role,
+        )
+
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url(hx2_allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        table_body = soup.find("tbody")
+        assert table_body.find("td", text=new_user.first_name)
+        assert table_body.find("td", text=new_user.last_name)
+        assert table_body.find("td", text=new_user.username)
+        assert table_body.find("td", text=new_user.email)
+
+    def test_non_hx2_no_eligible_users(
+        self, rdf_allocation_user, auth_client_factory, project
+    ):
+        """Test correct message shown when no eligible users for non-hx2 allocation."""
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url(rdf_allocation_user.allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        div = soup.find("div", class_="alert alert-info")
+
+        assert (
+            "All eligible users in group are already in this allocation!"
+            == div.text.strip()
+        )

@@ -3,7 +3,12 @@
 import re
 from typing import TYPE_CHECKING
 
-from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
+from coldfront.core.allocation.models import (
+    Allocation,
+    AllocationStatusChoice,
+    AllocationUser,
+)
+from coldfront.core.allocation.views import AllocationAddUsersView
 from coldfront.core.project.forms import ProjectAddUserForm
 from coldfront.core.project.models import (
     Project,
@@ -546,3 +551,25 @@ def user_create_hx2_allocation(request: "AuthenticatedHttpRequest") -> HttpRespo
         "imperial_coldfront_plugin/hx2_allocation_self_creation.html",
         context=dict(form=form, access_policy_url=settings.RCS_ACCESS_POLICY_URL),
     )
+
+
+class AllocationAddUsersViewHX2Filter(AllocationAddUsersView):
+    """View to add users to an allocation, with filtering for HX2 allocations."""
+
+    template_name = "imperial_coldfront_plugin/allocation_add_users.html"
+
+    def get_users_to_add(self, allocation_obj: Allocation) -> list[dict[str, str]]:
+        """Override to filter for HX2 allocations."""
+        users_to_add = super().get_users_to_add(allocation_obj)
+
+        if allocation_obj.get_parent_resource.name != "HX2":
+            # no additional filtering if not an HX2 allocation
+            return users_to_add
+
+        for i, user_dict in enumerate(users_to_add.copy()):
+            if AllocationUser.objects.filter(
+                user__username=user_dict["username"],
+            ).exists():
+                users_to_add.pop(i)
+
+        return users_to_add

@@ -59,4 +59,9 @@ urlpatterns = [
         views.user_create_hx2_allocation,
         name="user_create_hx2_allocation",
     ),
+    path(
+        "allocation/<int:pk>/add-users/",
+        views.AllocationAddUsersViewHX2Filter.as_view(),
+        name="allocation-add-users",
+    ),
 ]
