@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
-from coldfront.core.allocation.models import AllocationAttribute, AllocationUser
+from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Fieldset, Layout, Submit
@@ -354,13 +354,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
                 "Payment Requested",
                 "Paid",
             ],
-        )
-        if AllocationUser.objects.filter(
-            user=request_user, allocation__resources__name="HX2"
-        ):
-            # if user is already in ANY other HX2 allocation they shouldn't be
-            # able to be added to another, so filter them out
-            allocation_query_set = allocation_query_set.exclude(resources__name="HX2")
+        ).exclude(resources__name="HX2")
 
         allocation_choices = [
             (
@@ -378,9 +372,10 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
         allocation_choices.insert(0, ("__select_all__", "Select All"))
         if allocation_query_set:
             self.fields["allocation"].choices = allocation_choices_sorted
-            self.fields[
-                "allocation"
-            ].help_text = "<br/>Select allocations to add selected users to."
+            self.fields["allocation"].help_text = (
+                "<br/>Select allocations to add selected users to. HX2 allocations are "
+                "not shown here but users can be added to them individually."
+            )
         else:
             self.fields["allocation"].widget = forms.HiddenInput()
 

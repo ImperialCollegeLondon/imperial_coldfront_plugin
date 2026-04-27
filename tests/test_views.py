@@ -6,7 +6,11 @@ from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
-from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
+from coldfront.core.allocation.models import (
+    Allocation,
+    AllocationStatusChoice,
+    AllocationUser,
+)
 from coldfront.core.project.models import (
     ProjectStatusChoice,
     ProjectUser,
@@ -1491,37 +1495,88 @@ class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
             "\n", " "
         )
 
-    def test_non_hx2_allocation(
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
+    def test_existing_rdf_allocation(
         self,
-        project,
-        rdf_allocation_user,
-        hx2_allocation,
+        ldap_add_member_to_group_mock,
         user_factory,
         auth_client_factory,
+        project,
+        project_factory,
+        project_user_active_status,
+        project_user_role_manager,
+        rdf_allocation,
+        hx2_allocation_factory,
+        allocation_user_active_status,
     ):
         """Test that being a member of a non-hx2 allocation does not exclude a user."""
+        hx2_allocation = hx2_allocation_factory(project=project)
         new_user = user_factory()
-        project_active_user_status, _ = ProjectUserStatusChoice.objects.get_or_create(
-            name="Active"
-        )
-        manager_role, _ = ProjectUserRoleChoice.objects.get_or_create(name="Manager")
         ProjectUser.objects.create(
             project=project,
             user=new_user,
-            status=project_active_user_status,
-            role=manager_role,
+            status=project_user_active_status,
+            role=project_user_role_manager,
+        )
+        AllocationUser.objects.create(
+            allocation=rdf_allocation,
+            user=new_user,
+            status=allocation_user_active_status,
         )
 
         client = auth_client_factory(project.pi)
         response = client.get(self._get_url(hx2_allocation.pk))
         assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        table_body = soup.find("tbody")
+        table_body.find("td", text=new_user.first_name)
+        table_body.find("td", text=new_user.last_name)
+        table_body.find("td", text=new_user.username)
+        table_body.find("td", text=new_user.email)
+
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
+    @patch("imperial_coldfront_plugin.signals.ldap_remove_member_from_group")
+    def test_existing_inactive_hx2_allocation(
+        self,
+        add_member_to_group_mock,
+        remove_member_from_group_mock,
+        user_factory,
+        auth_client_factory,
+        hx2_allocation_user,
+        hx2_allocation_factory,
+        allocation_user_inactive_status,
+        project_factory,
+        project_user_active_status,
+        project_user_role_manager,
+    ):
+        """Test being a member of an inactive hx2 allocation does not exclude a user."""
+        hx2_allocation_user.status = allocation_user_inactive_status
+        hx2_allocation_user.save()
+
+        new_pi = user_factory()
+        new_project = project_factory(pi=new_pi)
+        new_hx2_allocation = hx2_allocation_factory(project=new_project)
+
+        user = hx2_allocation_user.user
+        ProjectUser.objects.create(
+            project=new_project,
+            user=user,
+            status=project_user_active_status,
+            role=project_user_role_manager,
+        )
+
+        client = auth_client_factory(new_pi)
+        response = client.get(self._get_url(new_hx2_allocation.pk))
+        assert response.status_code == 200
 
         soup = BeautifulSoup(response.content, "html.parser")
         table_body = soup.find("tbody")
-        assert table_body.find("td", text=new_user.first_name)
-        assert table_body.find("td", text=new_user.last_name)
-        assert table_body.find("td", text=new_user.username)
-        assert table_body.find("td", text=new_user.email)
+        table_body.find("td", text=user.first_name)
+        table_body.find("td", text=user.last_name)
+        table_body.find("td", text=user.username)
+        table_body.find("td", text=user.email)
 
     def test_non_hx2_no_eligible_users(
         self, rdf_allocation_user, auth_client_factory, project

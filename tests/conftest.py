@@ -310,7 +310,7 @@ def project_factory(
         ticket_id="",
     ):
         return ICLProject.objects.create_iclproject(
-            title=title or "{user.get_full_name()}'s Research Group",
+            title=title or f"{pi.get_full_name()}'s Research Group",
             description=description,
             field_of_science=field_of_science_other,
             user=pi,
@@ -380,7 +380,7 @@ def allocation_user_active_status(db):
 
 @pytest.fixture
 def allocation_user_inactive_status(db):
-    """Fixture to create an Inctive AllocationUserStatusChoice."""
+    """Fixture to create an Inactive AllocationUserStatusChoice."""
     from coldfront.core.allocation.models import AllocationUserStatusChoice
 
     return AllocationUserStatusChoice.objects.get_or_create(name="Inactive")[0]

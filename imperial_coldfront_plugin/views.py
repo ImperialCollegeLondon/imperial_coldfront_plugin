@@ -566,10 +566,12 @@ class AllocationAddUsersViewHX2Filter(AllocationAddUsersView):
             # no additional filtering if not an HX2 allocation
             return users_to_add
 
-        for i, user_dict in enumerate(users_to_add.copy()):
-            if AllocationUser.objects.filter(
-                user__username=user_dict["username"],
-            ).exists():
-                users_to_add.pop(i)
+        users_to_exclude = AllocationUser.objects.filter(
+            user__username__in=[user["username"] for user in users_to_add],
+            allocation__resources__name="HX2",
+            status__name="Active",
+        ).values_list("user__username", flat=True)
 
-        return users_to_add
+        return [
+            user for user in users_to_add if user["username"] not in users_to_exclude
+        ]

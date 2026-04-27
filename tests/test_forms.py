@@ -416,32 +416,16 @@ class TestProjectAddUsersToAllocationShortnameForm:
             )
         ]
 
-    def test_hx2_allocation_filter_existing(
+    def test_filter_hx2(
         self,
         project,
-        hx2_allocation_user,
-        project_factory,
         hx2_allocation_factory,
-        allocation_active_status,
-        rdf_allocation_factory,
+        rdf_allocation,
     ):
-        """Test that hx2 allocations are excluded if user is already in another."""
-        other_project = project_factory(
-            title="Other project", pi=project.pi, group_id="other_id"
-        )
-        hx2_allocation_factory(project=other_project)
-        rdf_allocation = rdf_allocation_factory(
-            project=other_project, shortname="other_shortname", gid="1"
-        )
+        """Test that hx2 allocations are excluded."""
+        hx2_allocation_factory(project=project)
+        form = ProjectAddUsersToAllocationShortnameForm(project.pi, project.pk)
 
-        form = ProjectAddUsersToAllocationShortnameForm(
-            hx2_allocation_user.user, other_project.pk
-        )
-
-        # the hx2_allocation fixture is not present because its in another project
-        # the new hx2 allocation is not present because the user is already
-        # a member of another one
-        # the rdf allocation is present because it's in the project
         assert [pk for pk, _ in form.fields["allocation"].choices] == [
             rdf_allocation.pk
         ]
