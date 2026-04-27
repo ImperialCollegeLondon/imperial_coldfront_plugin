@@ -562,15 +562,17 @@ class AllocationAddUsersViewHX2Filter(AllocationAddUsersView):
         """Override to filter for HX2 allocations."""
         users_to_add = super().get_users_to_add(allocation_obj)
 
-        if allocation_obj.get_parent_resource.name != "HX2":
+        if allocation_obj.get_parent_resource.name != "HX2" or not users_to_add:
             # no additional filtering if not an HX2 allocation
             return users_to_add
 
-        users_to_exclude = AllocationUser.objects.filter(
-            user__username__in=[user["username"] for user in users_to_add],
-            allocation__resources__name="HX2",
-            status__name="Active",
-        ).values_list("user__username", flat=True)
+        users_to_exclude = set(
+            AllocationUser.objects.filter(
+                user__username__in=[user["username"] for user in users_to_add],
+                allocation__resources__name="HX2",
+                status__name="Active",
+            ).values_list("user__username", flat=True)
+        )
 
         return [
             user for user in users_to_add if user["username"] not in users_to_exclude
