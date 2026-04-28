@@ -9,6 +9,7 @@ from coldfront.core.allocation.models import (
     AllocationUser,
     AllocationUserStatusChoice,
 )
+from coldfront.core.project.models import ProjectAttribute, ProjectAttributeType
 from coldfront.core.resource.models import Resource
 
 from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
@@ -714,14 +715,17 @@ class TestAllocationExpiryZeroQuota:
         zero_quota_mock.assert_not_called()
 
 
+@pytest.mark.parametrize("allocation_cls", (Allocation, HX2Allocation))
 class TestPreventMultipleHX2AllocationsPerProject:
     """Tests for prevent_multiple_hx2_allocations_per_project signal handler."""
 
-    def test_new_allocation_passes(self, project, rdf_allocation_dependencies):
+    def test_new_allocation_passes(
+        self, allocation_cls, project, rdf_allocation_dependencies
+    ):
         """Test that creating a first HX2 allocation for a project passes."""
         hx2_resource = Resource.objects.get(name="HX2")
         allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-        allocation = HX2Allocation.objects.create(
+        allocation = allocation_cls.objects.create(
             project=project, status=allocation_active_status
         )
         allocation.resources.add(hx2_resource)
@@ -730,13 +734,80 @@ class TestPreventMultipleHX2AllocationsPerProject:
         assert allocation.resources.filter(pk=hx2_resource.pk).exists()
 
     def test_duplicate_allocation_raises(
-        self, hx2_allocation, rdf_allocation_dependencies, allocation_active_status
+        self,
+        allocation_cls,
+        hx2_allocation,
+        rdf_allocation_dependencies,
+        allocation_active_status,
     ):
         """Test that creating a second HX2 allocation for the same project raises."""
         # Since the hx2_allocation fixture creates an HX2 allocation for the project,
         # trying to create another one should raise a ValueError.
         with pytest.raises(ValueError, match="already has an HX2 allocation"):
-            HX2Allocation.objects.create(
+            allocation_cls.objects.create(
                 project=hx2_allocation.project,
                 status=allocation_active_status,
             )
+
+
+class TestAllocationUserPreventMultipleHX2:
+    """Tests for allocation_user_prevent_multiple_hx2 signal handler."""
+
+    @pytest.fixture
+    def new_project(self, project_factory, user_factory):
+        """Fixture to create a new project for testing."""
+        return project_factory(user_factory(), "New Project")
+
+    def test_prevent(
+        self,
+        new_project,
+        hx2_allocation_user,
+        allocation_user_active_status,
+        allocation_active_status,
+    ):
+        """Test that a user cannot be added to multiple active HX2 allocations."""
+        new_allocation = Allocation.objects.create(
+            project=new_project,
+            status=allocation_active_status,
+        )
+        new_allocation.resources.add(Resource.objects.get(name="HX2"))
+
+        with pytest.raises(ValueError):
+            AllocationUser.objects.create(
+                allocation=new_allocation,
+                user=hx2_allocation_user,
+                status=allocation_user_active_status,
+            )
+
+    def test_inactive_allowed(
+        self,
+        new_project,
+        hx2_allocation_user,
+        allocation_user_active_status,
+        allocation_user_removed_status,
+        allocation_active_status,
+        ldap_remove_member_mock,
+    ):
+        """Test user can be added to multiple HX2 allocations if one is inactive."""
+        group_id_attr = ProjectAttributeType.objects.get(name="Group ID")
+        ProjectAttribute.objects.create(
+            proj_attr_type=group_id_attr,
+            project=new_project,
+            value=f"{new_project.pi.username}_new",
+        )
+
+        # create first HX2 allocation and add user
+        hx2_allocation_user.status = allocation_user_removed_status
+        hx2_allocation_user.save()
+
+        # should be able to add user to another active HX2 allocation
+        another_allocation = Allocation.objects.create(
+            project=new_project,
+            status=allocation_active_status,
+        )
+        another_allocation.resources.add(Resource.objects.get(name="HX2"))
+        AllocationUser.objects.create(
+            allocation=another_allocation,
+            user=hx2_allocation_user.user,
+            status=allocation_user_active_status,
+        )
