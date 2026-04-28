@@ -252,12 +252,6 @@ def _get_user_fixture(request):
     return request.getfixturevalue(request.param)
 
 
-@pytest.fixture(params=["user", "superuser"])
-def user_or_superuser(request):
-    """Parametrized fixture providing a user or member."""
-    return _get_user_fixture(request)
-
-
 @pytest.fixture
 def project_active_status(db):
     """Create a ProjectStatusChoice with name='Active'."""
@@ -275,7 +269,28 @@ def field_of_science_other(db):
 
 
 @pytest.fixture
-def project_factory(project_active_status, field_of_science_other):
+def project_user_active_status(db):
+    """Create a ProjectUserStatusChoice with name='Active'."""
+    from coldfront.core.project.models import ProjectUserStatusChoice
+
+    return ProjectUserStatusChoice.objects.get_or_create(name="Active")[0]
+
+
+@pytest.fixture
+def project_user_role_manager(db):
+    """Create a ProjectUserRoleChoice with name='Manager'."""
+    from coldfront.core.project.models import ProjectUserRoleChoice
+
+    return ProjectUserRoleChoice.objects.get_or_create(name="Manager")[0]
+
+
+@pytest.fixture
+def project_factory(
+    field_of_science_other,
+    project_active_status,
+    project_user_active_status,
+    project_user_role_manager,
+):
     """Provides a factory for Coldfront projects.
 
     The factory takes the following arguments:
@@ -283,15 +298,26 @@ def project_factory(project_active_status, field_of_science_other):
     - pi: The owner of the project.
     - title: The title of the project.
     """
+    from imperial_coldfront_plugin.models import ICLProject
 
-    def create_project(pi, title):
-        from imperial_coldfront_plugin.models import ICLProject
-
-        return ICLProject.objects.create(
-            pi=pi,
-            title=title,
-            status=project_active_status,
+    def create_project(
+        pi,
+        title="",
+        description="A default description for testing.",
+        department="dsde",
+        faculty="foe",
+        group_id=None,
+        ticket_id="",
+    ):
+        return ICLProject.objects.create_iclproject(
+            title=title or f"{pi.get_full_name()}'s Research Group",
+            description=description,
             field_of_science=field_of_science_other,
+            user=pi,
+            faculty=faculty,
+            department=department,
+            group_id=group_id or pi.username,
+            ticket_id=ticket_id,
         )
 
     return create_project
@@ -300,55 +326,70 @@ def project_factory(project_active_status, field_of_science_other):
 @pytest.fixture
 def project(user, project_factory):
     """Provides a Coldfront project owned by a user."""
-    from coldfront.core.project.models import (
-        ProjectAttribute,
-        ProjectAttributeType,
-        ProjectUser,
-        ProjectUserRoleChoice,
-        ProjectUserStatusChoice,
-    )
-
-    project_user_active_status = ProjectUserStatusChoice.objects.create(name="Active")
-    project_user_role_manager = ProjectUserRoleChoice.objects.create(name="Manager")
-
-    project = project_factory(pi=user, title=f"{user.get_full_name()}'s Research Group")
-    department_attribute_type = ProjectAttributeType.objects.get(name="Department")
-    faculty_attribute_type = ProjectAttributeType.objects.get(name="Faculty")
-    group_id_attribute_type = ProjectAttributeType.objects.get(name="Group ID")
-    ProjectAttribute.objects.create(
-        proj_attr_type=department_attribute_type, project=project, value="dsde"
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=faculty_attribute_type, project=project, value="foe"
-    )
-    ProjectAttribute.objects.create(
-        proj_attr_type=group_id_attribute_type, project=project, value=user.username
-    )
-    ProjectUser.objects.create(
-        project=project,
-        user=user,
-        status=project_user_active_status,
-        role=project_user_role_manager,
-    )
+    project = project_factory(pi=user)
     return project
 
 
 @pytest.fixture
-def rdf_allocation_dependencies(db):
-    """Provide the database dependencies needed for rdf allocation creation."""
-    from coldfront.core.allocation.models import (
-        AllocationAttributeType,
-        AllocationStatusChoice,
-        AllocationUserStatusChoice,
-        AttributeType,
+def project_attribute_factory(db):
+    """Factory for creating ProjectAttribute instances for Group ID."""
+    from coldfront.core.project.models import (
+        ProjectAttribute,
+        ProjectAttributeType,
     )
 
-    text_type = AttributeType.objects.get(name="Text")
-    AllocationStatusChoice.objects.create(name="Active")
-    AllocationAttributeType.objects.create(
-        name="Storage Quota (GB)", attribute_type=text_type
-    )
-    AllocationUserStatusChoice.objects.create(name="Active")
+    def create_project_attribute(
+        project,
+        name,
+        value,
+    ):
+        """Create a ProjectAttribute instance."""
+        attribute_type = ProjectAttributeType.objects.get(name=name)
+        return ProjectAttribute.objects.create(
+            project=project,
+            proj_attr_type=attribute_type,
+            value=value,
+        )
+
+    return create_project_attribute
+
+
+@pytest.fixture
+def allocation_active_status(db):
+    """Fixture to create an Active AllocationStatusChoice."""
+    from coldfront.core.allocation.models import AllocationStatusChoice
+
+    return AllocationStatusChoice.objects.get_or_create(name="Active")[0]
+
+
+@pytest.fixture
+def allocation_inactive_status(db):
+    """Fixture to create an Inactive AllocationStatusChoice."""
+    from coldfront.core.allocation.models import AllocationStatusChoice
+
+    return AllocationStatusChoice.objects.get_or_create(name="Inactive")[0]
+
+
+@pytest.fixture
+def allocation_user_active_status(db):
+    """Fixture to create an Active AllocationUserStatusChoice."""
+    from coldfront.core.allocation.models import AllocationUserStatusChoice
+
+    return AllocationUserStatusChoice.objects.get_or_create(name="Active")[0]
+
+
+@pytest.fixture
+def allocation_user_inactive_status(db):
+    """Fixture to create an Inactive AllocationUserStatusChoice."""
+    from coldfront.core.allocation.models import AllocationUserStatusChoice
+
+    return AllocationUserStatusChoice.objects.get_or_create(name="Inactive")[0]
+
+
+@pytest.fixture
+def allocation_dependencies(allocation_active_status, allocation_user_active_status):
+    """Provide the database dependencies needed for allocation creation."""
+    return
 
 
 @pytest.fixture(autouse=True)
@@ -383,53 +424,71 @@ def rdf_allocation_gid(settings):
 
 
 @pytest.fixture
-def rdf_allocation(
-    project,
-    rdf_allocation_dependencies,
-    rdf_allocation_shortname,
-    rdf_allocation_gid,
-    mocker,
-):
-    """A Coldfront allocation representing a rdf storage allocation."""
+def allocation_attribute_factory(db):
+    """Factory for creating AllocationAttribute instances for GID."""
     from coldfront.core.allocation.models import (
         AllocationAttribute,
         AllocationAttributeType,
-        AllocationStatusChoice,
     )
+
+    def create_allocation_attribute(
+        allocation,
+        name,
+        value,
+    ):
+        """Create an AllocationAttribute instance."""
+        attribute_type = AllocationAttributeType.objects.get(name=name)
+        return AllocationAttribute.objects.create(
+            allocation=allocation,
+            allocation_attribute_type=attribute_type,
+            value=value,
+        )
+
+    return create_allocation_attribute
+
+
+@pytest.fixture
+def rdf_allocation_factory(
+    project,
+    allocation_active_status,
+    rdf_allocation_shortname,
+    rdf_allocation_gid,
+    allocation_attribute_factory,
+    mocker,
+):
+    """A Coldfront allocation representing a rdf storage allocation."""
     from coldfront.core.resource.models import Resource
 
     from imperial_coldfront_plugin.models import RDFAllocation
 
     rdf_resource = Resource.objects.get(name="RDF Active")
-    shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
-    gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
 
-    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-    allocation = RDFAllocation.objects.create(
-        project=project, status=allocation_active_status
-    )
-    allocation.resources.add(rdf_resource)
-
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=shortname_attribute_type,
-        allocation=allocation,
-        value=rdf_allocation_shortname,
-    )
-    with patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False):
-        AllocationAttribute.objects.create(
-            allocation_attribute_type=gid_attribute_type,
-            allocation=allocation,
-            value=rdf_allocation_gid,
+    def _factory(project, shortname, gid):
+        allocation = RDFAllocation.objects.create(
+            project=project, status=allocation_active_status
         )
-    return allocation
+        allocation.resources.add(rdf_resource)
+
+        allocation_attribute_factory(
+            allocation=allocation, name="Shortname", value=shortname
+        )
+        with patch(
+            "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+        ):
+            allocation_attribute_factory(allocation=allocation, name="GID", value=gid)
+        return allocation
+
+    return _factory
 
 
 @pytest.fixture
-def allocation_user_active_status(db):
-    """Create an AllocationUserStatusChoice with name='Active'."""
-    from coldfront.core.allocation.models import AllocationUserStatusChoice
-
-    return AllocationUserStatusChoice.objects.create(name="Active")
+def rdf_allocation(
+    rdf_allocation_factory, project, rdf_allocation_shortname, rdf_allocation_gid
+):
+    """A Coldfront allocation representing a rdf storage allocation."""
+    return rdf_allocation_factory(
+        project=project, shortname=rdf_allocation_shortname, gid=rdf_allocation_gid
+    )
 
 
 @pytest.fixture
@@ -445,32 +504,6 @@ def rdf_allocation_user(allocation_user_active_status, rdf_allocation, user, moc
             user=user,
             status=allocation_user_active_status,
         )
-
-
-@pytest.fixture
-def allocation_attribute_factory(db):
-    """Factory for creating AllocationAttribute instances for GID."""
-    from coldfront.core.allocation.models import (
-        AllocationAttribute,
-        AllocationAttributeType,
-    )
-
-    def create_allocation_attribute(
-        allocation=None,
-        name=None,
-        value=None,
-    ):
-        """Create an AllocationAttribute instance."""
-        name = name or random_string()
-        return AllocationAttribute.objects.create(
-            allocation=allocation,
-            allocation_attribute_type=AllocationAttributeType.objects.get_or_create(
-                name=name, defaults={"attribute_type__name": "Text"}
-            )[0],
-            value=value,
-        )
-
-    return create_allocation_attribute
 
 
 @pytest.fixture(autouse=True)
@@ -496,36 +529,42 @@ def signals_async_task_mock(mocker):
 
 
 @pytest.fixture
-def hx2_allocation_group_id():
-    """Shortname applied to hx2_allocation fixture."""
-    return "testuser"
-
-
-@pytest.fixture
-def hx2_allocation_ldap_name(settings, hx2_allocation_group_id):
-    """LDAP group name associated with hx2_allocation fixture."""
-    return f"{settings.LDAP_HX2_SHORTNAME_PREFIX}{hx2_allocation_group_id}"
-
-
-@pytest.fixture
-def hx2_allocation(project, rdf_allocation_dependencies, hx2_allocation_group_id):
-    """A Coldfront allocation representing an HX2 RDF storage allocation."""
-    from coldfront.core.allocation.models import AllocationStatusChoice
+def hx2_resource(db):
+    """Get HX2 Resource instance."""
     from coldfront.core.resource.models import Resource
 
-    from imperial_coldfront_plugin.models import HX2Allocation
+    return Resource.objects.get(name="HX2")
 
-    hx2_resource = Resource.objects.get(name="HX2")
 
-    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
-    allocation = HX2Allocation.objects.create(
-        project=project,
-        status=allocation_active_status,
-        start_date=datetime.date.today(),
-        end_date=datetime.date.today() + datetime.timedelta(days=365),
-    )
-    allocation.resources.add(hx2_resource)
-    return allocation
+@pytest.fixture
+def hx2_allocation_factory(
+    allocation_active_status,
+    hx2_resource,
+    allocation_dependencies,
+):
+    """Factory for creating HX2Allocation instances."""
+
+    def create_hx2_allocation(
+        project, status=allocation_active_status, start_date=datetime.date.today()
+    ):
+        from imperial_coldfront_plugin.models import HX2Allocation
+
+        allocation = HX2Allocation.objects.create(
+            project=project, status=status, start_date=start_date
+        )
+        allocation.resources.add(hx2_resource)
+        return allocation
+
+    return create_hx2_allocation
+
+
+@pytest.fixture
+def hx2_allocation(
+    project,
+    hx2_allocation_factory,
+):
+    """A Coldfront allocation representing an HX2 RDF storage allocation."""
+    return hx2_allocation_factory(project=project)
 
 
 @pytest.fixture
