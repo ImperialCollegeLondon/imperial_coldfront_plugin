@@ -661,6 +661,19 @@ class TestProjectCreation(LoginRequiredMixin):
         response = superuser_client.get(self._get_url())
         assert response.status_code == 200
         assert isinstance(response.context["form"], AdminProjectCreationForm)
+        soup = BeautifulSoup(response.content, "html.parser")
+        form = soup.find("form")
+        assert form
+        assert form.find("input", attrs={"name": "title"})
+        assert form.find("textarea", attrs={"name": "description"})
+        assert form.find("select", attrs={"name": "field_of_science"})
+        assert form.find("select", attrs={"name": "faculty"})
+        assert form.find("select", attrs={"name": "department"})
+        assert form.find("input", attrs={"name": "username"})
+        assert form.find("input", attrs={"name": "group_id"})
+        assert form.find("input", attrs={"name": "ticket_id"})
+
+        assert form.find("button", type="submit", class_="btn btn-primary")
 
     def test_post(self, superuser_client, user, mocker):
         """Test posting with valid data."""
@@ -1429,6 +1442,9 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         assert not form.fields["accept_terms"].initial
 
         soup = BeautifulSoup(response.content, "html.parser")
+        form = soup.find("form")
+        assert form.find("select", attrs={"name": "project"})
+        assert form.find("input", attrs={"name": "accept_terms"})
         assert soup.find(
             "a", href=settings.RCS_ACCESS_POLICY_URL, text="RCS Access Policy"
         )

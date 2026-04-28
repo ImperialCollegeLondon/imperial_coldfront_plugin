@@ -14,6 +14,8 @@ from coldfront.core.project.models import (
 )
 from coldfront.core.project.views import ProjectAddUsersSearchResultsView
 from coldfront.core.user.utils import CombinedUserSearch, UserSearch
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import HTML, Fieldset, Layout, Submit
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -319,7 +321,7 @@ def project_creation(request: HttpRequest) -> HttpResponse:
         form = AdminProjectCreationForm()
     return render(
         request,
-        "imperial_coldfront_plugin/project_creation_form.html",
+        "imperial_coldfront_plugin/admin_project_creation_form.html",
         context=dict(form=form),
     )
 
@@ -361,6 +363,24 @@ def user_project_creation(request: "AuthenticatedHttpRequest") -> HttpResponse:
         form = UserProjectCreationForm(
             initial=dict(title=(f"{request.user.get_full_name()}'s Research Group"))
         )
+    form.helper = FormHelper()
+    form.helper.layout = Layout(
+        Fieldset(
+            "",
+            "title",
+            "description",
+            "field_of_science",
+            "faculty",
+            "department",
+            HTML(
+                "<p id='message-para' class='text-muted'>If your faculty or "
+                "department are not available please <a "
+                f"href='{settings.GENERIC_ASK_REQUEST_URL}'>raise a request.</a>."
+                "</p>"
+            ),
+            Submit("submit", "Create"),
+        ),
+    )
     return render(
         request,
         "imperial_coldfront_plugin/project_creation_form.html",
