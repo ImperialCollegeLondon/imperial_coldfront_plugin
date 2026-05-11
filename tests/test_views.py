@@ -477,7 +477,7 @@ class TestAddHXAllocation(LoginRequiredMixin):
         """Test creating a second HX2 allocation for the same project is blocked."""
         response = superuser_client.post(
             self._get_url(),
-            data=self._make_form_data(project, resource_type="hx2"),
+            data=self._make_form_data(project.pk, resource_type="hx2"),
         )
 
         # Form validation error should not raise an exception, but should re-render
