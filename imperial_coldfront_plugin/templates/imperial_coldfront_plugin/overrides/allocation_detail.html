@@ -319,7 +319,7 @@ This is a allocation from an archived group! You cannot make any changes.
     <div class="float-right">
       {% if allocation.project.status.name != 'Archived' and is_allowed_to_update_project and allocation.status.name in 'Active,New,Renewal Requested' %}
         <a class="btn btn-success"
-           href="{% url 'allocation-add-users' allocation.pk %}"
+           href="{% url 'imperial_coldfront_plugin:allocation-add-users' allocation.pk %}"
            role="button">
           <i class="fas fa-user-plus" aria-hidden="true"></i> Add Users
         </a>

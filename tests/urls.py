@@ -36,4 +36,9 @@ urlpatterns = [
     path("resource_list/", dummy_view, name="resource-list"),
     path("user_profile/", dummy_view, name="user-profile"),
     path("logout/", dummy_view, name="logout"),
+    path(
+        "allocation/<int:allocation_pk>/add-users",
+        dummy_view,
+        name="allocation-add-users",
+    ),
 ]
