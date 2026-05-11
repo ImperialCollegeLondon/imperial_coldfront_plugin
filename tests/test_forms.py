@@ -9,6 +9,7 @@ from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
     CreditTransactionForm,
     HXAllocationForm,
+    ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
@@ -395,3 +396,36 @@ class TestHXAllocationForm:
         """Test project queryset excludes projects with existing HX2 allocation."""
         form = HXAllocationForm()
         assert not form.fields["project"].queryset.exists()
+
+
+class TestProjectAddUsersToAllocationShortnameForm:
+    """Tests for ProjectAddUsersToAllocationShortnameForm."""
+
+    def test_allocation_shortname_queryset(self, project, rdf_allocation_user):
+        """Test form correctly formats choices."""
+        form = ProjectAddUsersToAllocationShortnameForm(
+            rdf_allocation_user.user, project.pk
+        )
+        allocation = rdf_allocation_user.allocation
+        resource = allocation.get_parent_resource
+        assert form.fields["allocation"].choices == [
+            (
+                allocation.pk,
+                f"{resource.name} ({resource.resource_type.name}) "
+                f"{allocation.shortname}",
+            )
+        ]
+
+    def test_filter_hx2(
+        self,
+        project,
+        hx2_allocation_factory,
+        rdf_allocation,
+    ):
+        """Test that hx2 allocations are excluded."""
+        hx2_allocation_factory(project=project)
+        form = ProjectAddUsersToAllocationShortnameForm(project.pi, project.pk)
+
+        assert [pk for pk, _ in form.fields["allocation"].choices] == [
+            rdf_allocation.pk
+        ]
