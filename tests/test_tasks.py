@@ -312,9 +312,16 @@ class TestCreateRDFAllocation:
         form = RDFAllocationForm(data=rdf_form_data)
         assert form.is_valid(), f"Form errors: {form.errors}"
 
+        before_count = CreditTransaction.objects.count()
+
         create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
 
-        assert not CreditTransaction.objects.filter(project=project, amount__lt=0)
+        assert CreditTransaction.objects.count() == before_count
+        assert not CreditTransaction.objects.filter(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        ).exists()
 
     def test_insufficient_credit_raises_and_rolls_back(
         self,
