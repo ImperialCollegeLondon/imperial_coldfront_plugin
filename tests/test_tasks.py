@@ -294,6 +294,43 @@ class TestCreateRDFAllocation:
         )
         assert debit_transaction.amount == -1
 
+    def test_success_locks_project_row_for_credit_transaction(
+        self,
+        mocker,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task acquires a project row lock before creating debit."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        select_for_update_mock = mocker.patch(
+            "imperial_coldfront_plugin.tasks.ICLProject.objects.select_for_update"
+        )
+        select_for_update_mock.return_value.get.return_value = project
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        select_for_update_mock.assert_called_once_with()
+        select_for_update_mock.return_value.get.assert_called_once_with(pk=project.pk)
+
     def test_success_skips_credit_transaction_when_checkbox_off(
         self,
         project,

@@ -21,6 +21,7 @@ from django.utils import timezone
 from imperial_coldfront_plugin.models import (
     CreditTransaction,
     HX2Allocation,
+    ICLProject,
     RDFAllocation,
 )
 
@@ -40,6 +41,39 @@ from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
 from .utils import get_rdf_allocation_credit_projection
+
+
+def _create_rdf_allocation_debit_transaction(
+    *,
+    project: ICLProject,
+    size_tb: int,
+    start_date: date,
+    end_date: date,
+    description: str,
+    authoriser: str,
+) -> ICLProject:
+    """Create a debit transaction for an RDF allocation under a project row lock."""
+    locked_project = ICLProject.objects.select_for_update().get(pk=project.pk)
+    current_balance, debit, projected_balance = get_rdf_allocation_credit_projection(
+        project=locked_project,
+        size_tb=size_tb,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    if projected_balance < 0:
+        raise ValueError(
+            "Insufficient project credits for this allocation. "
+            f"Current balance: {current_balance} credits. "
+            f"Required debit: {-debit} credits."
+        )
+
+    CreditTransaction.objects.create(
+        project=locked_project,
+        amount=debit,
+        description=description,
+        authoriser=authoriser,
+    )
+    return locked_project
 
 
 def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -> int:
@@ -88,24 +122,11 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
     logger.info("Creating initial database entries for RDF allocation.")
     with transaction.atomic():
         if should_create_credit_transaction:
-            current_balance, debit, projected_balance = (
-                get_rdf_allocation_credit_projection(
-                    project=project,
-                    size_tb=storage_size_tb,
-                    start_date=form_data["start_date"],
-                    end_date=form_data["end_date"],
-                )
-            )
-            if projected_balance < 0:
-                raise ValueError(
-                    "Insufficient project credits for this allocation. "
-                    f"Current balance: {current_balance} credits. "
-                    f"Required debit: {-debit} credits."
-                )
-
-            CreditTransaction.objects.create(
+            project = _create_rdf_allocation_debit_transaction(
                 project=project,
-                amount=debit,
+                size_tb=storage_size_tb,
+                start_date=form_data["start_date"],
+                end_date=form_data["end_date"],
                 description=credit_transaction_description,
                 authoriser=authoriser,
             )
