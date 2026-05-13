@@ -27,7 +27,7 @@ def test_calculate_rdf_allocation_credit_debit_uses_inclusive_days():
         size_tb=1, start_date=date(2026, 1, 1), end_date=date(2026, 2, 1)
     )
 
-    assert debit == -4
+    assert debit == -5
 
 
 @pytest.mark.django_db

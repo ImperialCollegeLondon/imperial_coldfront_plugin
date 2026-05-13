@@ -1,6 +1,7 @@
 """Utility functions for the Imperial Coldfront plugin."""
 
 from datetime import date
+from math import ceil
 
 from coldfront.core.allocation.models import Allocation, AllocationAttribute
 from django.conf import settings
@@ -77,7 +78,7 @@ def calculate_rdf_allocation_credit_debit(
         "1 / terabyte / year"
     )
     charge = charging_rate_per_tb_year.magnitude * size_tb * (duration_days / 365)
-    return -round(charge)
+    return -ceil(charge)
 
 
 def get_rdf_allocation_credit_projection(
