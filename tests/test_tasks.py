@@ -287,10 +287,12 @@ class TestCreateRDFAllocation:
 
         create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
 
-        debit_transaction = CreditTransaction.objects.get(amount=0)
-        assert debit_transaction.project == project
-        assert debit_transaction.description == "Auto debit for RDF allocation"
-        assert debit_transaction.authoriser == "adminuser"
+        debit_transaction = CreditTransaction.objects.get(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        )
+        assert debit_transaction.amount == -1
 
     def test_success_skips_credit_transaction_when_checkbox_off(
         self,
