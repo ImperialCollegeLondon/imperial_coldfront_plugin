@@ -214,6 +214,6 @@ GENERIC_ASK_REQUEST_URL = "https://servicemgt.imperial.ac.uk/esc?id=sc_cat_item&
 """URL of the form for users to request support when no specific form is available."""
 
 ENABLE_RDF_ALLOCATION_AUTO_CREDIT = ENV.bool(
-    "ENABLE_RDF_ALLOCATION_AUTO_CREDIT", default=True
+    "ENABLE_RDF_ALLOCATION_AUTO_CREDIT", default=False
 )
 """Feature flag to enable or disable automatic credit debits for RDF allocations."""
