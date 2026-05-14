@@ -6,7 +6,6 @@ import pytest
 from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
-    AllocationAttributeUsage,
     AllocationStatusChoice,
     AllocationUser,
 )
@@ -23,6 +22,7 @@ from imperial_coldfront_plugin.tasks import (
     check_rdf_ldap_consistency,
     create_rdf_allocation,
     unlink_expired_allocation_filesets,
+    zero_allocation_gpfs_quota,
 )
 
 
@@ -162,26 +162,6 @@ def notify_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.tasks.send_discrepancy_notification")
 
 
-def helper_add_quota_attributes(allocation, storage_quota, files_quota):
-    """Helper function to add quota attributes to an allocation."""
-    from coldfront.core.allocation.models import AllocationAttributeType
-
-    storage_quota_attribute_type = AllocationAttributeType.objects.get(
-        name="Storage Quota (TB)"
-    )
-    files_quota_attribute_type = AllocationAttributeType.objects.get(name="Files Quota")
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=storage_quota_attribute_type,
-        allocation=allocation,
-        value=storage_quota,
-    )
-    AllocationAttribute.objects.create(
-        allocation_attribute_type=files_quota_attribute_type,
-        allocation=allocation,
-        value=files_quota,
-    )
-
-
 class TestCreateRDFAllocation:
     """Tests for create_rdf_allocation task."""
 
@@ -191,11 +171,11 @@ class TestCreateRDFAllocation:
         ldap_create_group_mock,
         ldap_add_member_mock,
         project,
-        rdf_allocation_dependencies,
         rdf_allocation_shortname,
         rdf_allocation_ldap_name,
         settings,
         rdf_form_data,
+        allocation_dependencies,
     ):
         """Test create_rdf_allocation task."""
         # set all of these so they are not empty
@@ -240,17 +220,13 @@ class TestCreateRDFAllocation:
             allocation=allocation,
             value=size,
         )
-        AllocationAttributeUsage.objects.get(
-            allocation_attribute=storage_attribute, value=0
-        )
+        assert storage_attribute.allocationattributeusage.value == 0
         files_attribute = AllocationAttribute.objects.get(
             allocation_attribute_type__name="Files Quota",
             allocation=allocation,
             value=settings.GPFS_FILES_QUOTA,
         )
-        AllocationAttributeUsage.objects.get(
-            allocation_attribute=files_attribute, value=0
-        )
+        assert files_attribute.allocationattributeusage.value == 0
         AllocationAttribute.objects.get(
             allocation_attribute_type__name="Shortname",
             allocation=allocation,
@@ -288,11 +264,11 @@ class TestCreateRDFAllocation:
         ldap_add_member_mock,
         ldap_delete_group_mock,
         project,
-        rdf_allocation_dependencies,
         rdf_allocation_shortname,
         rdf_allocation_ldap_name,
         settings,
         rdf_form_data,
+        allocation_dependencies,
     ):
         """Test create_rdf_allocation task rolls back on GPFS error."""
         # first ldap call now raises an error
@@ -313,11 +289,11 @@ class TestCreateRDFAllocation:
         ldap_add_member_mock,
         ldap_delete_group_mock,
         project,
-        rdf_allocation_dependencies,
         rdf_allocation_shortname,
         rdf_allocation_ldap_name,
         settings,
         rdf_form_data,
+        allocation_dependencies,
     ):
         """Test create_rdf_allocation task rolls back on GPFS error."""
         # first gpfs call now raises an error
@@ -416,11 +392,11 @@ class TestCheckHX2LdapConsistency:
         hx2_allocation_user,
         ldap_group_search_mock,
         notify_mock,
-        hx2_allocation_ldap_name,
     ):
         """Test when everything is in sync between Coldfront and AD."""
         username = hx2_allocation_user.user.username
-        ldap_group_search_mock.return_value = {hx2_allocation_ldap_name: [username]}
+        ldap_name = hx2_allocation.ldap_shortname
+        ldap_group_search_mock.return_value = {ldap_name: [username]}
 
         result = check_hx2_ldap_consistency()
 
@@ -433,17 +409,17 @@ class TestCheckHX2LdapConsistency:
         hx2_allocation_user,
         ldap_group_search_mock,
         notify_mock,
-        hx2_allocation_ldap_name,
     ):
         """Test when a user is missing from AD group."""
         username = hx2_allocation_user.user.username
-        ldap_group_search_mock.return_value = {hx2_allocation_ldap_name: []}
+        ldap_name = hx2_allocation.ldap_shortname
+        ldap_group_search_mock.return_value = {ldap_name: []}
 
         result = check_hx2_ldap_consistency()
 
         assert len(result) == 1
         discrepancy = result[0]
-        assert discrepancy["group_name"] == hx2_allocation_ldap_name
+        assert discrepancy["group_name"] == ldap_name
         assert discrepancy["project_name"] == hx2_allocation.project.title
         assert username in discrepancy["missing_members"]
         assert not discrepancy["extra_members"]
@@ -456,20 +432,18 @@ class TestCheckHX2LdapConsistency:
         hx2_allocation_user,
         ldap_group_search_mock,
         notify_mock,
-        hx2_allocation_ldap_name,
     ):
         """Test when there are extra users in AD group."""
         username = hx2_allocation_user.user.username
         extra_user = "extra_user"
-        ldap_group_search_mock.return_value = {
-            hx2_allocation_ldap_name: [username, extra_user]
-        }
+        ldap_name = hx2_allocation_user.allocation.ldap_shortname
+        ldap_group_search_mock.return_value = {ldap_name: [username, extra_user]}
 
         result = check_hx2_ldap_consistency()
 
         assert len(result) == 1
         discrepancy = result[0]
-        assert discrepancy["group_name"] == hx2_allocation_ldap_name
+        assert discrepancy["group_name"] == ldap_name
         assert not discrepancy["missing_members"]
         assert extra_user in discrepancy["extra_members"]
 
@@ -694,15 +668,14 @@ class TestCheckRDFExpiryNotifications:
     def test_multiple_allocations(
         self,
         rdf_allocation,
-        rdf_allocation_dependencies,
         project,
         send_expiry_warning_mock,
         send_removal_warning_mock,
         settings,
+        allocation_active_status,
     ):
         """Test notifications sent for multiple allocations with different schedules."""
         # Get the required objects
-        allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
         rdf_resource = Resource.objects.get(name="RDF Active")
 
         # First allocation expires per expiry warning schedule (e.g., 30 days)
@@ -738,6 +711,20 @@ class TestCheckRDFExpiryNotifications:
 class TestZeroAllocationGPFSQuota:
     """Tests for zero_allocation_gpfs_quota task."""
 
+    @pytest.fixture
+    def storage_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Storage Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Storage Quota (TB)", value="10", allocation=rdf_allocation
+        )
+
+    @pytest.fixture
+    def files_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Files Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Files Quota", value="1000", allocation=rdf_allocation
+        )
+
     def test_feature_flag(
         self,
         async_task_mock,
@@ -747,8 +734,6 @@ class TestZeroAllocationGPFSQuota:
         settings,
     ):
         """Test zero_allocation_gpfs_quota does nothing when feature flag disabled."""
-        from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
-
         settings.ENABLE_RDF_ALLOCATION_LIFECYCLE = False
 
         zero_allocation_gpfs_quota(rdf_allocation.pk)
@@ -762,28 +747,11 @@ class TestZeroAllocationGPFSQuota:
         rdf_allocation,
         rdf_allocation_shortname,
         settings,
+        allocation_attribute_factory,
+        storage_quota_attr,
+        files_quota_attr,
     ):
         """Test zero_allocation_gpfs_quota successfully sets quota to zero."""
-        from coldfront.core.allocation.models import AllocationAttributeType
-
-        from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
-
-        # Ensure Storage Quota attribute exists
-        storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
-            name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
-        )
-        storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
-            allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
-        )
-
-        # Ensure Files Quota attribute exists
-        files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
-            name="Files Quota", defaults={"attribute_type": "Integer"}
-        )
-        files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
-            allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
-        )
-
         # Create and set allocation to Expired status
         expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
         rdf_allocation.status = expired_status
@@ -817,26 +785,10 @@ class TestZeroAllocationGPFSQuota:
         rdf_allocation,
         rdf_allocation_shortname,
         settings,
+        storage_quota_attr,
+        files_quota_attr,
     ):
         """Test zero_allocation_gpfs_quota works with Removed status."""
-        from coldfront.core.allocation.models import AllocationAttributeType
-
-        from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
-
-        storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
-            name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
-        )
-        rdf_allocation.allocationattribute_set.get_or_create(
-            allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
-        )
-
-        files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
-            name="Files Quota", defaults={"attribute_type": "Integer"}
-        )
-        rdf_allocation.allocationattribute_set.get_or_create(
-            allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
-        )
-
         removed_status, _ = AllocationStatusChoice.objects.get_or_create(name="Removed")
         rdf_allocation.status = removed_status
         rdf_allocation.save()
@@ -860,29 +812,13 @@ class TestZeroAllocationGPFSQuota:
         rdf_allocation_shortname,
         settings,
         mocker,
+        storage_quota_attr,
+        files_quota_attr,
     ):
         """Test zero_allocation_gpfs_quota handles GPFS client exceptions."""
-        from coldfront.core.allocation.models import AllocationAttributeType
-
-        from imperial_coldfront_plugin.tasks import zero_allocation_gpfs_quota
-
         logger_mock = mocker.patch("imperial_coldfront_plugin.tasks.logging.getLogger")
         mock_logger = mocker.MagicMock()
         logger_mock.return_value = mock_logger
-
-        storage_quota_type, _ = AllocationAttributeType.objects.get_or_create(
-            name="Storage Quota (TB)", defaults={"attribute_type": "Float"}
-        )
-        storage_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
-            allocation_attribute_type=storage_quota_type, defaults={"value": "10"}
-        )
-
-        files_quota_type, _ = AllocationAttributeType.objects.get_or_create(
-            name="Files Quota", defaults={"attribute_type": "Integer"}
-        )
-        files_quota_attr, _ = rdf_allocation.allocationattribute_set.get_or_create(
-            allocation_attribute_type=files_quota_type, defaults={"value": "1000"}
-        )
 
         expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
         rdf_allocation.status = expired_status
@@ -996,13 +932,20 @@ class TestCheckQuotaConsistency:
         gpfs_files_quota,
         fileset_shortname,
         expected_discrepancy,
+        allocation_attribute_factory,
     ):
         """Test check_quota_consistency task."""
         from imperial_coldfront_plugin.tasks import check_quota_consistency
 
-        # Configure allocation and fileset with specific parameters:
-        helper_add_quota_attributes(
-            rdf_allocation, alloc_storage_quota, alloc_files_quota
+        allocation_attribute_factory(
+            allocation=rdf_allocation,
+            name="Storage Quota (TB)",
+            value=alloc_storage_quota,
+        )
+        allocation_attribute_factory(
+            allocation=rdf_allocation,
+            name="Files Quota",
+            value=alloc_files_quota,
         )
 
         # Define exactly what the dictionary looks like after processing
