@@ -6,8 +6,17 @@ from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
-from coldfront.core.allocation.models import Allocation, AllocationStatusChoice
-from coldfront.core.project.models import ProjectStatusChoice
+from coldfront.core.allocation.models import (
+    Allocation,
+    AllocationStatusChoice,
+    AllocationUser,
+)
+from coldfront.core.project.models import (
+    ProjectStatusChoice,
+    ProjectUser,
+    ProjectUserRoleChoice,
+    ProjectUserStatusChoice,
+)
 from django.conf import settings
 from django.shortcuts import render
 from django.urls import reverse
@@ -41,15 +50,6 @@ def tag_with_text_filter(tag_name, text):
         return tag.name == tag_name and text in tag.text
 
     return _match
-
-
-@pytest.fixture
-def get_graph_api_client_mock(mocker, parsed_profile):
-    """Mock out imperial_coldfront_plugin.views.get_graph_api_client."""
-    mock = mocker.patch("imperial_coldfront_plugin.views.get_graph_api_client")
-    mock().user_profile.return_value = parsed_profile
-    mock().user_search_by.return_value = [parsed_profile]
-    return mock
 
 
 class TestRequestNavbar:
@@ -275,21 +275,6 @@ class TestHomeView:
         assert soup.find(
             "a", href=reverse("imperial_coldfront_plugin:user_create_group")
         )
-
-
-@pytest.fixture
-def eligible_pi_mock(mocker):
-    """Mock the user_eligible_to_be_pi function."""
-    return mocker.patch("imperial_coldfront_plugin.views.user_eligible_to_be_pi")
-
-
-@pytest.fixture
-def message_mock(mocker):
-    """Mock the message system, as it is not available in tests.
-
-    See https://stackoverflow.com/a/27300365/3778792 and other answers.
-    """
-    return mocker.patch("imperial_coldfront_plugin.views.messages")
 
 
 @pytest.fixture
@@ -762,7 +747,7 @@ class TestUserProjectCreation(LoginRequiredMixin):
     def _get_url(self):
         return reverse("imperial_coldfront_plugin:user_create_group")
 
-    def test_get(self, user_client, eligible_pi_mock):
+    def test_get(self, user, user_client, eligible_pi_mock, settings):
         """Test get method."""
         response = user_client.get(self._get_url())
         assert response.status_code == 200
@@ -772,6 +757,8 @@ class TestUserProjectCreation(LoginRequiredMixin):
         soup = BeautifulSoup(response.content, "html.parser")
         form = soup.find("form")
         assert form
+        assert form["method"] == "post"
+        assert form.get("action") is None
         assert form.find("input", attrs={"name": "title"})
         assert form.find("textarea", attrs={"name": "description"})
         assert form.find("select", attrs={"name": "field_of_science"})
@@ -780,6 +767,18 @@ class TestUserProjectCreation(LoginRequiredMixin):
         assert not form.find("input", attrs={"name": "username"})
         assert not form.find("input", attrs={"name": "group_id"})
         assert not form.find("input", attrs={"name": "ticket_id"})
+
+        assert form.find("input", type="submit", class_="btn btn-primary")
+
+        message_paragraph = form.find("p", class_="text-muted", id="message-para")
+        assert (
+            message_paragraph
+            and message_paragraph.a["href"] == settings.GENERIC_ASK_REQUEST_URL
+        )
+
+        assert response.context["form"].initial == dict(
+            title=f"{user.get_full_name()}'s Research Group"
+        )
 
     def test_feature_flag(self, user_client, settings, eligible_pi_mock):
         """Test that the view is inaccessible when the feature flag is disabled."""
@@ -1243,6 +1242,19 @@ class TestAllocationDetailBanners:
             },
         )
 
+    def test_banner_not_displayed_for_non_rdf_allocations(
+        self, request_, settings, hx2_allocation
+    ):
+        """Test that no banner is displayed for non-RDF allocations."""
+        expired_status, _ = AllocationStatusChoice.objects.get_or_create(name="Expired")
+        hx2_allocation.status = expired_status
+        response = self._render_allocation_detail(request_, hx2_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("div", id="expired-allocation")
+        assert not soup.find("div", id="deleted-allocation")
+        assert not soup.find("div", id="removed-allocation")
+        assert not soup.find("div", id="archived-allocation")
+
     def test_banner_displayed_for_expired_allocations(
         self, request_, rdf_allocation, settings
     ):
@@ -1358,7 +1370,7 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         ldap_gid_in_use_mock,
         auth_client_factory,
         project,
-        rdf_allocation_dependencies,
+        allocation_dependencies,
     ):
         """Test that a user can create an HX2 allocation."""
         client = auth_client_factory(project.pi)
@@ -1384,8 +1396,11 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
             "Select a valid choice. That choice is not one of the available choices."
         ]
 
-    def test_get(self, auth_client_factory, project, user_factory, project_factory):
+    def test_get(
+        self, auth_client_factory, project, user_factory, project_factory, settings
+    ):
         """Test that the form is rendered on GET and has the correct choices."""
+        settings.RCS_ACCESS_POLICY_URL = "https://example.com/rcs-policy"
         project_factory(pi=user_factory(), title="Other Project")
 
         client = auth_client_factory(project.pi)
@@ -1398,9 +1413,182 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         assert form.fields["project"].queryset.get() == project
         assert not form.fields["accept_terms"].initial
 
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find(
+            "a", href=settings.RCS_ACCESS_POLICY_URL, text="RCS Access Policy"
+        )
+
     def test_feature_flag(self, auth_client_factory, project, user_factory, settings):
         """Test that the view is disabled when the feature flag is off."""
         settings.ENABLE_USER_GROUP_CREATION = False
         client = auth_client_factory(project.pi)
         response = client.get(self._get_url())
         assert response.status_code == 403
+
+
+class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
+    """Tests the AllocationAddUsersViewHX2Filter class."""
+
+    def _get_url(self, allocation_pk=1):
+        return reverse(
+            "imperial_coldfront_plugin:allocation-add-users",
+            kwargs={"pk": allocation_pk},
+        )
+
+    def test_login_required(self, client, hx2_allocation):
+        """Test that login is required to access the view."""
+        # need to provide an allocation before running the login required test
+        # to avoid the view returning a 404 before the login required check is reached
+        super().test_login_required(client)
+
+    def test_hx2_allocation(
+        self, auth_client_factory, project, hx2_allocation, user_factory
+    ):
+        """Test that the view returns 200 for HX2 allocations."""
+        new_user = user_factory()
+        project_active_user_status, _ = ProjectUserStatusChoice.objects.get_or_create(
+            name="Active"
+        )
+        manager_role, _ = ProjectUserRoleChoice.objects.get_or_create(name="Manager")
+        ProjectUser.objects.create(
+            project=project,
+            user=new_user,
+            status=project_active_user_status,
+            role=manager_role,
+        )
+        client = auth_client_factory(project.pi)
+
+        response = client.get(self._get_url(hx2_allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        table_body = soup.find("tbody")
+        table_body.find("td", text=new_user.first_name)
+        table_body.find("td", text=new_user.last_name)
+        table_body.find("td", text=new_user.username)
+        table_body.find("td", text=new_user.email)
+
+    def test_existing_hx2_allocation(
+        self,
+        user_factory,
+        auth_client_factory,
+        project,
+        project_factory,
+        hx2_allocation_user,
+        hx2_allocation_factory,
+    ):
+        """Test user eligibility with an existing HX2 allocation."""
+        new_project = project_factory(
+            pi=hx2_allocation_user.user, group_id="new_project", title="new_project"
+        )
+        new_hx2_allocation = hx2_allocation_factory(project=new_project)
+
+        client = auth_client_factory(hx2_allocation_user.user)
+        response = client.get(self._get_url(new_hx2_allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        div = soup.find("div", class_="alert alert-info")
+
+        assert "All eligible users in group are already in this allocation!" in div.text
+        assert "already a member of another HX2 Allocation." in div.text.replace(
+            "\n", " "
+        )
+
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
+    def test_existing_rdf_allocation(
+        self,
+        ldap_add_member_to_group_mock,
+        user_factory,
+        auth_client_factory,
+        project,
+        project_factory,
+        project_user_active_status,
+        project_user_role_manager,
+        rdf_allocation,
+        hx2_allocation_factory,
+        allocation_user_active_status,
+    ):
+        """Test that being a member of a non-hx2 allocation does not exclude a user."""
+        hx2_allocation = hx2_allocation_factory(project=project)
+        new_user = user_factory()
+        ProjectUser.objects.create(
+            project=project,
+            user=new_user,
+            status=project_user_active_status,
+            role=project_user_role_manager,
+        )
+        AllocationUser.objects.create(
+            allocation=rdf_allocation,
+            user=new_user,
+            status=allocation_user_active_status,
+        )
+
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url(hx2_allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        table_body = soup.find("tbody")
+        table_body.find("td", text=new_user.first_name)
+        table_body.find("td", text=new_user.last_name)
+        table_body.find("td", text=new_user.username)
+        table_body.find("td", text=new_user.email)
+
+    @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
+    @patch("imperial_coldfront_plugin.signals.ldap_remove_member_from_group")
+    def test_existing_inactive_hx2_allocation(
+        self,
+        add_member_to_group_mock,
+        remove_member_from_group_mock,
+        user_factory,
+        auth_client_factory,
+        hx2_allocation_user,
+        hx2_allocation_factory,
+        allocation_user_inactive_status,
+        project_factory,
+        project_user_active_status,
+        project_user_role_manager,
+    ):
+        """Test being a member of an inactive hx2 allocation does not exclude a user."""
+        hx2_allocation_user.status = allocation_user_inactive_status
+        hx2_allocation_user.save()
+
+        new_pi = user_factory()
+        new_project = project_factory(pi=new_pi)
+        new_hx2_allocation = hx2_allocation_factory(project=new_project)
+
+        user = hx2_allocation_user.user
+        ProjectUser.objects.create(
+            project=new_project,
+            user=user,
+            status=project_user_active_status,
+            role=project_user_role_manager,
+        )
+
+        client = auth_client_factory(new_pi)
+        response = client.get(self._get_url(new_hx2_allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        table_body = soup.find("tbody")
+        table_body.find("td", text=user.first_name)
+        table_body.find("td", text=user.last_name)
+        table_body.find("td", text=user.username)
+        table_body.find("td", text=user.email)
+
+    def test_non_hx2_no_eligible_users(
+        self, rdf_allocation_user, auth_client_factory, project
+    ):
+        """Test correct message shown when no eligible users for non-hx2 allocation."""
+        client = auth_client_factory(project.pi)
+        response = client.get(self._get_url(rdf_allocation_user.allocation.pk))
+        assert response.status_code == 200
+
+        soup = BeautifulSoup(response.content, "html.parser")
+        div = soup.find("div", class_="alert alert-info")
+
+        assert (
+            "All eligible users in group are already in this allocation!"
+            == div.text.strip()
+        )

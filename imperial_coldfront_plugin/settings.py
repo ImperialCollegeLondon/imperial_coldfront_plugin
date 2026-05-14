@@ -6,10 +6,13 @@ These are imported into the project level settings by the Coldfront plugin mecha
 from pathlib import Path
 from string import ascii_lowercase, digits
 
+import django_stubs_ext
 import pint
 from coldfront.config.env import ENV
 
 from .acl import ACL, ACLEntry
+
+django_stubs_ext.monkeypatch()
 
 MICROSOFT_TENANT_ID = ENV.str("MICROSOFT_TENANT_ID", default="")
 ADDITIONAL_USER_SEARCH_CLASSES = ["imperial_coldfront_plugin.views.GraphAPISearch"]
@@ -203,6 +206,12 @@ SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
 
 RDF_ASK_TICKET_URL = ENV.str("RDF_ASK_TICKET_URL", default="")
 """URL of the form for users to request RDF access."""
+
+RCS_ACCESS_POLICY_URL = ENV.str("RCS_ACCESS_POLICY_URL", default="")
+"""URL of the RCS access policy document."""
+
+GENERIC_ASK_REQUEST_URL = "https://servicemgt.imperial.ac.uk/esc?id=sc_cat_item&sys_id=82cd1d2b1b4fe510ce015525464bcb8e&referrer=popular_items"
+"""URL of the form for users to request support when no specific form is available."""
 
 RCS_NOTIFICATION_EMAILS = ENV.str("RCS_NOTIFICATION_EMAILS", default="")
 """Email addresses to send RCS notifications to."""

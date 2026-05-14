@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import HTML, Fieldset, Layout, Submit
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -222,6 +224,28 @@ class UserProjectCreationForm(forms.ModelForm[ICLProject]):
     faculty = forms.ChoiceField(choices=get_faculty_choices)
     department = forms.ChoiceField(choices=get_initial_department_choices)
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialise new form instance and set up crispy forms layout."""
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            Fieldset(
+                "",
+                "title",
+                "description",
+                "field_of_science",
+                "faculty",
+                "department",
+                HTML(
+                    "<p id='message-para' class='text-muted'>If your faculty or "
+                    "department are not available please <a "
+                    f"href='{settings.GENERIC_ASK_REQUEST_URL}'>raise a request.</a>."
+                    "</p>"
+                ),
+                Submit("submit", "Create"),
+            ),
+        )
+
     def clean(self) -> dict[str, Any] | None:
         """Check if the faculty and department combination is valid.
 
@@ -316,7 +340,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
         self, request_user: "UserType", project_pk: int, *args: Any, **kwargs: Any
     ) -> None:
         """Initialize the form."""
-        super().__init__(request_user, project_pk, *args, **kwargs)
+        forms.Form.__init__(self, *args, **kwargs)
         project_obj = get_object_or_404(ICLProject, pk=project_pk)
 
         allocation_query_set = project_obj.allocation_set.filter(
@@ -330,7 +354,8 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
                 "Payment Requested",
                 "Paid",
             ],
-        )
+        ).exclude(resources__name="HX2")
+
         allocation_choices = [
             (
                 allocation.id,
@@ -347,9 +372,10 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
         allocation_choices.insert(0, ("__select_all__", "Select All"))
         if allocation_query_set:
             self.fields["allocation"].choices = allocation_choices_sorted
-            self.fields[
-                "allocation"
-            ].help_text = "<br/>Select allocations to add selected users to."
+            self.fields["allocation"].help_text = (
+                "<br/>Select allocations to add selected users to. HX2 allocations are "
+                "not shown here but users can be added to them individually."
+            )
         else:
             self.fields["allocation"].widget = forms.HiddenInput()
 
@@ -379,8 +405,13 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
 class HXAllocationForm(forms.Form):
     """Form for creating a new HX2 allocation."""
 
+    # This filters for projects that don't currently have a HX2 allocation.
+    # When functionality for HX3 is added, this filter may need to be removed
+    # or amended to allow projects with HX2 but not HX3 allocations to be selected.
     project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
-        queryset=ICLProject.objects.filter(status__name="Active"),
+        queryset=ICLProject.objects.filter(status__name="Active").exclude(
+            allocation__resources__name="HX2"
+        ),
         widget=_js_select_widget(),
     )
 
@@ -417,5 +448,5 @@ class HX2TermsAndConditionsForm(forms.Form):
     )
     accept_terms = forms.BooleanField(
         required=True,
-        label="I have read and accept the terms and conditions.",
+        label="I accept the terms and conditions of the RCS Access Policy.",
     )

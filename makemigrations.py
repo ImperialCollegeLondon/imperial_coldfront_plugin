@@ -3,6 +3,7 @@
 import sys
 
 import django
+import django_stubs_ext
 from django.conf import settings
 
 settings.configure(
@@ -41,7 +42,9 @@ settings.configure(
     GPFS_API_TIMEOUT=4,
 )
 
+django_stubs_ext.monkeypatch()
 django.setup()
+
 
 if __name__ == "__main__":
     from django.core.management import call_command
