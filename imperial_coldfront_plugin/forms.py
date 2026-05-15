@@ -340,7 +340,7 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
         self, request_user: "UserType", project_pk: int, *args: Any, **kwargs: Any
     ) -> None:
         """Initialize the form."""
-        super().__init__(request_user, project_pk, *args, **kwargs)
+        forms.Form.__init__(self, *args, **kwargs)
         project_obj = get_object_or_404(ICLProject, pk=project_pk)
 
         allocation_query_set = project_obj.allocation_set.filter(
@@ -354,7 +354,8 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
                 "Payment Requested",
                 "Paid",
             ],
-        )
+        ).exclude(resources__name="HX2")
+
         allocation_choices = [
             (
                 allocation.id,
@@ -371,9 +372,10 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
         allocation_choices.insert(0, ("__select_all__", "Select All"))
         if allocation_query_set:
             self.fields["allocation"].choices = allocation_choices_sorted
-            self.fields[
-                "allocation"
-            ].help_text = "<br/>Select allocations to add selected users to."
+            self.fields["allocation"].help_text = (
+                "<br/>Select allocations to add selected users to. HX2 allocations are "
+                "not shown here but users can be added to them individually."
+            )
         else:
             self.fields["allocation"].widget = forms.HiddenInput()
 
