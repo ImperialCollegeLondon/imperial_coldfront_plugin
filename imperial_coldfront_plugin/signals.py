@@ -341,20 +341,30 @@ def allocation_expiry_zero_quota(
     )
 
 
-@receiver(pre_save, sender=HX2Allocation)
-def prevent_multiple_hx2_allocations_per_project(
-    sender: type[HX2Allocation],
-    instance: HX2Allocation,
+@receiver(pre_save, sender=AllocationUser)
+def allocation_user_prevent_multiple_hx2(
+    sender: type[AllocationUser],
+    instance: AllocationUser,
     **kwargs: object,
 ) -> None:
-    """Prevent saving HX2Allocation if the project already has an HX2Allocation."""
-    existing_allocations = HX2Allocation.objects.filter(
-        project=instance.project,
-        resources__name="HX2",
-    )
+    """Prevent an AllocationUser from being active on multiple HX2 allocations."""
+    if instance.status.name != "Active":
+        return
 
-    if instance.pk is not None:
-        existing_allocations = existing_allocations.exclude(pk=instance.pk)
+    try:
+        HX2Allocation.from_allocation(instance.allocation)
+    except ValueError:
+        # Signal applies only to HX2Allocations
+        return
 
-    if existing_allocations.exists():
-        raise ValueError(f"Project {instance.project} already has an HX2 allocation.")
+    active_hx2_allocations = AllocationUser.objects.filter(
+        user=instance.user,
+        status__name="Active",
+        allocation__resources__name="HX2",
+        allocation__status__name="Active",
+    ).exclude(pk=instance.pk)
+
+    if active_hx2_allocations.exists():
+        raise ValueError(
+            f"User {instance.user.username} is already active on a HX2 allocation."
+        )
