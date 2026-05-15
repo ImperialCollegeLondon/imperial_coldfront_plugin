@@ -10,7 +10,7 @@ from coldfront.core.allocation.models import (
 from coldfront.core.project.models import ProjectAttribute
 from coldfront.core.resource.models import Resource
 
-from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
+from imperial_coldfront_plugin.models import RDFAllocation
 
 
 @pytest.fixture
@@ -689,35 +689,6 @@ class TestAllocationExpiryZeroQuota:
         zero_quota_mock.assert_not_called()
 
 
-@pytest.mark.parametrize("allocation_cls", (Allocation, HX2Allocation))
-class TestPreventMultipleHX2AllocationsPerProject:
-    """Tests for prevent_multiple_hx2_allocations_per_project signal handler."""
-
-    def test_new_allocation_passes(
-        self, allocation_cls, project, allocation_active_status, hx2_resource
-    ):
-        """Test that creating a first HX2 allocation for a project passes."""
-        allocation = allocation_cls.objects.create(
-            project=project, status=allocation_active_status
-        )
-        allocation.resources.add(hx2_resource)
-
-        assert allocation.pk is not None
-        assert allocation.get_parent_resource.name == "HX2"
-
-    def test_duplicate_allocation_raises(
-        self, allocation_cls, hx2_allocation, allocation_active_status
-    ):
-        """Test that creating a second HX2 allocation for the same project raises."""
-        # Since the hx2_allocation fixture creates an HX2 allocation for the project,
-        # trying to create another one should raise a ValueError.
-        with pytest.raises(ValueError, match="already has an HX2 allocation"):
-            allocation_cls.objects.create(
-                project=hx2_allocation.project,
-                status=allocation_active_status,
-            )
-
-
 class TestAllocationUserPreventMultipleHX2:
     """Tests for allocation_user_prevent_multiple_hx2 signal handler."""
 
@@ -743,7 +714,7 @@ class TestAllocationUserPreventMultipleHX2:
         with pytest.raises(ValueError):
             AllocationUser.objects.create(
                 allocation=new_allocation,
-                user=hx2_allocation_user,
+                user=hx2_allocation_user.user,
                 status=allocation_user_active_status,
             )
 
@@ -767,6 +738,25 @@ class TestAllocationUserPreventMultipleHX2:
             status=allocation_active_status,
         )
         another_allocation.resources.add(Resource.objects.get(name="HX2"))
+        AllocationUser.objects.create(
+            allocation=another_allocation,
+            user=hx2_allocation_user.user,
+            status=allocation_user_active_status,
+        )
+
+    def test_other_allocation_types_allowed(
+        self,
+        new_project,
+        hx2_allocation_user,
+        allocation_user_active_status,
+        allocation_active_status,
+    ):
+        """Test user can be added to multiple allocations if only one is HX2."""
+        # create another non-HX2 allocation and add user
+        another_allocation = Allocation.objects.create(
+            project=new_project,
+            status=allocation_active_status,
+        )
         AllocationUser.objects.create(
             allocation=another_allocation,
             user=hx2_allocation_user.user,
