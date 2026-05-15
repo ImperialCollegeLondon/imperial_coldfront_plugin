@@ -128,6 +128,7 @@ def test_send_discrepancy_notification_hx2():
     assert "HX2" in mail.outbox[0].body
 
 
+@override_settings(RCS_NOTIFICATION_EMAILS=[("Name", "rcs@email.com")])
 def test_notify_platforms_to_manually_delete_allocation():
     """Test the notify platforms to manually delete allocation email."""
     shortname = "bio-research-01"
