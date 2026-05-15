@@ -168,9 +168,7 @@ def notify_platforms_to_manually_delete_allocation(
     For an allocation that has hit the 'Deleted' status.
     """
     recipient_list = [
-        email.strip()
-        for email in settings.RCS_NOTIFICATION_EMAILS.split(",")
-        if email.strip()
+        email.strip() for email in settings.RCS_NOTIFICATION_EMAILS if email.strip()
     ]
 
     if not recipient_list:
