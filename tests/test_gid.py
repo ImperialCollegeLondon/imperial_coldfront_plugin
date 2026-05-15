@@ -14,7 +14,7 @@ from imperial_coldfront_plugin.gid import (
 def test_get_max_gid_in_range_no_existing_gids(db):
     """Test _get_max_gid_in_ranges when no existing GIDs are present.
 
-    This test checks that _get_max_gid_in_ranges returns None when there are
+    This test checks that _get_max_gid_in_range returns None when there are
     no existing GIDs in the database.
     """
     max_gid = _get_max_gid_in_range(
@@ -39,7 +39,7 @@ def test_get_max_gid_in_range_with_existing(
 ):
     """Test when an existing GID is present in or outside of the range.
 
-    This test checks that _get_max_gid_in_ranges correctly identifies the maximum GID
+    This test checks that _get_max_gid_in_range correctly identifies the maximum GID
     when there is an existing GID at the start of the range.
     """
     # Create an existing GID at the start of the range
@@ -145,14 +145,12 @@ def test_multiple_gid_ranges_overflow(
     # Override the GID_RANGES setting using the fixture
     settings.GID_RANGES = dict(test=[range(1000, 1100), range(2000, 2100)])
 
-    # Create an existing GID at the end of the first range
     allocation_attribute_factory(name="GID", value=1099, allocation=rdf_allocation)
     allocation_attribute_factory(name="GID", value=2000, allocation=rdf_allocation)
 
-    # Call the get_new_gid function
     gid = get_new_gid("test")
 
-    # Assert that the returned GID is the start of the next range
+    # Assert that the returned GID is in the second range
     assert gid == 2001
 
 
@@ -161,7 +159,7 @@ def test_multiple_gid_ranges(settings, allocation_attribute_factory, rdf_allocat
     # Override the GID_RANGES setting using the fixture
     settings.GID_RANGES = dict(test=[range(1000, 1100), range(2000, 2100)])
 
-    # Create an existing GID in the both ranges
+    # Create an existing GID in both ranges
     allocation_attribute_factory(name="GID", value=1005, allocation=rdf_allocation)
     allocation_attribute_factory(name="GID", value=2005, allocation=rdf_allocation)
 
