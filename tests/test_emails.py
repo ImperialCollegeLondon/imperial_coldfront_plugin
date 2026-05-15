@@ -140,8 +140,9 @@ def test_notify_platforms_to_manually_delete_allocation():
 
     expected_message = """
     The RDF allocation 'bio-research-01' with ID 12345
-    has reached the 'Deleted' status. Please take the necessary steps to
-    manually delete all associated data for this allocation.
+    has reached the 'Deleted' status.
+    Please take the necessary steps to manually delete all associated data
+    for this allocation.
     """
 
     notify_platforms_to_manually_delete_allocation(shortname, allocation_id)
