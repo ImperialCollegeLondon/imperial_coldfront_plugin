@@ -471,6 +471,23 @@ class TestAddHXAllocation(LoginRequiredMixin):
         assert response.status_code == 200
         assert response.context["form"].errors
 
+    def test_form_validation_existing_hx2(
+        self, superuser_client, project, hx2_allocation
+    ):
+        """Test creating a second HX2 allocation for the same project is blocked."""
+        response = superuser_client.post(
+            self._get_url(),
+            data=self._make_form_data(project.pk, resource_type="hx2"),
+        )
+
+        # Form validation error should not raise an exception, but should re-render
+        # the form (200 response)
+        assert response.status_code == 200
+        form = response.context["form"]
+        assert form.errors["project"] == [
+            "Select a valid choice. That choice is not one of the available choices."
+        ]
+
 
 class TestAllocationTaskResult(LoginRequiredMixin):
     """Tests for the allocation_task_result view."""
