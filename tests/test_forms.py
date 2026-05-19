@@ -145,13 +145,17 @@ def test_rdf_allocation_end_date_initial_value(rdf_form_data, settings):
 
 
 def test_rdf_allocation_form_auto_credit_fields_hidden_when_feature_disabled(settings):
-    """Test auto-credit fields are hidden when the feature flag is disabled."""
+    """Test auto-credit fields use HiddenInput when the feature flag is disabled."""
     settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = False
 
     form = RDFAllocationForm()
 
-    assert "create_credit_transaction" not in form.fields
-    assert "credit_transaction_description" not in form.fields
+    assert isinstance(
+        form.fields["create_credit_transaction"].widget, forms.HiddenInput
+    )
+    assert isinstance(
+        form.fields["credit_transaction_description"].widget, forms.HiddenInput
+    )
 
 
 def test_rdf_allocation_form_auto_credit_fields_present_when_feature_enabled(settings):
@@ -199,11 +203,6 @@ def test_rdf_allocation_rejects_when_project_has_insufficient_credit(
 ):
     """Test form blocks submission when project credits are insufficient."""
     settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
-    CreditTransaction.objects.create(
-        project=project,
-        amount=0,
-        description="zero seed credit",
-    )
 
     rdf_form_data.update(
         start_date=datetime.now().date(),

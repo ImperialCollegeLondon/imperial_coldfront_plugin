@@ -20,7 +20,6 @@ def test_calculate_credit_balance_returns_sum(project):
     assert calculate_credit_balance(project) == 85
 
 
-@pytest.mark.django_db
 def test_calculate_rdf_allocation_credit_debit_uses_inclusive_days():
     """Test debit calculation uses inclusive day count and rounding."""
     debit = calculate_rdf_allocation_credit_debit(
@@ -30,7 +29,6 @@ def test_calculate_rdf_allocation_credit_debit_uses_inclusive_days():
     assert debit == -5
 
 
-@pytest.mark.django_db
 def test_calculate_rdf_allocation_credit_debit_for_full_year():
     """Test debit calculation for a one-year allocation period."""
     debit = calculate_rdf_allocation_credit_debit(
@@ -42,7 +40,6 @@ def test_calculate_rdf_allocation_credit_debit_for_full_year():
     assert debit == -100
 
 
-@pytest.mark.django_db
 def test_calculate_rdf_allocation_credit_debit_invalid_date_range():
     """Test debit calculation rejects end dates before start dates."""
     with pytest.raises(ValueError, match="End date must be on or after start date"):

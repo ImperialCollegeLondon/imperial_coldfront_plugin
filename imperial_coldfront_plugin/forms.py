@@ -190,11 +190,11 @@ class RDFAllocationForm(forms.Form):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialise form and remove auto-credit fields when feature is disabled."""
+        """Initialise form and hide auto-credit fields when feature is disabled."""
         super().__init__(*args, **kwargs)
         if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
-            self.fields.pop("create_credit_transaction")
-            self.fields.pop("credit_transaction_description")
+            self.fields["create_credit_transaction"].widget = forms.HiddenInput()
+            self.fields["credit_transaction_description"].widget = forms.HiddenInput()
 
     def clean_dart_id(self) -> str:
         """Validate provided Dart ID."""
@@ -233,16 +233,12 @@ class RDFAllocationForm(forms.Form):
         if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
             return cleaned_data
 
-        create_credit_transaction = bool(
-            cleaned_data.get("create_credit_transaction", False)
-        )
-        if not create_credit_transaction:
-            cleaned_data["credit_transaction_description"] = ""
+        if not cleaned_data.get("create_credit_transaction"):
             return cleaned_data
 
-        description = (cleaned_data.get("credit_transaction_description") or "").strip()
-
-        cleaned_data["credit_transaction_description"] = description
+        cleaned_data["credit_transaction_description"] = (
+            cleaned_data.get("credit_transaction_description") or ""
+        ).strip()
 
         project = cleaned_data.get("project")
         size = cleaned_data.get("size")

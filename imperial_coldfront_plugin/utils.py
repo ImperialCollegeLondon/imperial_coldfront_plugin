@@ -3,6 +3,7 @@
 from datetime import date
 from math import ceil
 
+import pint
 from coldfront.core.allocation.models import Allocation, AllocationAttribute
 from django.conf import settings
 from django.db.models import Sum
@@ -35,19 +36,20 @@ def get_allocation_shortname(allocation: Allocation) -> str:
         return ""
 
 
-def calculate_credit_balance(project: ICLProject) -> int | None:
+def calculate_credit_balance(project: ICLProject) -> int:
     """Return the summed credit balance for a project.
 
     Args:
         project: The project whose credit balance is to be calculated.
 
     Returns:
-        The total credit balance as an integer, or None if there are no transactions.
+        The total credit balance as an integer. Returns 0 if the project has no
+        credit transactions.
     """
     result = CreditTransaction.objects.filter(project=project).aggregate(
         total=Sum("amount")
     )["total"]
-    return result
+    return result or 0
 
 
 def calculate_rdf_allocation_credit_debit(
@@ -74,11 +76,11 @@ def calculate_rdf_allocation_credit_debit(
         raise ValueError("End date must be on or after start date.")
 
     duration_days = (end_date - start_date).days + 1
-    charging_rate_per_tb_year = settings.SERVICE_CHARGING_RATES["rdf_active"].to(
-        "1 / terabyte / year"
-    )
-    charge = charging_rate_per_tb_year.magnitude * size_tb * (duration_days / 365)
-    return -ceil(charge)
+    charging_rate = settings.SERVICE_CHARGING_RATES["rdf_active"]
+    size = size_tb * pint.Unit("terabyte")
+    duration = duration_days * pint.Unit("day")
+    charge = (charging_rate * size * duration).to("dimensionless")
+    return -ceil(charge.magnitude)
 
 
 def get_rdf_allocation_credit_projection(
@@ -98,7 +100,7 @@ def get_rdf_allocation_credit_projection(
     Returns:
         Tuple of current_balance, debit, projected_balance.
     """
-    current_balance = calculate_credit_balance(project) or 0
+    current_balance = calculate_credit_balance(project)
     debit = calculate_rdf_allocation_credit_debit(
         size_tb=size_tb,
         start_date=start_date,
