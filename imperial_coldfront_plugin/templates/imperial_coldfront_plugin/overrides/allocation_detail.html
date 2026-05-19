@@ -22,7 +22,7 @@ This is a allocation from an archived group! You cannot make any changes.
       {% if allocation.expiry_warning_sent or allocation.expiry_warning_sent_at %}
         {% if allocation.expires_in >= 0 %}
           {% with days=allocation.expires_in %}
-            <div class="alert alert-warning" role="alert" id="expiring-allocation">
+            <div class="alert alert-warning" role="alert" id="near-expiry-allocation">
               <i class="far fa-clock" aria-hidden="true"></i>
               <strong>This allocation will expire in {{ days }} day{{ days|pluralize }}.</strong>
             </div>
