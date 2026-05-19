@@ -161,7 +161,7 @@ def test_rdf_allocation_form_auto_credit_fields_present_when_feature_enabled(set
     form = RDFAllocationForm()
 
     assert "create_credit_transaction" in form.fields
-    assert form.fields["create_credit_transaction"].initial is True
+    assert form.fields["create_credit_transaction"].initial
     assert "credit_transaction_description" in form.fields
 
 
