@@ -6,6 +6,7 @@ import pytest
 from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
+    AllocationAttributeUsage,
     AllocationStatusChoice,
     AllocationUser,
 )
@@ -23,6 +24,7 @@ from imperial_coldfront_plugin.tasks import (
     check_rdf_ldap_consistency,
     create_rdf_allocation,
     unlink_expired_allocation_filesets,
+    update_quota_usages_task,
     zero_allocation_gpfs_quota,
 )
 
@@ -1200,3 +1202,62 @@ class TestUnlinkExpiredAllocationFilesets:
         unlink_expired_allocation_filesets()
 
         mock_client.unlink_fileset.assert_not_called()
+
+
+class TestUpdateQuotaUsagesTask:
+    """Tests for update_quota_usages_task."""
+
+    @pytest.fixture
+    def storage_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Storage Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Storage Quota (TB)", value="10", allocation=rdf_allocation
+        )
+
+    @pytest.fixture
+    def storage_quota_usage(self, storage_quota_attr):
+        """Fixture to create Storage Quota attribute usage for the allocation."""
+        return AllocationAttributeUsage.objects.create(
+            allocation_attribute=storage_quota_attr,
+            value=10.0,
+        )
+
+    @pytest.fixture
+    def files_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Files Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Files Quota", value="1000", allocation=rdf_allocation
+        )
+
+    @pytest.fixture
+    def files_quota_usage(self, files_quota_attr):
+        """Fixture to create Files Quota attribute usage for the allocation."""
+        return AllocationAttributeUsage.objects.create(
+            allocation_attribute=files_quota_attr,
+            value=1000.0,
+        )
+
+    def test_round_quota_usage_values(
+        self,
+        retrieve_all_fileset_quotas_mock,
+        rdf_allocation,
+        storage_quota_attr,
+        storage_quota_usage,
+        files_quota_attr,
+        files_quota_usage,
+    ):
+        """Test that quota usages value is rounded to 2 decimal places."""
+        retrieve_all_fileset_quotas_mock.return_value = {
+            rdf_allocation.shortname: {
+                "block_usage_tb": 1.23456789,
+                "files_usage": 1234,
+            }
+        }
+
+        update_quota_usages_task()
+
+        storage_quota_usage.refresh_from_db()
+        assert storage_quota_usage.value == 1.23
+
+        files_quota_usage.refresh_from_db()
+        assert files_quota_usage.value == 1234
