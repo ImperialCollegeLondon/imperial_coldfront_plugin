@@ -442,19 +442,17 @@ class ProjectAddUsersSearchResultsShortnameView(ProjectAddUsersSearchResultsView
                     users_already_in_project.append(ele)
             context["users_already_in_project"] = users_already_in_project
 
+        allocation_form = ProjectAddUsersToAllocationShortnameForm(
+            request.user, project_obj.pk, prefix="allocationform"
+        )
         # The following block of code is used to hide/show the allocation div.
-        if project_obj.allocation_set.filter(
-            status__name__in=["Active", "New", "Renewal Requested"]
-        ).exists():
+        if allocation_form.fields["allocation"].choices:
             div_allocation_class = "placeholder_div_class"
         else:
             div_allocation_class = "d-none"
         context["div_allocation_class"] = div_allocation_class
         ###
 
-        allocation_form = ProjectAddUsersToAllocationShortnameForm(
-            request.user, project_obj.pk, prefix="allocationform"
-        )
         context["pk"] = pk
         context["allocation_form"] = allocation_form
         return render(request, self.template_name, context)
