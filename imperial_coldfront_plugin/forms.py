@@ -349,14 +349,11 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
             allocation_choices, key=lambda x: x[1][0].lower()
         )
         allocation_choices.insert(0, ("__select_all__", "Select All"))
-        if allocation_query_set:
-            self.fields["allocation"].choices = allocation_choices_sorted
-            self.fields["allocation"].help_text = (
-                "<br/>Select allocations to add selected users to. HX2 allocations are "
-                "not shown here but users can be added to them individually."
-            )
-        else:
-            self.fields["allocation"].widget = forms.HiddenInput()
+        self.fields["allocation"].choices = allocation_choices_sorted
+        self.fields["allocation"].help_text = (
+            "<br/>Select allocations to add selected users to. HX2 allocations are "
+            "not shown here but users can be added to them individually."
+        )
 
 
 class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
