@@ -327,6 +327,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         self,
         create_rdf_allocation_mock,
         superuser_client,
+        superuser,
         project,
         rdf_allocation_shortname,
     ):
@@ -359,12 +360,94 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         create_rdf_allocation_mock.assert_called_once()
         called_args, _ = create_rdf_allocation_mock.call_args
         form_data = called_args[0]
+        authoriser = called_args[1]
         assert form_data["project"] == project
         assert form_data["start_date"] == start_date
         assert form_data["end_date"] == end_date
         assert form_data["size"] == size
         assert form_data["allocation_shortname"] == rdf_allocation_shortname
         assert form_data["description"] == description
+        assert authoriser == superuser.username
+
+    @patch("imperial_coldfront_plugin.views.create_rdf_allocation")
+    def test_post_feature_flag_enabled_auto_credit_passes_form_fields(
+        self,
+        create_rdf_allocation_mock,
+        superuser_client,
+        superuser,
+        project,
+        rdf_allocation_shortname,
+        settings,
+    ):
+        """Test that auto-credit fields are passed through when feature is enabled."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser=superuser.username,
+        )
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                start_date=timezone.now().date(),
+                end_date=timezone.now().date(),
+                size=1,
+                allocation_shortname=rdf_allocation_shortname,
+                description="A longer description text.",
+                create_credit_transaction="on",
+                credit_transaction_description="Auto debit for this allocation",
+            ),
+        )
+
+        assert response.status_code == HTTPStatus.FOUND
+        create_rdf_allocation_mock.assert_called_once()
+        called_args, _ = create_rdf_allocation_mock.call_args
+        form_data = called_args[0]
+        authoriser = called_args[1]
+        assert form_data["create_credit_transaction"] is True
+        assert (
+            form_data["credit_transaction_description"]
+            == "Auto debit for this allocation"
+        )
+        assert authoriser == superuser.username
+
+    def test_post_feature_flag_enabled_blocks_insufficient_credit(
+        self,
+        superuser_client,
+        project,
+        rdf_allocation_shortname,
+        settings,
+        mocker,
+    ):
+        """Test submission is blocked when projected auto-debit exceeds credits."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        async_task_mock = mocker.patch("imperial_coldfront_plugin.views.async_task")
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                start_date=timezone.now().date(),
+                end_date=timezone.now().date(),
+                size=10,
+                allocation_shortname=rdf_allocation_shortname,
+                description="A longer description text.",
+                create_credit_transaction="on",
+                credit_transaction_description="Auto debit for this allocation",
+            ),
+        )
+
+        assert response.status_code == HTTPStatus.OK
+        form = response.context["form"]
+        assert not form.is_valid()
+        assert (
+            "Insufficient project credits for this allocation."
+            in form.errors["__all__"][0]
+        )
+        async_task_mock.assert_not_called()
 
     class TestLoadDepartmentsView:
         """Tests for the load_departments view."""

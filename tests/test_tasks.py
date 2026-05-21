@@ -16,6 +16,7 @@ from django.utils import timezone
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
+from imperial_coldfront_plugin.models import CreditTransaction
 from imperial_coldfront_plugin.tasks import (
     check_hx2_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
@@ -257,6 +258,149 @@ class TestCreateRDFAllocation:
             files_quota=settings.GPFS_FILES_QUOTA,
             logger=logging.getLogger("django-q"),
         )
+
+    def test_success_creates_credit_transaction_when_enabled(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task creates a debit transaction when auto-credit is enabled."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        debit_transaction = CreditTransaction.objects.get(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        )
+        assert debit_transaction.amount == -1
+
+    def test_success_locks_project_row_for_credit_transaction(
+        self,
+        mocker,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task acquires a project row lock before creating debit."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        select_for_update_mock = mocker.patch(
+            "imperial_coldfront_plugin.tasks.ICLProject.objects.select_for_update"
+        )
+        select_for_update_mock.return_value.get.return_value = project
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        select_for_update_mock.assert_called_once_with()
+        select_for_update_mock.return_value.get.assert_called_once_with(pk=project.pk)
+
+    def test_success_skips_credit_transaction_when_checkbox_off(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task skips debit creation when auto-credit is disabled in form."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=False,
+            credit_transaction_description="",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        before_count = CreditTransaction.objects.count()
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        assert CreditTransaction.objects.count() == before_count
+        assert not CreditTransaction.objects.filter(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        ).exists()
+
+    def test_insufficient_credit_raises_and_rolls_back(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test defensive task check blocks allocation when balance changes."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=10,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=10,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        # Simulate balance reduction between form submit and async task execution.
+        CreditTransaction.objects.create(
+            project=project,
+            amount=-10,
+            description="intervening debit",
+            authoriser="admin",
+        )
+
+        before_count = CreditTransaction.objects.count()
+        with pytest.raises(ValueError, match="Insufficient project credits"):
+            create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        assert not Allocation.objects.all()
+        assert CreditTransaction.objects.count() == before_count
 
     def test_ldap_rollback(
         gpfs_create_fileset_mock,
