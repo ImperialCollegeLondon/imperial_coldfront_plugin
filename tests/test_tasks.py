@@ -1102,11 +1102,11 @@ class TestUpdateQuotaUsagesTask:
         files_quota_attr,
         files_quota_usage,
     ):
-        """Test that quota usages values are rounded to 2 decimal places."""
+        """Test that quota usages value is rounded to 2 decimal places."""
         retrieve_all_fileset_quotas_mock.return_value = {
             rdf_allocation.shortname: {
                 "block_usage_tb": 1.23456789,
-                "files_usage": 1234.56789,
+                "files_usage": 1234,
             }
         }
 
@@ -1116,4 +1116,4 @@ class TestUpdateQuotaUsagesTask:
         assert storage_quota_usage.value == 1.23
 
         files_quota_usage.refresh_from_db()
-        assert files_quota_usage.value == 1234.57
+        assert files_quota_usage.value == 1234

@@ -264,7 +264,7 @@ def update_quota_usages_task() -> None:
         storage_attribute_usage.value = round(usages[rdf_id]["block_usage_tb"], 2)
         storage_attribute_usage.save()
         files_attribute_usage = allocation.files_quota_attr.allocationattributeusage
-        files_attribute_usage.value = round(usages[rdf_id]["files_usage"], 2)
+        files_attribute_usage.value = usages[rdf_id]["files_usage"]
         files_attribute_usage.save()
 
 
