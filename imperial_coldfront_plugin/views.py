@@ -109,7 +109,11 @@ def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = RDFAllocationForm(request.POST)
         if form.is_valid():
-            task_id = async_task(create_rdf_allocation, form.cleaned_data)
+            task_id = async_task(
+                create_rdf_allocation,
+                form.cleaned_data,
+                request.user.username,
+            )
             return redirect(
                 "imperial_coldfront_plugin:allocation_task_result",
                 task_id=task_id,

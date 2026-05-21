@@ -16,7 +16,7 @@ from imperial_coldfront_plugin.forms import (
     get_faculty_choices,
     get_initial_department_choices,
 )
-from imperial_coldfront_plugin.models import ICLProject
+from imperial_coldfront_plugin.models import CreditTransaction, ICLProject
 
 
 def test_get_faculty_choices():
@@ -142,6 +142,104 @@ def test_rdf_allocation_end_date_initial_value(rdf_form_data, settings):
     assert form["end_date"].initial == datetime.now().date() + timedelta(
         days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS
     )
+
+
+def test_rdf_allocation_form_auto_credit_fields_hidden_when_feature_disabled(settings):
+    """Test auto-credit fields use HiddenInput when the feature flag is disabled."""
+    settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = False
+
+    form = RDFAllocationForm()
+
+    assert isinstance(
+        form.fields["create_credit_transaction"].widget, forms.HiddenInput
+    )
+    assert isinstance(
+        form.fields["credit_transaction_description"].widget, forms.HiddenInput
+    )
+
+
+def test_rdf_allocation_form_auto_credit_fields_present_when_feature_enabled(settings):
+    """Test auto-credit fields are present when the feature flag is enabled."""
+    settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+
+    form = RDFAllocationForm()
+
+    assert "create_credit_transaction" in form.fields
+    assert form.fields["create_credit_transaction"].initial
+    assert "credit_transaction_description" in form.fields
+
+
+def test_rdf_allocation_description_not_required_when_auto_credit_disabled(
+    settings, rdf_form_data
+):
+    """Test description is optional when auto-credit checkbox is unticked."""
+    settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+
+    rdf_form_data.update(
+        create_credit_transaction=False,
+        credit_transaction_description="",
+    )
+    form = RDFAllocationForm(data=rdf_form_data)
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+
+
+def test_rdf_allocation_rejects_end_date_before_start_date(settings, rdf_form_data):
+    """Test form rejects end dates before start dates."""
+    settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = False
+
+    rdf_form_data.update(
+        start_date=datetime.now().date() + timedelta(days=2),
+        end_date=datetime.now().date() + timedelta(days=1),
+    )
+    form = RDFAllocationForm(data=rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["end_date"] == ["End date must be on or after start date."]
+
+
+def test_rdf_allocation_rejects_when_project_has_insufficient_credit(
+    settings, rdf_form_data, project
+):
+    """Test form blocks submission when project credits are insufficient."""
+    settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+
+    rdf_form_data.update(
+        start_date=datetime.now().date(),
+        end_date=datetime.now().date(),
+        size=10,
+        create_credit_transaction=True,
+        credit_transaction_description="Auto debit for allocation",
+    )
+    form = RDFAllocationForm(data=rdf_form_data)
+
+    assert not form.is_valid()
+    assert (
+        "Insufficient project credits for this allocation." in form.errors["__all__"][0]
+    )
+
+
+def test_rdf_allocation_accepts_when_project_has_sufficient_credit(
+    settings, rdf_form_data, project
+):
+    """Test form allows submission when project credits cover projected debit."""
+    settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+    CreditTransaction.objects.create(
+        project=project,
+        amount=1000,
+        description="large seed credit",
+    )
+
+    rdf_form_data.update(
+        start_date=datetime.now().date(),
+        end_date=datetime.now().date(),
+        size=1,
+        create_credit_transaction=True,
+        credit_transaction_description="Auto debit for allocation",
+    )
+    form = RDFAllocationForm(data=rdf_form_data)
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
 
 
 @pytest.fixture
