@@ -1,5 +1,6 @@
 """Email sending functionality."""
 
+import textwrap
 from typing import TypedDict
 
 from django.conf import settings
@@ -190,7 +191,7 @@ def notify_platforms_to_manually_delete_allocation(
 
     send_mail(
         subject=subject,
-        message=message,
+        message=textwrap.dedent(message),
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=recipient_list,
     )

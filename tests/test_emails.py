@@ -1,5 +1,7 @@
 """Email tests."""
 
+import textwrap
+
 from django.core import mail
 from django.test import override_settings
 
@@ -153,4 +155,4 @@ def test_notify_platforms_to_manually_delete_allocation():
     actual_subject = mail.outbox[0].subject
 
     assert actual_subject == expected_subject
-    assert actual_message == expected_message
+    assert actual_message == textwrap.dedent(expected_message)
