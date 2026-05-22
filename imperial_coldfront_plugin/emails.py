@@ -1,5 +1,6 @@
 """Email sending functionality."""
 
+import textwrap
 from typing import TypedDict
 
 from django.conf import settings
@@ -157,6 +158,42 @@ All associated data has been permanently removed.
         message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[project_owner_email],
+    )
+
+
+def notify_platforms_to_manually_delete_allocation(
+    allocation_shortname: str, allocation_id: int
+) -> None:
+    """Notify RCS Platforms team to manually delete data.
+
+    For an allocation that has hit the 'Deleted' status.
+    """
+    recipient_list = [
+        email[1].strip()
+        for email in settings.RCS_NOTIFICATION_EMAILS
+        if email[1].strip()
+    ]
+
+    if not recipient_list:
+        return
+
+    subject = (
+        f"Manual Deletion Required for RDF Allocation - {allocation_shortname}"
+        f" (ID: {allocation_id})"
+    )
+
+    message = f"""
+    The RDF allocation '{allocation_shortname}' with ID {allocation_id}
+    has reached the 'Deleted' status.
+    Please take the necessary steps to manually delete all associated data
+    for this allocation.
+    """
+
+    send_mail(
+        subject=subject,
+        message=textwrap.dedent(message),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=recipient_list,
     )
 
 

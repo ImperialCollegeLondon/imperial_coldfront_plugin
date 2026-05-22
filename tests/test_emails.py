@@ -1,9 +1,12 @@
 """Email tests."""
 
+import textwrap
+
 from django.core import mail
 from django.test import override_settings
 
 from imperial_coldfront_plugin.emails import (
+    notify_platforms_to_manually_delete_allocation,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
     send_quota_discrepancy_notification,
@@ -125,3 +128,31 @@ def test_send_discrepancy_notification_hx2():
     assert len(mail.outbox) == 1
     assert "HX2" in mail.outbox[0].subject
     assert "HX2" in mail.outbox[0].body
+
+
+@override_settings(RCS_NOTIFICATION_EMAILS=[("Name", "rcs@email.com")])
+def test_notify_platforms_to_manually_delete_allocation():
+    """Test the notify platforms to manually delete allocation email."""
+    shortname = "bio-research-01"
+    allocation_id = 12345
+
+    expected_subject = (
+        "Manual Deletion Required for RDF Allocation - bio-research-01 (ID: 12345)"
+    )
+
+    expected_message = """
+    The RDF allocation 'bio-research-01' with ID 12345
+    has reached the 'Deleted' status.
+    Please take the necessary steps to manually delete all associated data
+    for this allocation.
+    """
+
+    notify_platforms_to_manually_delete_allocation(shortname, allocation_id)
+
+    # Django intercepts emails sent during tests, access them using mail.
+    assert len(mail.outbox) == 1
+    actual_message = mail.outbox[0].body
+    actual_subject = mail.outbox[0].subject
+
+    assert actual_subject == expected_subject
+    assert actual_message == textwrap.dedent(expected_message)

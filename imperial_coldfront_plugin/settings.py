@@ -213,6 +213,9 @@ RCS_ACCESS_POLICY_URL = ENV.str("RCS_ACCESS_POLICY_URL", default="")
 GENERIC_ASK_REQUEST_URL = "https://servicemgt.imperial.ac.uk/esc?id=sc_cat_item&sys_id=82cd1d2b1b4fe510ce015525464bcb8e&referrer=popular_items"
 """URL of the form for users to request support when no specific form is available."""
 
+RCS_NOTIFICATION_EMAILS = ENV.str("RCS_NOTIFICATION_EMAILS", default="")
+"""Email addresses to send RCS notifications to."""
+
 ENABLE_RDF_ALLOCATION_AUTO_CREDIT = ENV.bool(
     "ENABLE_RDF_ALLOCATION_AUTO_CREDIT", default=False
 )
