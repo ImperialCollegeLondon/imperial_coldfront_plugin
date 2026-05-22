@@ -374,7 +374,9 @@ def update_allocation_status() -> None:
     allocations_to_delete.update(status=deleted_status)
 
     for allocation in allocations_to_delete:
-        notify_platforms_to_manually_delete_allocation(allocation.shortname, allocation.pk)
+        notify_platforms_to_manually_delete_allocation(
+            allocation.shortname, allocation.pk
+        )
 
 
 def check_rdf_allocation_expiry_notifications() -> None:
