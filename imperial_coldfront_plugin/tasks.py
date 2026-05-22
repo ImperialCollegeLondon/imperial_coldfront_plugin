@@ -18,7 +18,12 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
+from imperial_coldfront_plugin.models import (
+    CreditTransaction,
+    HX2Allocation,
+    ICLProject,
+    RDFAllocation,
+)
 
 from .emails import (
     Discrepancy,
@@ -36,9 +41,43 @@ from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
+from .utils import get_rdf_allocation_credit_projection
 
 
-def create_rdf_allocation(form_data: AllocationFormData) -> int:
+def _create_rdf_allocation_debit_transaction(
+    *,
+    project: ICLProject,
+    size_tb: int,
+    start_date: date,
+    end_date: date,
+    description: str,
+    authoriser: str,
+) -> ICLProject:
+    """Create a debit transaction for an RDF allocation under a project row lock."""
+    locked_project = ICLProject.objects.select_for_update().get(pk=project.pk)
+    current_balance, debit, projected_balance = get_rdf_allocation_credit_projection(
+        project=locked_project,
+        size_tb=size_tb,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    if projected_balance < 0:
+        raise ValueError(
+            "Insufficient project credits for this allocation. "
+            f"Current balance: {current_balance} credits. "
+            f"Required debit: {-debit} credits."
+        )
+
+    CreditTransaction.objects.create(
+        project=locked_project,
+        amount=debit,
+        description=description,
+        authoriser=authoriser,
+    )
+    return locked_project
+
+
+def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -> int:
     """Create an RDF allocation from a validated RDFAllocationForm.
 
     Note that this function interacts with external systems.
@@ -55,6 +94,11 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
     project = form_data["project"]
     shortname = form_data["allocation_shortname"]
     ldap_name = f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
+    should_create_credit_transaction = bool(
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT
+        and form_data.get("create_credit_transaction", True)
+    )
+    credit_transaction_description = form_data.get("credit_transaction_description", "")
 
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     location_attribute_type = AllocationAttributeType.objects.get(
@@ -78,6 +122,16 @@ def create_rdf_allocation(form_data: AllocationFormData) -> int:
 
     logger.info("Creating initial database entries for RDF allocation.")
     with transaction.atomic():
+        if should_create_credit_transaction:
+            project = _create_rdf_allocation_debit_transaction(
+                project=project,
+                size_tb=storage_size_tb,
+                start_date=form_data["start_date"],
+                end_date=form_data["end_date"],
+                description=credit_transaction_description,
+                authoriser=authoriser,
+            )
+
         rdf_allocation = RDFAllocation.objects.create(
             project=project,
             status=allocation_active_status,
@@ -262,7 +316,7 @@ def update_quota_usages_task() -> None:
         storage_attribute_usage = (
             allocation.storage_quota_tb_attr.allocationattributeusage
         )
-        storage_attribute_usage.value = usages[rdf_id]["block_usage_tb"]
+        storage_attribute_usage.value = round(usages[rdf_id]["block_usage_tb"], 2)
         storage_attribute_usage.save()
         files_attribute_usage = allocation.files_quota_attr.allocationattributeusage
         files_attribute_usage.value = usages[rdf_id]["files_usage"]

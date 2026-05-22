@@ -6,6 +6,7 @@ import pytest
 from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
+    AllocationAttributeUsage,
     AllocationStatusChoice,
     AllocationUser,
 )
@@ -16,12 +17,14 @@ from django.utils import timezone
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
+from imperial_coldfront_plugin.models import CreditTransaction
 from imperial_coldfront_plugin.tasks import (
     check_hx2_ldap_consistency,
     check_rdf_allocation_expiry_notifications,
     check_rdf_ldap_consistency,
     create_rdf_allocation,
     unlink_expired_allocation_filesets,
+    update_quota_usages_task,
     zero_allocation_gpfs_quota,
 )
 
@@ -265,6 +268,149 @@ class TestCreateRDFAllocation:
             files_quota=settings.GPFS_FILES_QUOTA,
             logger=logging.getLogger("django-q"),
         )
+
+    def test_success_creates_credit_transaction_when_enabled(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task creates a debit transaction when auto-credit is enabled."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        debit_transaction = CreditTransaction.objects.get(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        )
+        assert debit_transaction.amount == -1
+
+    def test_success_locks_project_row_for_credit_transaction(
+        self,
+        mocker,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task acquires a project row lock before creating debit."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        select_for_update_mock = mocker.patch(
+            "imperial_coldfront_plugin.tasks.ICLProject.objects.select_for_update"
+        )
+        select_for_update_mock.return_value.get.return_value = project
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        select_for_update_mock.assert_called_once_with()
+        select_for_update_mock.return_value.get.assert_called_once_with(pk=project.pk)
+
+    def test_success_skips_credit_transaction_when_checkbox_off(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task skips debit creation when auto-credit is disabled in form."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=False,
+            credit_transaction_description="",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        before_count = CreditTransaction.objects.count()
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        assert CreditTransaction.objects.count() == before_count
+        assert not CreditTransaction.objects.filter(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        ).exists()
+
+    def test_insufficient_credit_raises_and_rolls_back(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test defensive task check blocks allocation when balance changes."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=10,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=10,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        # Simulate balance reduction between form submit and async task execution.
+        CreditTransaction.objects.create(
+            project=project,
+            amount=-10,
+            description="intervening debit",
+            authoriser="admin",
+        )
+
+        before_count = CreditTransaction.objects.count()
+        with pytest.raises(ValueError, match="Insufficient project credits"):
+            create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        assert not Allocation.objects.all()
+        assert CreditTransaction.objects.count() == before_count
 
     def test_ldap_rollback(
         gpfs_create_fileset_mock,
@@ -1064,3 +1210,62 @@ class TestUnlinkExpiredAllocationFilesets:
         unlink_expired_allocation_filesets()
 
         mock_client.unlink_fileset.assert_not_called()
+
+
+class TestUpdateQuotaUsagesTask:
+    """Tests for update_quota_usages_task."""
+
+    @pytest.fixture
+    def storage_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Storage Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Storage Quota (TB)", value="10", allocation=rdf_allocation
+        )
+
+    @pytest.fixture
+    def storage_quota_usage(self, storage_quota_attr):
+        """Fixture to create Storage Quota attribute usage for the allocation."""
+        return AllocationAttributeUsage.objects.create(
+            allocation_attribute=storage_quota_attr,
+            value=10.0,
+        )
+
+    @pytest.fixture
+    def files_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Files Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Files Quota", value="1000", allocation=rdf_allocation
+        )
+
+    @pytest.fixture
+    def files_quota_usage(self, files_quota_attr):
+        """Fixture to create Files Quota attribute usage for the allocation."""
+        return AllocationAttributeUsage.objects.create(
+            allocation_attribute=files_quota_attr,
+            value=1000.0,
+        )
+
+    def test_round_quota_usage_values(
+        self,
+        retrieve_all_fileset_quotas_mock,
+        rdf_allocation,
+        storage_quota_attr,
+        storage_quota_usage,
+        files_quota_attr,
+        files_quota_usage,
+    ):
+        """Test that quota usages value is rounded to 2 decimal places."""
+        retrieve_all_fileset_quotas_mock.return_value = {
+            rdf_allocation.shortname: {
+                "block_usage_tb": 1.23456789,
+                "files_usage": 1234,
+            }
+        }
+
+        update_quota_usages_task()
+
+        storage_quota_usage.refresh_from_db()
+        assert storage_quota_usage.value == 1.23
+
+        files_quota_usage.refresh_from_db()
+        assert files_quota_usage.value == 1234

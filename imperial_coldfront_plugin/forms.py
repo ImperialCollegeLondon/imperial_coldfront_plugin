@@ -5,7 +5,7 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
@@ -22,6 +22,7 @@ from django.utils import timezone
 from imperial_coldfront_plugin.models import ICLProject
 from imperial_coldfront_plugin.utils import (
     get_allocation_shortname,
+    get_rdf_allocation_credit_projection,
 )
 
 from .dart import DartIDValidationError, validate_dart_id
@@ -132,6 +133,8 @@ class AllocationFormData(TypedDict):
     size: int
     dart_id: str
     allocation_shortname: str
+    create_credit_transaction: NotRequired[bool]
+    credit_transaction_description: NotRequired[str]
 
 
 class RDFAllocationForm(forms.Form):
@@ -172,6 +175,26 @@ class RDFAllocationForm(forms.Form):
         max_length=settings.ALLOCATION_SHORTNAME_MAX_LENGTH,
         validators=[filesystem_path_component_validator],
     )
+    create_credit_transaction = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text=(
+            "Create a debit transaction from the requested storage size and duration."
+        ),
+    )
+    credit_transaction_description = forms.CharField(
+        required=False,
+        max_length=255,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Description to store on the generated credit transaction.",
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialise form and hide auto-credit fields when feature is disabled."""
+        super().__init__(*args, **kwargs)
+        if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
+            self.fields["create_credit_transaction"].widget = forms.HiddenInput()
+            self.fields["credit_transaction_description"].widget = forms.HiddenInput()
 
     def clean_dart_id(self) -> str:
         """Validate provided Dart ID."""
@@ -193,6 +216,52 @@ class RDFAllocationForm(forms.Form):
             raise ValidationError("Name already in use.")
 
         return shortname
+
+    def clean(self) -> dict[str, Any]:
+        """Validate date ordering and optional auto-credit debit fields."""
+        cleaned_data_raw = super().clean()
+        cleaned_data: dict[str, Any] = (
+            cleaned_data_raw if cleaned_data_raw is not None else {}
+        )
+
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date must be on or after start date.")
+            return cleaned_data
+
+        if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
+            return cleaned_data
+
+        if not cleaned_data.get("create_credit_transaction"):
+            return cleaned_data
+
+        cleaned_data["credit_transaction_description"] = (
+            cleaned_data.get("credit_transaction_description") or ""
+        ).strip()
+
+        project = cleaned_data.get("project")
+        size = cleaned_data.get("size")
+        if project and size is not None and start_date and end_date:
+            current_balance, debit, projected_balance = (
+                get_rdf_allocation_credit_projection(
+                    project=project,
+                    size_tb=size,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
+            if projected_balance < 0:
+                self.add_error(
+                    None,
+                    (
+                        "Insufficient project credits for this allocation. "
+                        f"Current balance: {current_balance} credits. "
+                        f"Required debit: {-debit} credits."
+                    ),
+                )
+
+        return cleaned_data
 
 
 class DartIDForm(forms.Form):
@@ -349,14 +418,11 @@ class ProjectAddUsersToAllocationShortnameForm(ProjectAddUsersToAllocationForm):
             allocation_choices, key=lambda x: x[1][0].lower()
         )
         allocation_choices.insert(0, ("__select_all__", "Select All"))
-        if allocation_query_set:
-            self.fields["allocation"].choices = allocation_choices_sorted
-            self.fields["allocation"].help_text = (
-                "<br/>Select allocations to add selected users to. HX2 allocations are "
-                "not shown here but users can be added to them individually."
-            )
-        else:
-            self.fields["allocation"].widget = forms.HiddenInput()
+        self.fields["allocation"].choices = allocation_choices_sorted
+        self.fields["allocation"].help_text = (
+            "<br/>Select allocations to add selected users to. HX2 allocations are "
+            "not shown here but users can be added to them individually."
+        )
 
 
 class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):

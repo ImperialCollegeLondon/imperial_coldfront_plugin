@@ -215,3 +215,8 @@ GENERIC_ASK_REQUEST_URL = "https://servicemgt.imperial.ac.uk/esc?id=sc_cat_item&
 
 RCS_NOTIFICATION_EMAILS = ENV.str("RCS_NOTIFICATION_EMAILS", default="")
 """Email addresses to send RCS notifications to."""
+
+ENABLE_RDF_ALLOCATION_AUTO_CREDIT = ENV.bool(
+    "ENABLE_RDF_ALLOCATION_AUTO_CREDIT", default=False
+)
+"""Feature flag to enable or disable automatic credit debits for RDF allocations."""
