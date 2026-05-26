@@ -72,7 +72,7 @@ def send_discrepancy_notification(
 
     mail_admins(
         subject=(
-            f"LDAP Consistency Check - Discrepancies found for {source} allocations"
+            f"AD Consistency Check - Discrepancies found for {source} allocations"
         ),
         message=message,
     )
