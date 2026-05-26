@@ -540,6 +540,22 @@ class TestCheckRDFLdapConsistency:
 
         notify_mock.assert_called_once_with(result, source="RDF")
 
+    def test_missing_group(
+        self,
+        rdf_allocation,
+        rdf_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        rdf_allocation_ldap_name,
+    ):
+        """Test when allocation does not have corresponding AD group."""
+        ldap_group_search_mock.return_value = {}
+
+        result = check_rdf_ldap_consistency()
+
+        assert result == DiscrepancyCheckResult([], [rdf_allocation_ldap_name])
+        notify_mock.assert_called_once_with(result, source="RDF")
+
 
 class TestCheckHX2LdapConsistency:
     """Tests for check_hx2_ldap_consistency task."""
@@ -607,6 +623,21 @@ class TestCheckHX2LdapConsistency:
         assert not discrepancy.missing_members
         assert discrepancy.extra_members == [extra_user]
 
+        notify_mock.assert_called_once_with(result, source="HX2")
+
+    def test_missing_group(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+    ):
+        """Test when allocation does not have corresponding AD group."""
+        ldap_group_search_mock.return_value = {}
+
+        result = check_hx2_ldap_consistency()
+
+        assert result == DiscrepancyCheckResult([], [hx2_allocation.ldap_shortname])
         notify_mock.assert_called_once_with(result, source="HX2")
 
 

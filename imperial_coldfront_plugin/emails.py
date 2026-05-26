@@ -67,7 +67,7 @@ def send_discrepancy_notification(
 
     if check_result.missing_ldap_groups:
         message += f"\n{source} allocations that do not have corresponding AD group:\n"
-        for group in check_result.missing_ldap_groups:
+        for group in sorted(check_result.missing_ldap_groups):
             message += f"\t- {group}\n"
 
     mail_admins(

@@ -674,8 +674,8 @@ def check_hx2_user_group_consistency() -> Discrepancy | None:
             "Unable to find HX2 access group in AD during consistency check."
         )
 
-    missing_members = allocation_group_members - ldap_group_members
-    extra_members = ldap_group_members - allocation_group_members
+    missing_members = list(allocation_group_members - ldap_group_members)
+    extra_members = list(ldap_group_members - allocation_group_members)
 
     if not (missing_members or extra_members):
         return None
@@ -683,8 +683,8 @@ def check_hx2_user_group_consistency() -> Discrepancy | None:
     check_result = Discrepancy(
         group_name=settings.LDAP_HX2_ACCESS_GROUP_NAME,
         project_name="",
-        missing_members=list(allocation_group_members - ldap_group_members),
-        extra_members=list(ldap_group_members - allocation_group_members),
+        missing_members=missing_members,
+        extra_members=extra_members,
     )
 
     send_hx2_access_group_discrepancy_notification(check_result)

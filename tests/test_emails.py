@@ -193,7 +193,7 @@ def test_notify_platforms_to_manually_delete_allocation():
     assert actual_message == textwrap.dedent(expected_message)
 
 
-def test_send_hx2_accessaccess_group_discrepancy_notification():
+def test_send_hx2_access_group_discrepancy_notification():
     """Test sending discrepancy notification for HX2 access groups."""
     check_result = Discrepancy(
         project_name="",
