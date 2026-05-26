@@ -295,3 +295,34 @@ def send_fileset_not_found_notification(shortnames: list[str]) -> None:
         subject=subject,
         message=message,
     )
+
+
+def send_hx2_access_group_discrepancy_notification(discrepancy: Discrepancy) -> None:
+    """Send notification to admins about discrepancies in HX2 access groups.
+
+    Args:
+        discrepancy: The details of the discrepancy found.
+    """
+    if not settings.ADMINS:
+        return
+
+    subject = "Coldfront - HX2 Access Group Membership Discrepancy Detected"
+    message = (
+        "A discrepancy has been detected between the membership of the HX2 access group"
+        f" in Active Directory ({discrepancy.group_name}) and the expected membership "
+        "based on Coldfront data.\n\n"
+    )
+    if discrepancy.missing_members:
+        message += "Missing members (in Coldfront but not in AD):\n"
+        for member in sorted(discrepancy.missing_members):
+            message += f"  - {member}\n"
+
+    if discrepancy.extra_members:
+        message += "\nExtra members (in AD but not in Coldfront):\n"
+        for member in sorted(discrepancy.extra_members):
+            message += f"  - {member}\n"
+
+    mail_admins(
+        subject=subject,
+        message=message,
+    )

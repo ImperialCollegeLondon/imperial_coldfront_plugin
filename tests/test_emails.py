@@ -13,6 +13,7 @@ from imperial_coldfront_plugin.emails import (
     notify_platforms_to_manually_delete_allocation,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
+    send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
 
@@ -190,3 +191,29 @@ def test_notify_platforms_to_manually_delete_allocation():
 
     assert actual_subject == expected_subject
     assert actual_message == textwrap.dedent(expected_message)
+
+
+def test_send_hx2_accessaccess_group_discrepancy_notification():
+    """Test sending discrepancy notification for HX2 access groups."""
+    check_result = Discrepancy(
+        project_name="",
+        group_name="hx2-testgroup",
+        missing_members=["alice"],
+        extra_members=["bob"],
+    )
+
+    expected_body = (
+        "A discrepancy has been detected between the membership of the HX2 access group"
+        " in Active Directory (hx2-testgroup) and the expected membership based on "
+        "Coldfront data.\n\n"
+        "Missing members (in Coldfront but not in AD):\n"
+        "  - alice\n\n"
+        "Extra members (in AD but not in Coldfront):\n"
+        "  - bob\n"
+    )
+    send_hx2_access_group_discrepancy_notification(check_result)
+    (message,) = mail.outbox
+    assert message.subject.endswith(
+        "Coldfront - HX2 Access Group Membership Discrepancy Detected"
+    )
+    assert message.body == expected_body.lstrip()

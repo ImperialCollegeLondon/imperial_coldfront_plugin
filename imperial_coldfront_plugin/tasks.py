@@ -36,6 +36,7 @@ from .emails import (
     send_allocation_removal_warning,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
+    send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
 from .forms import AllocationFormData
@@ -651,3 +652,41 @@ def unlink_expired_allocation_filesets() -> None:
             )
         except Exception:
             logger.exception(f"Error unlinking fileset for allocation {shortname}")
+
+
+def check_hx2_user_group_consistency() -> Discrepancy | None:
+    """Check consistency of user group memberships for HX2 allocations."""
+    if not settings.LDAP_ENABLED:
+        return None
+
+    allocation_group_members = set(
+        AllocationUser.objects.filter(
+            status__name="Active",
+            allocation__resources__name="HX2",
+            allocation__status__name="Active",
+        ).values_list("user__username", flat=True)
+    )
+    search_results = ldap_group_member_search(settings.LDAP_HX2_ACCESS_GROUP_NAME)
+    try:
+        ldap_group_members = set(search_results[settings.LDAP_HX2_ACCESS_GROUP_NAME])
+    except KeyError:
+        raise ValueError(
+            "Unable to find HX2 access group in AD during consistency check."
+        )
+
+    missing_members = allocation_group_members - ldap_group_members
+    extra_members = ldap_group_members - allocation_group_members
+
+    if not (missing_members or extra_members):
+        return None
+
+    check_result = Discrepancy(
+        group_name=settings.LDAP_HX2_ACCESS_GROUP_NAME,
+        project_name="",
+        missing_members=list(allocation_group_members - ldap_group_members),
+        extra_members=list(ldap_group_members - allocation_group_members),
+    )
+
+    send_hx2_access_group_discrepancy_notification(check_result)
+
+    return check_result
