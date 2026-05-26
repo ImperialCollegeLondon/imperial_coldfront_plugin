@@ -1,19 +1,29 @@
 """Email tests."""
 
 import textwrap
+from string import Template
 
+import pytest
 from django.core import mail
 from django.test import override_settings
 
 from imperial_coldfront_plugin.emails import (
+    Discrepancy,
+    DiscrepancyCheckResult,
     notify_platforms_to_manually_delete_allocation,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
+    send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
 
 
-@override_settings(ADMINS=[("Name", "admin@email.com")])
+@pytest.fixture(autouse=True)
+def admin_email(settings):
+    """Set up admin email for testing."""
+    settings.ADMINS = [("Name", "admin@email.com")]
+
+
 def test_send_quota_discrepancy_notification():
     """Test the quota discrepancy email."""
     discrepancies = [
@@ -66,7 +76,6 @@ The following discrepancies were detected between Coldfront and GPFS:
     assert actual_message == expected_message
 
 
-@override_settings(ADMINS=[("Name", "admin@email.com")])
 def test_send_fileset_not_found_notification():
     """Test the fileset not found email."""
     shortnames = ["bio-research-01", "physics-dept-lab"]
@@ -91,43 +100,69 @@ The following allocation(s) in Coldfront had no corresponding fileset in GPFS:
     assert actual_message == expected_message
 
 
-@override_settings(ADMINS=[("Name", "admin@email.com")])
-def test_send_discrepancy_notification_rdf():
-    """Test that the discrepancy email references RDF by default."""
-    discrepancies = [
-        {
-            "project_name": "Test Project",
-            "group_name": "rdfdev-testgroup",
-            "missing_members": ["alice"],
-            "extra_members": [],
-        }
-    ]
+message = Template(
+    "The following discrepancies for $source allocations were detected between "
+    "Coldfront and Active Directory:"
+    "\n\n"
+    "$membership_discrepancies_text"
+    "$missing_ldap_groups_text"
+)
 
-    # Default with no source uses RDF:
-    send_discrepancy_notification(discrepancies, source="RDF")
+
+@pytest.mark.parametrize("source", ["RDF", "HX2"])
+def test_send_discrepancy_notification_membership_discrepancies(source: str):
+    """Test email text for group membership discrepancies."""
+    check_result = DiscrepancyCheckResult(
+        membership_discrepancies=[
+            Discrepancy(
+                project_name="Test Project",
+                group_name="rdfdev-testgroup",
+                missing_members=["alice"],
+                extra_members=["bob"],
+            )
+        ],
+        missing_ldap_groups=[],
+    )
+
+    membership_discrepancies_text = (
+        "Membership Discrepancies:\n\n"
+        "- Project: Test Project (Group: rdfdev-testgroup)\n"
+        "  Missing members (in Coldfront but not in AD):\n"
+        "    - alice\n"
+        "  Extra members (in AD but not in Coldfront):\n"
+        "    - bob\n"
+    )
+
+    send_discrepancy_notification(check_result, source=source)
 
     assert len(mail.outbox) == 1
-    assert "RDF" in mail.outbox[0].subject
-    assert "RDF" in mail.outbox[0].body
+    assert mail.outbox[0].body == message.substitute(
+        source=source,
+        membership_discrepancies_text=membership_discrepancies_text,
+        missing_ldap_groups_text="",
+    )
 
 
-@override_settings(ADMINS=[("Name", "admin@email.com")])
-def test_send_discrepancy_notification_hx2():
-    """Test that the discrepancy email references HX2 when source is HX2."""
-    discrepancies = [
-        {
-            "project_name": "Test Project",
-            "group_name": "hx2dev-testgroup",
-            "missing_members": ["alice"],
-            "extra_members": [],
-        }
-    ]
+@pytest.mark.parametrize("source", ["RDF", "HX2"])
+def test_send_discrepancy_notification_missing_ldap_groups(source: str):
+    """Test that the discrepancy email includes missing LDAP groups."""
+    check_result = DiscrepancyCheckResult(
+        membership_discrepancies=[],
+        missing_ldap_groups=["rdfdev-testgroup"],
+    )
+    missing_ldap_groups_text = (
+        f"\n{source} allocations that do not have corresponding AD group:\n"
+        "\t- rdfdev-testgroup\n"
+    )
 
-    send_discrepancy_notification(discrepancies, source="HX2")
+    send_discrepancy_notification(check_result, source=source)
 
     assert len(mail.outbox) == 1
-    assert "HX2" in mail.outbox[0].subject
-    assert "HX2" in mail.outbox[0].body
+    assert mail.outbox[0].body == message.substitute(
+        source=source,
+        membership_discrepancies_text="",
+        missing_ldap_groups_text=missing_ldap_groups_text,
+    )
 
 
 @override_settings(RCS_NOTIFICATION_EMAILS=[("Name", "rcs@email.com")])
@@ -156,3 +191,29 @@ def test_notify_platforms_to_manually_delete_allocation():
 
     assert actual_subject == expected_subject
     assert actual_message == textwrap.dedent(expected_message)
+
+
+def test_send_hx2_access_group_discrepancy_notification():
+    """Test sending discrepancy notification for HX2 access groups."""
+    check_result = Discrepancy(
+        project_name="",
+        group_name="hx2-testgroup",
+        missing_members=["alice"],
+        extra_members=["bob"],
+    )
+
+    expected_body = (
+        "A discrepancy has been detected between the membership of the HX2 access group"
+        " in Active Directory (hx2-testgroup) and the expected membership based on "
+        "Coldfront data.\n\n"
+        "Missing members (in Coldfront but not in AD):\n"
+        "  - alice\n\n"
+        "Extra members (in AD but not in Coldfront):\n"
+        "  - bob\n"
+    )
+    send_hx2_access_group_discrepancy_notification(check_result)
+    (message,) = mail.outbox
+    assert message.subject.endswith(
+        "Coldfront - HX2 Access Group Membership Discrepancy Detected"
+    )
+    assert message.body == expected_body.lstrip()

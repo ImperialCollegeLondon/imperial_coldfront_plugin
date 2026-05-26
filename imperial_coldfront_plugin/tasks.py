@@ -27,6 +27,7 @@ from imperial_coldfront_plugin.models import (
 
 from .emails import (
     Discrepancy,
+    DiscrepancyCheckResult,
     QuotaDiscrepancy,
     notify_platforms_to_manually_delete_allocation,
     send_allocation_deletion_notification,
@@ -35,6 +36,7 @@ from .emails import (
     send_allocation_removal_warning,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
+    send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
 from .forms import AllocationFormData
@@ -236,9 +238,10 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
 def find_discrepancies_helper(
     allocations: QuerySet[RDFAllocation | HX2Allocation],
     ldap_groups: dict[str, list[str]],
-) -> list[Discrepancy]:
+) -> DiscrepancyCheckResult:
     """Finds discrepancies between LDAP groups and allocation users."""
     discrepancies: list[Discrepancy] = []
+    missing_ldap_groups = []
     for allocation in allocations:
         group_name = allocation.ldap_shortname
 
@@ -247,26 +250,32 @@ def find_discrepancies_helper(
         )
         expected_usernames = [au.user.username for au in active_users]
 
-        actual_members = ldap_groups.get(group_name, [])
+        actual_members = ldap_groups.get(group_name)
+        if actual_members is None:
+            missing_ldap_groups.append(group_name)
+            continue
+
         missing_members = set(expected_usernames) - set(actual_members)
         extra_members = set(actual_members) - set(expected_usernames)
 
         if missing_members or extra_members:
             discrepancies.append(
-                {
-                    "group_name": group_name,
-                    "project_name": allocation.project.title,
-                    "missing_members": list(missing_members),
-                    "extra_members": list(extra_members),
-                }
+                Discrepancy(
+                    group_name=group_name,
+                    project_name=allocation.project.title,
+                    missing_members=list(missing_members),
+                    extra_members=list(extra_members),
+                )
             )
-    return discrepancies
+    return DiscrepancyCheckResult(
+        membership_discrepancies=discrepancies, missing_ldap_groups=missing_ldap_groups
+    )
 
 
-def check_rdf_ldap_consistency() -> list[Discrepancy]:
+def check_rdf_ldap_consistency() -> DiscrepancyCheckResult | None:
     """Check the consistency of LDAP groups with the RDF Active allocations."""
     if not settings.LDAP_ENABLED:
-        return []
+        return None
 
     allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active",
@@ -274,18 +283,18 @@ def check_rdf_ldap_consistency() -> list[Discrepancy]:
     ).distinct()
     ldap_groups = ldap_group_member_search(f"{settings.LDAP_RDF_SHORTNAME_PREFIX}*")
 
-    discrepancies = find_discrepancies_helper(allocations, ldap_groups)
+    check_result = find_discrepancies_helper(allocations, ldap_groups)
 
-    if discrepancies:
-        send_discrepancy_notification(discrepancies, source="RDF")
+    if check_result.discrepancies_found:
+        send_discrepancy_notification(check_result, source="RDF")
 
-    return discrepancies
+    return check_result
 
 
-def check_hx2_ldap_consistency() -> list[Discrepancy]:
+def check_hx2_ldap_consistency() -> DiscrepancyCheckResult | None:
     """Check the consistency of LDAP groups with the HX2 allocations in the database."""
     if not settings.LDAP_ENABLED:
-        return []
+        return None
 
     allocations = HX2Allocation.objects.filter(
         resources__name="HX2",
@@ -293,12 +302,12 @@ def check_hx2_ldap_consistency() -> list[Discrepancy]:
     ).distinct()
     ldap_groups = ldap_group_member_search(f"{settings.LDAP_HX2_SHORTNAME_PREFIX}*")
 
-    discrepancies = find_discrepancies_helper(allocations, ldap_groups)
+    check_result = find_discrepancies_helper(allocations, ldap_groups)
 
-    if discrepancies:
-        send_discrepancy_notification(discrepancies, source="HX2")
+    if check_result.discrepancies_found:
+        send_discrepancy_notification(check_result, source="HX2")
 
-    return discrepancies
+    return check_result
 
 
 def update_quota_usages_task() -> None:
@@ -643,3 +652,41 @@ def unlink_expired_allocation_filesets() -> None:
             )
         except Exception:
             logger.exception(f"Error unlinking fileset for allocation {shortname}")
+
+
+def check_hx2_user_group_consistency() -> Discrepancy | None:
+    """Check consistency of user group memberships for HX2 allocations."""
+    if not settings.LDAP_ENABLED:
+        return None
+
+    allocation_group_members = set(
+        AllocationUser.objects.filter(
+            status__name="Active",
+            allocation__resources__name="HX2",
+            allocation__status__name="Active",
+        ).values_list("user__username", flat=True)
+    )
+    search_results = ldap_group_member_search(settings.LDAP_HX2_ACCESS_GROUP_NAME)
+    try:
+        ldap_group_members = set(search_results[settings.LDAP_HX2_ACCESS_GROUP_NAME])
+    except KeyError:
+        raise ValueError(
+            "Unable to find HX2 access group in AD during consistency check."
+        )
+
+    missing_members = list(allocation_group_members - ldap_group_members)
+    extra_members = list(ldap_group_members - allocation_group_members)
+
+    if not (missing_members or extra_members):
+        return None
+
+    check_result = Discrepancy(
+        group_name=settings.LDAP_HX2_ACCESS_GROUP_NAME,
+        project_name="",
+        missing_members=missing_members,
+        extra_members=extra_members,
+    )
+
+    send_hx2_access_group_discrepancy_notification(check_result)
+
+    return check_result
