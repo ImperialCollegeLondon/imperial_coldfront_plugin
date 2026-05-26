@@ -1,13 +1,15 @@
 """Email sending functionality."""
 
 import textwrap
+from dataclasses import dataclass
 from typing import TypedDict
 
 from django.conf import settings
 from django.core.mail import mail_admins, send_mail
 
 
-class Discrepancy(TypedDict):
+@dataclass
+class Discrepancy:
     """Structure for holding discrepancies found during LDAP consistency check."""
 
     group_name: str
@@ -16,38 +18,57 @@ class Discrepancy(TypedDict):
     extra_members: list[str]
 
 
+@dataclass
+class DiscrepancyCheckResult:
+    """Result of an LDAP consistency check."""
+
+    membership_discrepancies: list[Discrepancy]
+    missing_ldap_groups: list[str]
+
+    @property
+    def discrepancies_found(self) -> bool:
+        """Whether any discrepancies were found."""
+        return bool(self.membership_discrepancies or self.missing_ldap_groups)
+
+
 def send_discrepancy_notification(
-    discrepancies: list[Discrepancy], source: str
+    check_result: DiscrepancyCheckResult, source: str
 ) -> None:
     """Send email notification for discrepancies found during the consistency check.
 
     Args:
-        discrepancies: List of discrepancies found.
+        check_result: Discrepancies found.
         source: The source of the discrepancies ("RDF" or "HX2").
     """
     if not settings.ADMINS:
         return
 
     message = (
-        f"The following discrepancies for {source} were detected between "
-        f"Coldfront and AD:\n\n"
+        f"The following discrepancies for {source} allocations were detected between "
+        f"Coldfront and Active Directory:\n\n"
     )
 
-    message += "Membership Discrepancies:\n"
-    for discrepancy in discrepancies:
-        project_name = discrepancy["project_name"]
-        group_id = discrepancy["group_name"]
+    if check_result.membership_discrepancies:
+        message += "Membership Discrepancies:\n"
+    for discrepancy in check_result.membership_discrepancies:
+        project_name = discrepancy.project_name
+        group_id = discrepancy.group_name
         message += f"\n- Project: {project_name} (Group: {group_id})\n"
 
-        if discrepancy["missing_members"]:
+        if discrepancy.missing_members:
             message += "  Missing members (in Coldfront but not in AD):\n"
-            for member in sorted(discrepancy["missing_members"]):
+            for member in sorted(discrepancy.missing_members):
                 message += f"    - {member}\n"
 
-        if discrepancy["extra_members"]:
+        if discrepancy.extra_members:
             message += "  Extra members (in AD but not in Coldfront):\n"
-            for member in sorted(discrepancy["extra_members"]):
+            for member in sorted(discrepancy.extra_members):
                 message += f"    - {member}\n"
+
+    if check_result.missing_ldap_groups:
+        message += f"\n{source} allocations that do not have corresponding AD group:\n"
+        for group in check_result.missing_ldap_groups:
+            message += f"\t- {group}\n"
 
     mail_admins(
         subject=(

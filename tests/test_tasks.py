@@ -14,6 +14,7 @@ from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.utils import timezone
 
+from imperial_coldfront_plugin.emails import DiscrepancyCheckResult
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
@@ -485,7 +486,7 @@ class TestCheckRDFLdapConsistency:
 
         result = check_rdf_ldap_consistency()
 
-        assert result == []
+        assert result == DiscrepancyCheckResult([], [])
         notify_mock.assert_not_called()
 
     def test_missing_members(
@@ -501,15 +502,16 @@ class TestCheckRDFLdapConsistency:
         ldap_group_search_mock.return_value = {rdf_allocation_ldap_name: []}
 
         result = check_rdf_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == rdf_allocation_ldap_name
-        assert discrepancy["project_name"] == rdf_allocation.project.title
-        assert username in discrepancy["missing_members"]
-        assert not discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == rdf_allocation_ldap_name
+        assert discrepancy.project_name == rdf_allocation.project.title
+        assert discrepancy.missing_members == [username]
+        assert not discrepancy.extra_members
 
-        notify_mock.assert_called_once()
+        notify_mock.assert_called_once_with(result, source="RDF")
 
     def test_extra_members(
         self,
@@ -527,14 +529,15 @@ class TestCheckRDFLdapConsistency:
         }
 
         result = check_rdf_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == rdf_allocation_ldap_name
-        assert not discrepancy["missing_members"]
-        assert extra_user in discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == rdf_allocation_ldap_name
+        assert not discrepancy.missing_members
+        assert discrepancy.extra_members == [extra_user]
 
-        notify_mock.assert_called_once()
+        notify_mock.assert_called_once_with(result, source="RDF")
 
 
 class TestCheckHX2LdapConsistency:
@@ -554,7 +557,7 @@ class TestCheckHX2LdapConsistency:
 
         result = check_hx2_ldap_consistency()
 
-        assert result == []
+        assert result == DiscrepancyCheckResult([], [])
         notify_mock.assert_not_called()
 
     def test_missing_members(
@@ -570,13 +573,14 @@ class TestCheckHX2LdapConsistency:
         ldap_group_search_mock.return_value = {ldap_name: []}
 
         result = check_hx2_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == ldap_name
-        assert discrepancy["project_name"] == hx2_allocation.project.title
-        assert username in discrepancy["missing_members"]
-        assert not discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == ldap_name
+        assert discrepancy.project_name == hx2_allocation.project.title
+        assert discrepancy.missing_members == [username]
+        assert not discrepancy.extra_members
 
         notify_mock.assert_called_once_with(result, source="HX2")
 
@@ -594,12 +598,13 @@ class TestCheckHX2LdapConsistency:
         ldap_group_search_mock.return_value = {ldap_name: [username, extra_user]}
 
         result = check_hx2_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == ldap_name
-        assert not discrepancy["missing_members"]
-        assert extra_user in discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == ldap_name
+        assert not discrepancy.missing_members
+        assert discrepancy.extra_members == [extra_user]
 
         notify_mock.assert_called_once_with(result, source="HX2")
 
