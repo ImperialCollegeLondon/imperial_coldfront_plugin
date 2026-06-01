@@ -1192,7 +1192,14 @@ class TestProjectDetailView:
         assert not soup.find("div", class_="card", id="credit-balance-card")
 
     def test_credit_balance_only_visible_to_pi_superuser_and_manager(
-        self, rf, project, settings, user_factory, superuser, project_user_role_manager
+        self,
+        rf,
+        project,
+        settings,
+        user_factory,
+        superuser,
+        project_user_role_manager,
+        project_user_active_status,
     ):
         """Ensure credit balance section is only rendered for the PI, superusers, and managers."""  # noqa: E501
         settings.SHOW_CREDIT_BALANCE = True
@@ -1225,7 +1232,14 @@ class TestProjectDetailView:
         assert soup.find("div", class_="card", id="credit-balance-card")
 
         # manager should see the section
-        request.user = project_user_role_manager.user
+        manager = user_factory()
+        ProjectUser.objects.create(
+            project=project,
+            user=manager,
+            status=project_user_active_status,
+            role=project_user_role_manager,
+        )
+        request.user = manager
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
@@ -1271,16 +1285,6 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         """Test that superuser can access the transactions page."""
         url = self._get_url(project.pk)
         response = superuser_client.get(url)
-        assert response.status_code == 200
-
-    def test_manager_can_access(
-        self, project, project_user_role_manager, auth_client_factory
-    ):
-        """Test that project managers can access the transactions page."""
-        manager = project_user_role_manager.user
-        client = auth_client_factory(manager)
-        url = self._get_url(project.pk)
-        response = client.get(url)
         assert response.status_code == 200
 
     def test_transactions_displayed_with_total(self, superuser_client, project):
@@ -1348,6 +1352,27 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert len(rows) == 2
         assert rows[0].find("span", class_="text-success")
         assert rows[1].find("span", class_="text-danger")
+
+    def test_managers_can_see_transactions(
+        self,
+        user_factory,
+        auth_client_factory,
+        project,
+        project_user_active_status,
+        project_user_role_manager,
+    ):
+        """Test that project managers can access the transactions page."""
+        manager = user_factory()
+        ProjectUser.objects.create(
+            project=project,
+            user=manager,
+            status=project_user_active_status,
+            role=project_user_role_manager,
+        )
+        client = auth_client_factory(manager)
+        url = self._get_url(project.pk)
+        response = client.get(url)
+        assert response.status_code == 200
 
 
 class TestAllocationDetailBanners:
