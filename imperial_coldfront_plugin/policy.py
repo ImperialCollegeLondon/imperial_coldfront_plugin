@@ -168,3 +168,23 @@ def check_project_pi_or_superuser(project: Project, user: "User") -> None:
     """
     if not (user.is_superuser or user == project.pi):
         raise PermissionDenied
+
+
+def check_project_manager_or_pi_or_superuser(project: Project, user: "User") -> None:
+    """Check if the user is the owner of the project, a manager, or a superuser.
+
+    Args:
+      project: The project to check against.
+      user: The user to check.
+
+    Raises:
+      PermissionDenied: If the user is neither the project manager nor a superuser.
+    """
+    is_manager = project.projectuser_set.filter(
+        user=user,
+        role__name="Manager",
+        status__name="Active",
+    ).exists()
+
+    if not (user.is_superuser or is_manager or user == project.pi):
+        raise PermissionDenied
