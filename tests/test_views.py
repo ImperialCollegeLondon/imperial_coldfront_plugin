@@ -1047,6 +1047,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
                 project=project.pk,
                 amount=amount,
                 description=description,
+                transaction_type="Storage",
             ),
         )
 
