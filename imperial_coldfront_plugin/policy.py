@@ -179,7 +179,7 @@ def check_project_manager_or_pi_or_superuser(project: Project, user: "User") -> 
 
     Raises:
       PermissionDenied: If the user is neither the project owner (PI), a manager, nor a superuser.
-    """
+    """  # noqa: E501
     is_manager = project.projectuser_set.filter(
         user=user,
         role__name="Manager",
