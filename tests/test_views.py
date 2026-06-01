@@ -1197,16 +1197,15 @@ class TestProjectDetailView:
         project,
         settings,
         user_factory,
-        superuser,
-        project_user_role_manager,
-        project_user_active_status,
+        manager_pi_or_superuser,
     ):
         """Ensure credit balance section is only rendered for the PI, superusers, and managers."""  # noqa: E501
         settings.SHOW_CREDIT_BALANCE = True
         tmpl = "imperial_coldfront_plugin/overrides/project_detail.html"
 
-        # non-member should not see the section
         request = rf.get("/")
+
+        # non-member should not see the section
         request.user = user_factory()
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
@@ -1215,31 +1214,8 @@ class TestProjectDetailView:
         soup = BeautifulSoup(response.content, "html.parser")
         assert not soup.find("div", class_="card", id="credit-balance-card")
 
-        # project PI should see the section
-        request.user = project.pi
-        response = render(
-            request, tmpl, context={"project": project, "settings": settings}
-        )
-        soup = BeautifulSoup(response.content, "html.parser")
-        assert soup.find("div", class_="card", id="credit-balance-card")
-
-        # superuser should see the section
-        request.user = superuser
-        response = render(
-            request, tmpl, context={"project": project, "settings": settings}
-        )
-        soup = BeautifulSoup(response.content, "html.parser")
-        assert soup.find("div", class_="card", id="credit-balance-card")
-
-        # manager should see the section
-        manager = user_factory()
-        ProjectUser.objects.create(
-            project=project,
-            user=manager,
-            status=project_user_active_status,
-            role=project_user_role_manager,
-        )
-        request.user = manager
+        # privileged user should see the section
+        request.user = manager_pi_or_superuser
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
