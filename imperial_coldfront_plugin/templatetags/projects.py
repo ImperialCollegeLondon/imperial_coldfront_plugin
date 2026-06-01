@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from coldfront.core.project.models import ProjectUser
+from coldfront.core.project.models import Project, ProjectUser
 from django import template
 from django.db.models.query import QuerySet
 
@@ -87,7 +87,7 @@ def get_project_credit_balance(project: ICLProject) -> int:
 
 
 @register.simple_tag
-def is_project_manager(project: ICLProject, user: "User") -> bool:
+def is_project_manager(project: Project, user: "User") -> bool:
     """Check if the user is a manager of the project.
 
     Args:
