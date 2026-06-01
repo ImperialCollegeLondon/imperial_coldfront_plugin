@@ -445,6 +445,14 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Description of the transaction",
     )
+    transaction_type = forms.ChoiceField(
+        choices=[
+            ("Storage", "Storage"),
+            ("Donation", "Donation"),
+            ("Other", "Other"),
+        ],
+        help_text="Type of the transaction",
+    )
 
 
 class HXAllocationForm(forms.Form):

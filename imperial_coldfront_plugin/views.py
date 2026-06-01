@@ -513,6 +513,7 @@ def project_credit_transactions(
                 "transaction": transaction,
                 "running_balance": running,
                 "authoriser": transaction.authoriser,
+                "transaction_type": transaction.transaction_type,
             }
         )
 
