@@ -84,3 +84,22 @@ def get_project_credit_balance(project: ICLProject) -> int:
     """
     balance = calculate_credit_balance(project)
     return balance if balance is not None else 0
+
+
+@register.simple_tag
+def is_project_manager(project: ICLProject, user: "User") -> bool:
+    """Check if the user is a manager of the project.
+
+    Args:
+      project: The project to check against.
+      user: The user to check.
+
+    Returns:
+        True if the user is a manager of the project, False otherwise.
+    """
+    return ProjectUser.objects.filter(
+        project=project,
+        user=user,
+        role__name="Manager",
+        status__name="Active",
+    ).exists()
