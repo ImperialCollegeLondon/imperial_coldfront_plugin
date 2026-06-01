@@ -186,5 +186,5 @@ def check_project_manager_or_pi_or_superuser(project: Project, user: "User") -> 
         status__name="Active",
     ).exists()
 
-    if not (user.is_superuser or is_manager or user == project.pi):
+    if not (user.is_superuser or user == project.pi or is_manager):
         raise PermissionDenied
