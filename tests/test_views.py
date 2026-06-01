@@ -1193,10 +1193,10 @@ class TestProjectDetailView:
         soup = BeautifulSoup(response.content, "html.parser")
         assert not soup.find("div", class_="card", id="credit-balance-card")
 
-    def test_credit_balance_only_visible_to_pi_and_superuser(
-        self, rf, project, settings, user_factory, superuser
+    def test_credit_balance_only_visible_to_pi_superuser_and_manager(
+        self, rf, project, settings, user_factory, superuser, project_user_role_manager
     ):
-        """Ensure credit balance section is only rendered for the PI and superusers."""
+        """Ensure credit balance section is only rendered for the PI, superusers, and managers."""  # noqa: E501
         settings.SHOW_CREDIT_BALANCE = True
         tmpl = "imperial_coldfront_plugin/overrides/project_detail.html"
 
@@ -1220,6 +1220,14 @@ class TestProjectDetailView:
 
         # superuser should see the section
         request.user = superuser
+        response = render(
+            request, tmpl, context={"project": project, "settings": settings}
+        )
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("div", class_="card", id="credit-balance-card")
+
+        # manager should see the section
+        request.user = project_user_role_manager.user
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
@@ -1265,6 +1273,16 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         """Test that superuser can access the transactions page."""
         url = self._get_url(project.pk)
         response = superuser_client.get(url)
+        assert response.status_code == 200
+
+    def test_manager_can_access(
+        self, project, project_user_role_manager, auth_client_factory
+    ):
+        """Test that project managers can access the transactions page."""
+        manager = project_user_role_manager.user
+        client = auth_client_factory(manager)
+        url = self._get_url(project.pk)
+        response = client.get(url)
         assert response.status_code == 200
 
     def test_transactions_displayed_with_total(self, superuser_client, project):
