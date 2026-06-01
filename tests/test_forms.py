@@ -425,61 +425,62 @@ class TestAdminProjectCreationForm(TestUserProjectCreationForm):
         assert "group_id" not in form.errors
 
 
-def test_credit_transaction_form_valid(project):
-    """Test CreditTransactionForm with valid data."""
-    form_data = {
-        "project": project.pk,
-        "amount": 100,
-        "description": "Test credit transaction",
-    }
-    form = CreditTransactionForm(data=form_data)
-    assert form.is_valid()
-    assert form.cleaned_data["amount"] == 100
-    assert form.cleaned_data["description"] == "Test credit transaction"
+class TestCreditTransactionForm:
+    """Tests for CreditTransactionForm."""
 
+    def test_credit_transaction_form_valid(self, project):
+        """Test CreditTransactionForm with valid data."""
+        form_data = {
+            "project": project.pk,
+            "amount": 100,
+            "description": "Test credit transaction",
+            "transaction_type": "Storage",
+        }
+        form = CreditTransactionForm(data=form_data)
+        assert form.is_valid()
+        assert form.cleaned_data["amount"] == 100
+        assert form.cleaned_data["description"] == "Test credit transaction"
 
-def test_credit_transaction_form_zero_amount(project):
-    """Test CreditTransactionForm with zero amount."""
-    form_data = {
-        "project": project.pk,
-        "amount": 0,
-        "description": "Zero amount transaction",
-    }
-    form = CreditTransactionForm(data=form_data)
-    assert form.is_valid()
+    def test_credit_transaction_form_zero_amount(self, project):
+        """Test CreditTransactionForm with zero amount."""
+        form_data = {
+            "project": project.pk,
+            "amount": 0,
+            "description": "Zero amount transaction",
+            "transaction_type": "Storage",
+        }
+        form = CreditTransactionForm(data=form_data)
+        assert form.is_valid()
 
+    def test_credit_transaction_form_missing_project(self):
+        """Test CreditTransactionForm with missing project."""
+        form_data = {
+            "amount": 100,
+            "description": "Test credit transaction",
+        }
+        form = CreditTransactionForm(data=form_data)
+        assert not form.is_valid()
+        assert "project" in form.errors
 
-def test_credit_transaction_form_missing_project():
-    """Test CreditTransactionForm with missing project."""
-    form_data = {
-        "amount": 100,
-        "description": "Test credit transaction",
-    }
-    form = CreditTransactionForm(data=form_data)
-    assert not form.is_valid()
-    assert "project" in form.errors
+    def test_credit_transaction_form_missing_amount(self, project):
+        """Test CreditTransactionForm with missing amount."""
+        form_data = {
+            "project": project.pk,
+            "description": "Test credit transaction",
+        }
+        form = CreditTransactionForm(data=form_data)
+        assert not form.is_valid()
+        assert "amount" in form.errors
 
-
-def test_credit_transaction_form_missing_amount(project):
-    """Test CreditTransactionForm with missing amount."""
-    form_data = {
-        "project": project.pk,
-        "description": "Test credit transaction",
-    }
-    form = CreditTransactionForm(data=form_data)
-    assert not form.is_valid()
-    assert "amount" in form.errors
-
-
-def test_credit_transaction_form_missing_description(project):
-    """Test CreditTransactionForm with missing description."""
-    form_data = {
-        "project": project.pk,
-        "amount": 100,
-    }
-    form = CreditTransactionForm(data=form_data)
-    assert not form.is_valid()
-    assert "description" in form.errors
+    def test_credit_transaction_form_missing_description(self, project):
+        """Test CreditTransactionForm with missing description."""
+        form_data = {
+            "project": project.pk,
+            "amount": 100,
+        }
+        form = CreditTransactionForm(data=form_data)
+        assert not form.is_valid()
+        assert "description" in form.errors
 
 
 class TestHXAllocationForm:
