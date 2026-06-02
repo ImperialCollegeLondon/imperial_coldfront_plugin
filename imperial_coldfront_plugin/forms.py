@@ -432,7 +432,7 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         """Meta class for the form."""
 
         model = CreditTransaction
-        fields = ("project", "amount", "description")
+        fields = ("project", "amount", "description", "transaction_type")
 
     project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
         queryset=ICLProject.objects.filter(status__name="Active"),
@@ -445,14 +445,14 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text="Description of the transaction",
     )
-    transaction_type = forms.ChoiceField(
-        choices=[
-            ("Storage", "Storage"),
-            ("Donation", "Donation"),
-            ("Other", "Other"),
-        ],
-        help_text="Type of the transaction",
-    )
+    # transaction_type = forms.ChoiceField(
+    #     choices=[
+    #         ("Storage", "Storage"),
+    #         ("Donation", "Donation"),
+    #         ("Other", "Other"),
+    #     ],
+    #     help_text="Type of the transaction",
+    # )
 
 
 class HXAllocationForm(forms.Form):
