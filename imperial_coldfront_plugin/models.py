@@ -392,19 +392,22 @@ class ICLProject(Project):
 class CreditTransaction(models.Model):
     """Model representing a credit transaction."""
 
+    class TransactionType(models.TextChoices):
+        """Enumeration of transaction types for credit transactions."""
+
+        STORAGE = "STG", "Storage"
+        DONATION = "DON", "Donation"
+        OTHER = "OTH", "Other"
+
     timestamp = models.DateTimeField(auto_now_add=True)
     amount = models.IntegerField()
     description = models.CharField(max_length=255)
     authoriser = models.CharField(max_length=255, default="")
     project = models.ForeignKey(ICLProject, on_delete=models.CASCADE)
     transaction_type = models.CharField(
-        choices=[
-            ("Storage", "Storage"),
-            ("Donation", "Donation"),
-            ("Other", "Other"),
-        ],
+        choices=TransactionType.choices,
         max_length=20,
-        default="",
+        default=TransactionType.OTHER,
     )
 
     def __str__(self) -> str:
