@@ -440,7 +440,7 @@ class TestCreditTransactionForm:
         assert form.is_valid()
         assert form.cleaned_data["amount"] == 100
         assert form.cleaned_data["description"] == "Test credit transaction"
-        assert form.cleaned_data["transaction_type"] == "Storage"
+        assert form.cleaned_data["transaction_type"] == "STG"
 
     def test_form_zero_amount(self, project):
         """Test CreditTransactionForm with zero amount."""
@@ -448,7 +448,7 @@ class TestCreditTransactionForm:
             "project": project.pk,
             "amount": 0,
             "description": "Zero amount transaction",
-            "transaction_type": "Storage",
+            "transaction_type": "STG",
         }
         form = CreditTransactionForm(data=form_data)
         assert form.is_valid()
