@@ -1314,13 +1314,13 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         footer = table.tfoot.tr
         assert footer.find(tag_with_text_filter("th", str(total)))
 
-    def test_positive_negative_amounts_styled(self, superuser_client, project):
+    def test_positive_negative_amounts_styled_types(self, superuser_client, project):
         """Test that positive amounts are green and negative are red."""
         CreditTransaction.objects.create(
-            project=project, amount=100, description="Credit"
+            project=project, amount=100, description="Credit", transaction_type="STG"
         )
         CreditTransaction.objects.create(
-            project=project, amount=-50, description="Debit"
+            project=project, amount=-50, description="Debit", transaction_type="STG"
         )
 
         url = self._get_url(project.pk)
@@ -1332,29 +1332,6 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert len(rows) == 2
         assert rows[0].find("span", class_="text-success")
         assert rows[1].find("span", class_="text-danger")
-
-    def test_type_displayed(self, superuser_client, project):
-        """Test that the transaction type is displayed."""
-        CreditTransaction.objects.create(
-            project=project,
-            amount=100,
-            description="Credit",
-            transaction_type="STG",
-        )
-        CreditTransaction.objects.create(
-            project=project,
-            amount=-50,
-            description="Debit",
-            transaction_type="STG",
-        )
-
-        url = self._get_url(project.pk)
-        response = superuser_client.get(url)
-
-        soup = BeautifulSoup(response.content, "html.parser")
-        table = soup.find("table")
-        rows = table.tbody.findChildren("tr")
-        assert len(rows) == 2
         assert rows[0].find("td", text="Storage")
         assert rows[1].find("td", text="Storage")
 
