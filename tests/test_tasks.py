@@ -6,6 +6,7 @@ import pytest
 from coldfront.core.allocation.models import (
     Allocation,
     AllocationAttribute,
+    AllocationAttributeUsage,
     AllocationStatusChoice,
     AllocationUser,
 )
@@ -13,15 +14,19 @@ from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.utils import timezone
 
+from imperial_coldfront_plugin.emails import Discrepancy, DiscrepancyCheckResult
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
+from imperial_coldfront_plugin.models import CreditTransaction
 from imperial_coldfront_plugin.tasks import (
     check_hx2_ldap_consistency,
+    check_hx2_user_group_consistency,
     check_rdf_allocation_expiry_notifications,
     check_rdf_ldap_consistency,
     create_rdf_allocation,
     unlink_expired_allocation_filesets,
+    update_quota_usages_task,
     zero_allocation_gpfs_quota,
 )
 
@@ -151,6 +156,14 @@ def retrieve_all_fileset_quotas_mock(mocker):
 
 
 @pytest.fixture
+def notify_platforms_to_manually_delete_allocation_mock(mocker):
+    """Mock notify_platforms_to_manually_delete_allocation."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.notify_platforms_to_manually_delete_allocation"
+    )
+
+
+@pytest.fixture
 def ldap_group_search_mock(mocker):
     """Mock the ldap Connection search method."""
     return mocker.patch("imperial_coldfront_plugin.tasks.ldap_group_member_search")
@@ -258,6 +271,149 @@ class TestCreateRDFAllocation:
             logger=logging.getLogger("django-q"),
         )
 
+    def test_success_creates_credit_transaction_when_enabled(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task creates a debit transaction when auto-credit is enabled."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        debit_transaction = CreditTransaction.objects.get(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        )
+        assert debit_transaction.amount == -1
+
+    def test_success_locks_project_row_for_credit_transaction(
+        self,
+        mocker,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task acquires a project row lock before creating debit."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=100,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        select_for_update_mock = mocker.patch(
+            "imperial_coldfront_plugin.tasks.ICLProject.objects.select_for_update"
+        )
+        select_for_update_mock.return_value.get.return_value = project
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        select_for_update_mock.assert_called_once_with()
+        select_for_update_mock.return_value.get.assert_called_once_with(pk=project.pk)
+
+    def test_success_skips_credit_transaction_when_checkbox_off(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test task skips debit creation when auto-credit is disabled in form."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=1,
+            create_credit_transaction=False,
+            credit_transaction_description="",
+        )
+
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        before_count = CreditTransaction.objects.count()
+
+        create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        assert CreditTransaction.objects.count() == before_count
+        assert not CreditTransaction.objects.filter(
+            project=project,
+            description="Auto debit for RDF allocation",
+            authoriser="adminuser",
+        ).exists()
+
+    def test_insufficient_credit_raises_and_rolls_back(
+        self,
+        project,
+        settings,
+        rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test defensive task check blocks allocation when balance changes."""
+        settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
+        CreditTransaction.objects.create(
+            project=project,
+            amount=10,
+            description="seed credit",
+            authoriser="admin",
+        )
+        rdf_form_data.update(
+            start_date=timezone.now().date(),
+            end_date=timezone.now().date(),
+            size=10,
+            create_credit_transaction=True,
+            credit_transaction_description="Auto debit for RDF allocation",
+        )
+        form = RDFAllocationForm(data=rdf_form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+        # Simulate balance reduction between form submit and async task execution.
+        CreditTransaction.objects.create(
+            project=project,
+            amount=-10,
+            description="intervening debit",
+            authoriser="admin",
+        )
+
+        before_count = CreditTransaction.objects.count()
+        with pytest.raises(ValueError, match="Insufficient project credits"):
+            create_rdf_allocation(form.cleaned_data, authoriser="adminuser")
+
+        assert not Allocation.objects.all()
+        assert CreditTransaction.objects.count() == before_count
+
     def test_ldap_rollback(
         gpfs_create_fileset_mock,
         ldap_create_group_mock,
@@ -331,7 +487,7 @@ class TestCheckRDFLdapConsistency:
 
         result = check_rdf_ldap_consistency()
 
-        assert result == []
+        assert result == DiscrepancyCheckResult([], [])
         notify_mock.assert_not_called()
 
     def test_missing_members(
@@ -347,15 +503,16 @@ class TestCheckRDFLdapConsistency:
         ldap_group_search_mock.return_value = {rdf_allocation_ldap_name: []}
 
         result = check_rdf_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == rdf_allocation_ldap_name
-        assert discrepancy["project_name"] == rdf_allocation.project.title
-        assert username in discrepancy["missing_members"]
-        assert not discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == rdf_allocation_ldap_name
+        assert discrepancy.project_name == rdf_allocation.project.title
+        assert discrepancy.missing_members == [username]
+        assert not discrepancy.extra_members
 
-        notify_mock.assert_called_once()
+        notify_mock.assert_called_once_with(result, source="RDF")
 
     def test_extra_members(
         self,
@@ -373,14 +530,31 @@ class TestCheckRDFLdapConsistency:
         }
 
         result = check_rdf_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == rdf_allocation_ldap_name
-        assert not discrepancy["missing_members"]
-        assert extra_user in discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == rdf_allocation_ldap_name
+        assert not discrepancy.missing_members
+        assert discrepancy.extra_members == [extra_user]
 
-        notify_mock.assert_called_once()
+        notify_mock.assert_called_once_with(result, source="RDF")
+
+    def test_missing_group(
+        self,
+        rdf_allocation,
+        rdf_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        rdf_allocation_ldap_name,
+    ):
+        """Test when allocation does not have corresponding AD group."""
+        ldap_group_search_mock.return_value = {}
+
+        result = check_rdf_ldap_consistency()
+
+        assert result == DiscrepancyCheckResult([], [rdf_allocation_ldap_name])
+        notify_mock.assert_called_once_with(result, source="RDF")
 
 
 class TestCheckHX2LdapConsistency:
@@ -400,7 +574,7 @@ class TestCheckHX2LdapConsistency:
 
         result = check_hx2_ldap_consistency()
 
-        assert result == []
+        assert result == DiscrepancyCheckResult([], [])
         notify_mock.assert_not_called()
 
     def test_missing_members(
@@ -416,13 +590,14 @@ class TestCheckHX2LdapConsistency:
         ldap_group_search_mock.return_value = {ldap_name: []}
 
         result = check_hx2_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == ldap_name
-        assert discrepancy["project_name"] == hx2_allocation.project.title
-        assert username in discrepancy["missing_members"]
-        assert not discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == ldap_name
+        assert discrepancy.project_name == hx2_allocation.project.title
+        assert discrepancy.missing_members == [username]
+        assert not discrepancy.extra_members
 
         notify_mock.assert_called_once_with(result, source="HX2")
 
@@ -440,13 +615,29 @@ class TestCheckHX2LdapConsistency:
         ldap_group_search_mock.return_value = {ldap_name: [username, extra_user]}
 
         result = check_hx2_ldap_consistency()
+        membership_discrepancies = result.membership_discrepancies
 
-        assert len(result) == 1
-        discrepancy = result[0]
-        assert discrepancy["group_name"] == ldap_name
-        assert not discrepancy["missing_members"]
-        assert extra_user in discrepancy["extra_members"]
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == ldap_name
+        assert not discrepancy.missing_members
+        assert discrepancy.extra_members == [extra_user]
 
+        notify_mock.assert_called_once_with(result, source="HX2")
+
+    def test_missing_group(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+    ):
+        """Test when allocation does not have corresponding AD group."""
+        ldap_group_search_mock.return_value = {}
+
+        result = check_hx2_ldap_consistency()
+
+        assert result == DiscrepancyCheckResult([], [hx2_allocation.ldap_shortname])
         notify_mock.assert_called_once_with(result, source="HX2")
 
 
@@ -1056,3 +1247,168 @@ class TestUnlinkExpiredAllocationFilesets:
         unlink_expired_allocation_filesets()
 
         mock_client.unlink_fileset.assert_not_called()
+
+
+class TestUpdateQuotaUsagesTask:
+    """Tests for update_quota_usages_task."""
+
+    @pytest.fixture
+    def storage_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Storage Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Storage Quota (TB)", value="10", allocation=rdf_allocation
+        )
+
+    @pytest.fixture
+    def storage_quota_usage(self, storage_quota_attr):
+        """Fixture to create Storage Quota attribute usage for the allocation."""
+        return AllocationAttributeUsage.objects.create(
+            allocation_attribute=storage_quota_attr,
+            value=10.0,
+        )
+
+    @pytest.fixture
+    def files_quota_attr(self, rdf_allocation, allocation_attribute_factory):
+        """Fixture to create Files Quota attribute for the allocation."""
+        return allocation_attribute_factory(
+            name="Files Quota", value="1000", allocation=rdf_allocation
+        )
+
+    @pytest.fixture
+    def files_quota_usage(self, files_quota_attr):
+        """Fixture to create Files Quota attribute usage for the allocation."""
+        return AllocationAttributeUsage.objects.create(
+            allocation_attribute=files_quota_attr,
+            value=1000.0,
+        )
+
+    def test_round_quota_usage_values(
+        self,
+        retrieve_all_fileset_quotas_mock,
+        rdf_allocation,
+        storage_quota_attr,
+        storage_quota_usage,
+        files_quota_attr,
+        files_quota_usage,
+    ):
+        """Test that quota usages value is rounded to 2 decimal places."""
+        retrieve_all_fileset_quotas_mock.return_value = {
+            rdf_allocation.shortname: {
+                "block_usage_tb": 1.23456789,
+                "files_usage": 1234,
+            }
+        }
+
+        update_quota_usages_task()
+
+        storage_quota_usage.refresh_from_db()
+        assert storage_quota_usage.value == 1.23
+
+        files_quota_usage.refresh_from_db()
+        assert files_quota_usage.value == 1234
+
+
+class TestCheckHX2UserGroupConsistency:
+    """Tests for check_hx2_user_group_consistency task."""
+
+    @pytest.fixture(autouse=True)
+    def notify_mock(self, mocker):
+        """Fixture to mock the notify function."""
+        return mocker.patch(
+            "imperial_coldfront_plugin.tasks."
+            "send_hx2_access_group_discrepancy_notification"
+        )
+
+    def test_no_discrepancies(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        settings,
+    ):
+        """Test when everything is in sync between Coldfront and AD."""
+        username = hx2_allocation_user.user.username
+        ldap_name = settings.LDAP_HX2_ACCESS_GROUP_NAME
+        ldap_group_search_mock.return_value = {ldap_name: [username]}
+
+        result = check_hx2_user_group_consistency()
+        assert result is None
+        notify_mock.assert_not_called()
+
+    def test_missing_members(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        settings,
+    ):
+        """Test when a user is missing from AD group."""
+        username = hx2_allocation_user.user.username
+        ldap_name = settings.LDAP_HX2_ACCESS_GROUP_NAME
+        ldap_group_search_mock.return_value = {ldap_name: []}
+
+        discrepancy = check_hx2_user_group_consistency()
+        assert discrepancy == Discrepancy(
+            group_name=ldap_name,
+            project_name="",
+            missing_members=[username],
+            extra_members=[],
+        )
+
+        notify_mock.assert_called_once_with(discrepancy)
+
+    def test_extra_members(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        settings,
+    ):
+        """Test when there are extra users in AD group."""
+        username = hx2_allocation_user.user.username
+        extra_user = "extra_user"
+        ldap_name = settings.LDAP_HX2_ACCESS_GROUP_NAME
+        ldap_group_search_mock.return_value = {ldap_name: [username, extra_user]}
+
+        discrepancy = check_hx2_user_group_consistency()
+        assert discrepancy == Discrepancy(
+            group_name=ldap_name,
+            project_name="",
+            missing_members=[],
+            extra_members=[extra_user],
+        )
+
+        notify_mock.assert_called_once_with(discrepancy)
+
+    def test_ldap_disabled(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        settings,
+    ):
+        """Test when a user is missing from AD group."""
+        settings.LDAP_ENABLED = False
+
+        # setup a potential discrepancy that should not be reported
+        ldap_name = settings.LDAP_HX2_ACCESS_GROUP_NAME
+        ldap_group_search_mock.return_value = {ldap_name: []}
+
+        discrepancy = check_hx2_user_group_consistency()
+
+        assert discrepancy is None
+        notify_mock.assert_not_called()
+
+    def test_missing_ldap_group(self, ldap_group_search_mock, notify_mock, db):
+        """Test when the LDAP group is missing."""
+        ldap_group_search_mock.return_value = {}
+
+        with pytest.raises(
+            ValueError,
+            match=r"Unable to find HX2 access group in AD during consistency check.",
+        ):
+            check_hx2_user_group_consistency()

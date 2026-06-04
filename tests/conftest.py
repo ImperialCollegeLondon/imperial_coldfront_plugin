@@ -15,6 +15,7 @@ from django.test import Client
 def pytest_configure():
     """Configure Django settings for standalone test suite execution."""
     import coldfront
+    import pint
 
     from imperial_coldfront_plugin import settings as plugin_settings
 
@@ -114,6 +115,9 @@ def pytest_configure():
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
             ENABLE_USER_GROUP_CREATION=True,
             RDF_ASK_TICKET_URL="http://example.com/ticket",
+            SERVICE_CHARGING_RATES={
+                "rdf_active": 50 / (pint.Unit("terabyte") * pint.Unit("year")),
+            },
         ),  # override settings loaded by env var for tests
     )
 
