@@ -1239,30 +1239,6 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
             kwargs={"pk": pk},
         )
 
-    def test_permission_denied_non_member(
-        self, user_factory, auth_client_factory, project
-    ):
-        """Test that non-project members cannot access the view."""
-        non_member = user_factory()
-        client = auth_client_factory(non_member)
-
-        url = self._get_url(project.pk)
-        response = client.get(url)
-        assert response.status_code == 403
-
-    def test_pi_can_access(self, client, project):
-        """Test that PI can access the transactions page."""
-        client.force_login(project.pi)
-        url = self._get_url(project.pk)
-        response = client.get(url)
-        assert response.status_code == 200
-
-    def test_superuser_can_access(self, superuser_client, project):
-        """Test that superuser can access the transactions page."""
-        url = self._get_url(project.pk)
-        response = superuser_client.get(url)
-        assert response.status_code == 200
-
     def test_transactions_displayed_with_total(self, superuser_client, project):
         """Test that transactions are sorted and running balance is calculated."""
         settings.SHOW_CREDIT_BALANCE = True
@@ -1329,26 +1305,31 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert rows[0].find("span", class_="text-success")
         assert rows[1].find("span", class_="text-danger")
 
-    def test_managers_can_see_transactions(
+    def test_pi_superuser_and_manager_can_access(
         self,
-        user_factory,
-        auth_client_factory,
+        client,
         project,
-        project_user_active_status,
-        project_user_role_manager,
+        manager_pi_or_superuser,
+        user_factory,
+        settings,
+        auth_client_factory,
     ):
-        """Test that project managers can access the transactions page."""
-        manager = user_factory()
-        ProjectUser.objects.create(
-            project=project,
-            user=manager,
-            status=project_user_active_status,
-            role=project_user_role_manager,
-        )
-        client = auth_client_factory(manager)
+        """Test that the PI, superusers, and managers can access the view."""
+        settings.SHOW_CREDIT_BALANCE = True
         url = self._get_url(project.pk)
+
+        # non-privileged user should get 403
+        regular_user = user_factory()
+        client = auth_client_factory(regular_user)
         response = client.get(url)
+        assert response.status_code == 403
+
+        # privileged user should see the transactions table
+        privileged_client = auth_client_factory(manager_pi_or_superuser)
+        response = privileged_client.get(url)
         assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("table", id="transactions-table")
 
 
 class TestAllocationDetailBanners:
