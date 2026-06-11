@@ -1,5 +1,7 @@
 """Email sending functionality."""
 
+import textwrap
+from dataclasses import dataclass
 from typing import TypedDict
 
 from django.conf import settings
@@ -12,7 +14,8 @@ HIGH_PRIORITY_EMAIL_HEADERS = {
 }
 
 
-class Discrepancy(TypedDict):
+@dataclass
+class Discrepancy:
     """Structure for holding discrepancies found during LDAP consistency check."""
 
     group_name: str
@@ -21,42 +24,61 @@ class Discrepancy(TypedDict):
     extra_members: list[str]
 
 
+@dataclass
+class DiscrepancyCheckResult:
+    """Result of an LDAP consistency check."""
+
+    membership_discrepancies: list[Discrepancy]
+    missing_ldap_groups: list[str]
+
+    @property
+    def discrepancies_found(self) -> bool:
+        """Whether any discrepancies were found."""
+        return bool(self.membership_discrepancies or self.missing_ldap_groups)
+
+
 def send_discrepancy_notification(
-    discrepancies: list[Discrepancy], source: str
+    check_result: DiscrepancyCheckResult, source: str
 ) -> None:
     """Send email notification for discrepancies found during the consistency check.
 
     Args:
-        discrepancies: List of discrepancies found.
+        check_result: Discrepancies found.
         source: The source of the discrepancies ("RDF" or "HX2").
     """
     if not settings.ADMINS:
         return
 
     message = (
-        f"The following discrepancies for {source} were detected between "
-        f"Coldfront and AD:\n\n"
+        f"The following discrepancies for {source} allocations were detected between "
+        f"Coldfront and Active Directory:\n\n"
     )
 
-    message += "Membership Discrepancies:\n"
-    for discrepancy in discrepancies:
-        project_name = discrepancy["project_name"]
-        group_id = discrepancy["group_name"]
+    if check_result.membership_discrepancies:
+        message += "Membership Discrepancies:\n"
+    for discrepancy in check_result.membership_discrepancies:
+        project_name = discrepancy.project_name
+        group_id = discrepancy.group_name
         message += f"\n- Project: {project_name} (Group: {group_id})\n"
 
-        if discrepancy["missing_members"]:
+        if discrepancy.missing_members:
             message += "  Missing members (in Coldfront but not in AD):\n"
-            for member in sorted(discrepancy["missing_members"]):
+            for member in sorted(discrepancy.missing_members):
                 message += f"    - {member}\n"
 
-        if discrepancy["extra_members"]:
+        if discrepancy.extra_members:
             message += "  Extra members (in AD but not in Coldfront):\n"
-            for member in sorted(discrepancy["extra_members"]):
+            for member in sorted(discrepancy.extra_members):
                 message += f"    - {member}\n"
+
+    if check_result.missing_ldap_groups:
+        message += f"\n{source} allocations that do not have corresponding AD group:\n"
+        for group in sorted(check_result.missing_ldap_groups):
+            message += f"\t- {group}\n"
 
     mail_admins(
         subject=(
-            f"LDAP Consistency Check - Discrepancies found for {source} allocations"
+            f"AD Consistency Check - Discrepancies found for {source} allocations"
         ),
         message=message,
     )
@@ -170,6 +192,42 @@ All associated data has been permanently removed.
     ).send()
 
 
+def notify_platforms_to_manually_delete_allocation(
+    allocation_shortname: str, allocation_id: int
+) -> None:
+    """Notify RCS Platforms team to manually delete data.
+
+    For an allocation that has hit the 'Deleted' status.
+    """
+    recipient_list = [
+        email[1].strip()
+        for email in settings.RCS_NOTIFICATION_EMAILS
+        if email[1].strip()
+    ]
+
+    if not recipient_list:
+        return
+
+    subject = (
+        f"Manual Deletion Required for RDF Allocation - {allocation_shortname}"
+        f" (ID: {allocation_id})"
+    )
+
+    message = f"""
+    The RDF allocation '{allocation_shortname}' with ID {allocation_id}
+    has reached the 'Deleted' status.
+    Please take the necessary steps to manually delete all associated data
+    for this allocation.
+    """
+
+    send_mail(
+        subject=subject,
+        message=textwrap.dedent(message),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=recipient_list,
+    )
+
+
 class QuotaDiscrepancy(TypedDict):
     """Structure for holding discrepancies found during quota consistency check."""
 
@@ -243,6 +301,37 @@ def send_fileset_not_found_notification(shortnames: list[str]) -> None:
     )
     for shortname in shortnames:
         message += f"\t- {shortname}\n"
+    mail_admins(
+        subject=subject,
+        message=message,
+    )
+
+
+def send_hx2_access_group_discrepancy_notification(discrepancy: Discrepancy) -> None:
+    """Send notification to admins about discrepancies in HX2 access groups.
+
+    Args:
+        discrepancy: The details of the discrepancy found.
+    """
+    if not settings.ADMINS:
+        return
+
+    subject = "Coldfront - HX2 Access Group Membership Discrepancy Detected"
+    message = (
+        "A discrepancy has been detected between the membership of the HX2 access group"
+        f" in Active Directory ({discrepancy.group_name}) and the expected membership "
+        "based on Coldfront data.\n\n"
+    )
+    if discrepancy.missing_members:
+        message += "Missing members (in Coldfront but not in AD):\n"
+        for member in sorted(discrepancy.missing_members):
+            message += f"  - {member}\n"
+
+    if discrepancy.extra_members:
+        message += "\nExtra members (in AD but not in Coldfront):\n"
+        for member in sorted(discrepancy.extra_members):
+            message += f"  - {member}\n"
+
     mail_admins(
         subject=subject,
         message=message,
