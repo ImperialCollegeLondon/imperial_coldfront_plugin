@@ -261,7 +261,7 @@ def test_send_hx2_access_group_discrepancy_notification():
 )
 @override_settings(DEFAULT_FROM_EMAIL="noreply@email.com")
 def test_allocation_status_emails_have_imp_flag(send_email, arguments):
-    """Test that allocation status emails are sent with the imp flag."""
+    """Test that allocation status emails are sent with the importance flag."""
     send_email(**arguments)
 
     assert len(mail.outbox) == 1

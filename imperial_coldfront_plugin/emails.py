@@ -103,7 +103,7 @@ Please take necessary action to renew or backup your data.
 """
     EmailMessage(
         subject=subject,
-        body=body,
+        body=textwrap.dedent(body),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[project_owner_email],
         headers=HIGH_PRIORITY_EMAIL_HEADERS,
@@ -132,7 +132,7 @@ Data removal will occur soon if no action is taken.
 """
     EmailMessage(
         subject=subject,
-        body=body,
+        body=textwrap.dedent(body),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[project_owner_email],
         headers=HIGH_PRIORITY_EMAIL_HEADERS,
@@ -159,7 +159,7 @@ Data will be permanently deleted soon.
 """
     EmailMessage(
         subject=subject,
-        body=body,
+        body=textwrap.dedent(body),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[project_owner_email],
         headers=HIGH_PRIORITY_EMAIL_HEADERS,
@@ -185,7 +185,7 @@ All associated data has been permanently removed.
 """
     EmailMessage(
         subject=subject,
-        body=body,
+        body=textwrap.dedent(body),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[project_owner_email],
         headers=HIGH_PRIORITY_EMAIL_HEADERS,
