@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TypedDict
 
 from django.conf import settings
-from django.core.mail import EmailMessage, mail_admins
+from django.core.mail import EmailMessage, mail_admins, send_mail
 
 HIGH_PRIORITY_EMAIL_HEADERS = {
     "Importance": "high",
