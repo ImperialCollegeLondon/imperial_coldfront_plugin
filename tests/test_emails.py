@@ -221,7 +221,7 @@ def test_send_hx2_access_group_discrepancy_notification():
         "Coldfront - HX2 Access Group Membership Discrepancy Detected"
     )
     assert message.body == expected_body.lstrip()
-    
+
 
 @pytest.mark.parametrize(
     "send_email, arguments",
