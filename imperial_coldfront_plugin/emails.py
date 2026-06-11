@@ -3,7 +3,13 @@
 from typing import TypedDict
 
 from django.conf import settings
-from django.core.mail import mail_admins, send_mail
+from django.core.mail import EmailMessage, mail_admins
+
+HIGH_PRIORITY_EMAIL_HEADERS = {
+    "Importance": "high",
+    "X-Priority": "2",
+    "X-MSMail-Priority": "High",
+}
 
 
 class Discrepancy(TypedDict):
@@ -67,18 +73,19 @@ def send_allocation_expiry_warning(
         days_until_expiry: Number of days until the allocation expires.
     """
     subject = f"RDF Allocation Expiry Warning - {days_until_expiry} days remaining"
-    message = f"""
+    body = f"""
 Your RDF allocation {allocation_shortname} will expire in {days_until_expiry} days.
 
 Please take necessary action to renew or backup your data.
 
 """
-    send_mail(
+    EmailMessage(
         subject=subject,
-        message=message,
+        body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[project_owner_email],
-    )
+        to=[project_owner_email],
+        headers=HIGH_PRIORITY_EMAIL_HEADERS,
+    ).send()
 
 
 def send_allocation_removal_warning(
@@ -94,19 +101,20 @@ def send_allocation_removal_warning(
     subject = (
         f"RDF Allocation Removal Warning - Expired {abs(days_since_expiry)} days ago"
     )
-    message = f"""
+    body = f"""
 Your RDF allocation {allocation_shortname} expired {abs(days_since_expiry)} days ago.
 
 Data removal will occur soon if no action is taken.
 
 [Placeholder text for removal warning]
 """
-    send_mail(
+    EmailMessage(
         subject=subject,
-        message=message,
+        body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[project_owner_email],
-    )
+        to=[project_owner_email],
+        headers=HIGH_PRIORITY_EMAIL_HEADERS,
+    ).send()
 
 
 def send_allocation_deletion_warning(
@@ -120,19 +128,20 @@ def send_allocation_deletion_warning(
         days_since_expiry: Number of days since the allocation expired.
     """
     subject = "RDF Allocation Deletion Warning - Final Notice"
-    message = f"""
+    body = f"""
 Your RDF allocation {allocation_shortname} expired {abs(days_since_expiry)} days ago.
 
 Data will be permanently deleted soon.
 
 [Placeholder text for deletion warning]
 """
-    send_mail(
+    EmailMessage(
         subject=subject,
-        message=message,
+        body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[project_owner_email],
-    )
+        to=[project_owner_email],
+        headers=HIGH_PRIORITY_EMAIL_HEADERS,
+    ).send()
 
 
 def send_allocation_deletion_notification(
@@ -145,19 +154,20 @@ def send_allocation_deletion_notification(
         project_owner_email: Email address of the project owner.
     """
     subject = "RDF Allocation Deleted"
-    message = f"""
+    body = f"""
 Your RDF allocation {allocation_shortname} has been deleted.
 
 All associated data has been permanently removed.
 
 [Placeholder text for deletion notification]
 """
-    send_mail(
+    EmailMessage(
         subject=subject,
-        message=message,
+        body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[project_owner_email],
-    )
+        to=[project_owner_email],
+        headers=HIGH_PRIORITY_EMAIL_HEADERS,
+    ).send()
 
 
 class QuotaDiscrepancy(TypedDict):

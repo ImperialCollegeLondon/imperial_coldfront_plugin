@@ -1,9 +1,14 @@
 """Email tests."""
 
+import pytest
 from django.core import mail
 from django.test import override_settings
 
 from imperial_coldfront_plugin.emails import (
+    send_allocation_deletion_notification,
+    send_allocation_deletion_warning,
+    send_allocation_expiry_warning,
+    send_allocation_removal_warning,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
     send_quota_discrepancy_notification,
@@ -125,3 +130,52 @@ def test_send_discrepancy_notification_hx2():
     assert len(mail.outbox) == 1
     assert "HX2" in mail.outbox[0].subject
     assert "HX2" in mail.outbox[0].body
+
+
+@pytest.mark.parametrize(
+    "send_email, arguments",
+    [
+        (
+            send_allocation_expiry_warning,
+            {
+                "allocation_shortname": "bio-research-01",
+                "project_owner_email": "owner@email.com",
+                "days_until_expiry": 7,
+            },
+        ),
+        (
+            send_allocation_removal_warning,
+            {
+                "allocation_shortname": "bio-research-01",
+                "project_owner_email": "owner@email.com",
+                "days_since_expiry": 8,
+            },
+        ),
+        (
+            send_allocation_deletion_warning,
+            {
+                "allocation_shortname": "bio-research-01",
+                "project_owner_email": "owner@email.com",
+                "days_since_expiry": 10,
+            },
+        ),
+        (
+            send_allocation_deletion_notification,
+            {
+                "allocation_shortname": "bio-research-01",
+                "project_owner_email": "owner@email.com",
+            },
+        ),
+    ],
+)
+@override_settings(DEFAULT_FROM_EMAIL="noreply@email.com")
+def test_allocation_status_emails_have_imp_flag(send_email, arguments):
+    """Test that allocation status emails are sent with the imp flag."""
+    send_email(**arguments)
+
+    assert len(mail.outbox) == 1
+    headers = mail.outbox[0].extra_headers
+
+    assert headers["Importance"] == "high"
+    assert headers["X-Priority"] == "2"
+    assert headers["X-MSMail-Priority"] == "High"
