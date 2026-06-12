@@ -19,6 +19,7 @@
                 <th scope="col">Date</th>
                 <th scope="col" class="w-50">Description</th>
                 <th scope="col">Authoriser</th>
+                <th scope="col">Type</th>
                 <th scope="col" class="text-right">Amount</th>
                 <th scope="col" class="text-right">Running Balance</th>
               </tr>
@@ -29,6 +30,7 @@
                   <td>{{ row.transaction.timestamp|date:"Y-m-d H:i" }}</td>
                   <td>{{ row.transaction.description }}</td>
                   <td>{{ row.transaction.authoriser }}</td>
+                  <td>{{ row.transaction.get_transaction_type_display }}</td>
                   <td class="text-right">
                     <span class="{% if row.transaction.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
                       {{ row.transaction.amount|intcomma }}
