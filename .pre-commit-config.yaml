@@ -15,11 +15,11 @@ repos:
       - id: pretty-format-yaml
         args: [--autofix, --indent, '2', --offset, '2']
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.2
+    rev: 0.37.3
     hooks:
       - id: check-github-workflows
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.16
+    rev: v0.15.17
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -35,7 +35,7 @@ repos:
         args: [-I, .codespell_ignore.txt]
         exclude: .*/static/.*/js/.*
   - repo: https://github.com/djlint/djLint
-    rev: v1.39.0
+    rev: v1.39.2
     hooks:
       - id: djlint-reformat-django
         exclude: imperial_coldfront_plugin/templates/imperial_coldfront_plugin/overrides/.*.html
