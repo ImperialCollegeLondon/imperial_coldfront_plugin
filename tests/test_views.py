@@ -1459,6 +1459,41 @@ class TestAllocationDetailBanners:
         assert not soup.find("div", id="removed-allocation")
         assert not soup.find("div", id="archived-allocation")
 
+    def test_banner_for_near_expiry_allocation(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that the near-expiry banner is displayed for allocations near expiry."""
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        rdf_allocation.status = active_status
+        rdf_allocation.end_date = timezone.now().date() + timedelta(days=3)
+        rdf_allocation.save()
+        settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = 7
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        banner = soup.find("div", id="near-expiry-allocation", class_="alert-warning")
+        assert banner
+        assert "This allocation will expire in 3 days." in banner.text
+
+    def test_when_no_banner_should_be_displayed(
+        self, request_, rdf_allocation, settings
+    ):
+        """Test that no banner is displayed.
+
+        When allocation is active and not near expiry.
+        """
+        active_status, _ = AllocationStatusChoice.objects.get_or_create(name="Active")
+        rdf_allocation.status = active_status
+        rdf_allocation.end_date = timezone.now().date() + timedelta(days=95)
+        rdf_allocation.save()
+        settings.RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = 7
+        response = self._render_allocation_detail(request_, rdf_allocation, settings)
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert not soup.find("div", id="expired-allocation")
+        assert not soup.find("div", id="deleted-allocation")
+        assert not soup.find("div", id="removed-allocation")
+        assert not soup.find("div", id="archived-allocation")
+        assert not soup.find("div", id="near-expiry-allocation")
+
 
 class TestUserCreateHX2AllocationView(LoginRequiredMixin):
     """Tests for the user_create_hx2_allocation view."""
