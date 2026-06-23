@@ -335,19 +335,9 @@ class TestAllocationUserLDAPGroupRemoveMembership:
     """Tests for allocation_user_ldap_group_membership_deletion signal handler."""
 
     @pytest.fixture
-    def allocation(self, rdf_or_hx2_allocation):
-        """Fixture to return an RDF or HX2 allocation."""
-        return rdf_or_hx2_allocation
-
-    @pytest.fixture
     def allocation_user(self, rdf_or_hx2_allocation_user):
         """Fixture to return an RDF or HX2 allocation user."""
         return rdf_or_hx2_allocation_user
-
-    @pytest.fixture
-    def ldap_groupname(self, allocation):
-        """Fixture to return the LDAP group name for the allocation."""
-        return allocation.ldap_shortname
 
     def test_success(
         self,
@@ -427,19 +417,9 @@ class TestAllocationUserHX2AccessGroupDeletion(
     """
 
     @pytest.fixture
-    def allocation(self, hx2_allocation):
-        """Fixture to return an HX2 allocation."""
-        return hx2_allocation
-
-    @pytest.fixture
     def allocation_user(self, hx2_allocation_user):
         """Fixture to return an HX2 allocation user."""
         return hx2_allocation_user
-
-    @pytest.fixture
-    def ldap_groupname(self, settings):
-        """Fixture to return the LDAP group name for HX2 access."""
-        return settings.LDAP_HX2_ACCESS_GROUP_NAME
 
     def test_rdf_allocation_does_not_sync(
         self,

@@ -33,6 +33,7 @@ dev = [
     "types-requests",
     "types-ldap3",
     "beautifulsoup4",
+    "pytest-unused-fixtures",
 ]
 doc = [
     "mkdocs",
@@ -93,6 +94,7 @@ addopts = [
     "--ignore=makemigrations.py",
     "--ignore=imperial_coldfront_plugin/migrations",
     "--mypy",
+    "--unused-fixtures"
 ]
 
 [tool.ruff]
