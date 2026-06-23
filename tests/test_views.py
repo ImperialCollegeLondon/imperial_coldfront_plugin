@@ -1047,6 +1047,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
                 project=project.pk,
                 amount=amount,
                 description=description,
+                transaction_type="STG",
             ),
         )
 
@@ -1062,6 +1063,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
         assert transaction.description == description
         assert transaction.timestamp is not None
         assert transaction.authoriser == superuser.username
+        assert transaction.transaction_type == "STG"
 
     def test_post_missing_project(self, superuser_client):
         """Test form validation failure when project is missing."""
@@ -1305,20 +1307,20 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         for row, transaction in zip(rows, transactions):
             cells = row.findChildren("td")
             assert cells[2].text.strip() == transaction.authoriser
-            assert cells[3].span.text.strip() == str(transaction.amount)
+            assert cells[4].span.text.strip() == str(transaction.amount)
             total += transaction.amount
-            assert cells[4].text.strip() == str(total)
+            assert cells[5].text.strip() == str(total)
 
         footer = table.tfoot.tr
         assert footer.find(tag_with_text_filter("th", str(total)))
 
-    def test_positive_negative_amounts_styled(self, superuser_client, project):
+    def test_positive_negative_amounts_styled_types(self, superuser_client, project):
         """Test that positive amounts are green and negative are red."""
         CreditTransaction.objects.create(
-            project=project, amount=100, description="Credit"
+            project=project, amount=100, description="Credit", transaction_type="STG"
         )
         CreditTransaction.objects.create(
-            project=project, amount=-50, description="Debit"
+            project=project, amount=-50, description="Debit", transaction_type="STG"
         )
 
         url = self._get_url(project.pk)
@@ -1330,6 +1332,8 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert len(rows) == 2
         assert rows[0].find("span", class_="text-success")
         assert rows[1].find("span", class_="text-danger")
+        assert rows[0].find("td", text="Storage")
+        assert rows[1].find("td", text="Storage")
 
 
 class TestAllocationDetailBanners:
