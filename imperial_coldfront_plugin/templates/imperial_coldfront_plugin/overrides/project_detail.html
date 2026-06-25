@@ -5,6 +5,7 @@
 {% load projects %}
 {% load common_tags %}
 
+
 {% if is_allowed_to_update_project and project.needs_review%}
   <div class="alert alert-warning">
     You need to review this project. <a href="{% url 'project-review' project.pk %}">Review Project</a>
@@ -26,7 +27,8 @@
 </div>
 
 {% if settings.SHOW_CREDIT_BALANCE %}
-  {% if request.user == project.pi or request.user.is_superuser %}
+{% is_project_manager project request.user as can_view_credit %}
+  {% if request.user == project.pi or request.user.is_superuser or can_view_credit %}
 <!-- Start Credit Balance Display -->
 <div class="card mb-3 bg-light border-primary" id="credit-balance-card">
   <div class="card-body">

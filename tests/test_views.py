@@ -1047,6 +1047,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
                 project=project.pk,
                 amount=amount,
                 description=description,
+                transaction_type="STG",
             ),
         )
 
@@ -1062,6 +1063,7 @@ class TestCreateCreditTransaction(LoginRequiredMixin):
         assert transaction.description == description
         assert transaction.timestamp is not None
         assert transaction.authoriser == superuser.username
+        assert transaction.transaction_type == "STG"
 
     def test_post_missing_project(self, superuser_client):
         """Test form validation failure when project is missing."""
@@ -1191,15 +1193,21 @@ class TestProjectDetailView:
         soup = BeautifulSoup(response.content, "html.parser")
         assert not soup.find("div", class_="card", id="credit-balance-card")
 
-    def test_credit_balance_only_visible_to_pi_and_superuser(
-        self, rf, project, settings, user_factory, superuser
+    def test_credit_balance_only_visible_to_pi_superuser_and_manager(
+        self,
+        rf,
+        project,
+        settings,
+        user_factory,
+        manager_pi_or_superuser,
     ):
-        """Ensure credit balance section is only rendered for the PI and superusers."""
+        """Ensure credit balance section is only rendered for the PI, superusers, and managers."""  # noqa: E501
         settings.SHOW_CREDIT_BALANCE = True
         tmpl = "imperial_coldfront_plugin/overrides/project_detail.html"
 
-        # non-member should not see the section
         request = rf.get("/")
+
+        # non-member should not see the section
         request.user = user_factory()
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
@@ -1208,16 +1216,8 @@ class TestProjectDetailView:
         soup = BeautifulSoup(response.content, "html.parser")
         assert not soup.find("div", class_="card", id="credit-balance-card")
 
-        # project PI should see the section
-        request.user = project.pi
-        response = render(
-            request, tmpl, context={"project": project, "settings": settings}
-        )
-        soup = BeautifulSoup(response.content, "html.parser")
-        assert soup.find("div", class_="card", id="credit-balance-card")
-
-        # superuser should see the section
-        request.user = superuser
+        # privileged user should see the section
+        request.user = manager_pi_or_superuser
         response = render(
             request, tmpl, context={"project": project, "settings": settings}
         )
@@ -1240,30 +1240,6 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
             "imperial_coldfront_plugin:project-credit-transactions",
             kwargs={"pk": pk},
         )
-
-    def test_permission_denied_non_member(
-        self, user_factory, auth_client_factory, project
-    ):
-        """Test that non-project members cannot access the view."""
-        non_member = user_factory()
-        client = auth_client_factory(non_member)
-
-        url = self._get_url(project.pk)
-        response = client.get(url)
-        assert response.status_code == 403
-
-    def test_pi_can_access(self, client, project):
-        """Test that PI can access the transactions page."""
-        client.force_login(project.pi)
-        url = self._get_url(project.pk)
-        response = client.get(url)
-        assert response.status_code == 200
-
-    def test_superuser_can_access(self, superuser_client, project):
-        """Test that superuser can access the transactions page."""
-        url = self._get_url(project.pk)
-        response = superuser_client.get(url)
-        assert response.status_code == 200
 
     def test_transactions_displayed_with_total(self, superuser_client, project):
         """Test that transactions are sorted and running balance is calculated."""
@@ -1305,20 +1281,20 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         for row, transaction in zip(rows, transactions):
             cells = row.findChildren("td")
             assert cells[2].text.strip() == transaction.authoriser
-            assert cells[3].span.text.strip() == str(transaction.amount)
+            assert cells[4].span.text.strip() == str(transaction.amount)
             total += transaction.amount
-            assert cells[4].text.strip() == str(total)
+            assert cells[5].text.strip() == str(total)
 
         footer = table.tfoot.tr
         assert footer.find(tag_with_text_filter("th", str(total)))
 
-    def test_positive_negative_amounts_styled(self, superuser_client, project):
+    def test_positive_negative_amounts_styled_types(self, superuser_client, project):
         """Test that positive amounts are green and negative are red."""
         CreditTransaction.objects.create(
-            project=project, amount=100, description="Credit"
+            project=project, amount=100, description="Credit", transaction_type="STG"
         )
         CreditTransaction.objects.create(
-            project=project, amount=-50, description="Debit"
+            project=project, amount=-50, description="Debit", transaction_type="STG"
         )
 
         url = self._get_url(project.pk)
@@ -1330,6 +1306,34 @@ class TestProjectCreditTransactionsView(LoginRequiredMixin):
         assert len(rows) == 2
         assert rows[0].find("span", class_="text-success")
         assert rows[1].find("span", class_="text-danger")
+        assert rows[0].find("td", text="Storage")
+        assert rows[1].find("td", text="Storage")
+
+    def test_pi_superuser_and_manager_can_access(
+        self,
+        client,
+        project,
+        manager_pi_or_superuser,
+        user_factory,
+        settings,
+        auth_client_factory,
+    ):
+        """Test that the PI, superusers, and managers can access the view."""
+        settings.SHOW_CREDIT_BALANCE = True
+        url = self._get_url(project.pk)
+
+        # non-privileged user should get 403
+        regular_user = user_factory()
+        client = auth_client_factory(regular_user)
+        response = client.get(url)
+        assert response.status_code == 403
+
+        # privileged user should see the transactions table
+        privileged_client = auth_client_factory(manager_pi_or_superuser)
+        response = privileged_client.get(url)
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("table", id="transactions-table")
 
 
 class TestAllocationDetailBanners:
