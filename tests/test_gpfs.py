@@ -3,11 +3,15 @@ from pathlib import Path
 from unittest.mock import Mock, call
 
 import pytest
+import requests
 
 from imperial_coldfront_plugin.gpfs_client import (
     DirectoryExistsError,
+    ErrorWhenProcessingJob,
+    FilesetCreationError,
     FilesetPathInfo,
     GPFSClient,
+    UnknownGroupDuringFilesetCreation,
     create_fileset_set_quota,
 )
 
@@ -19,7 +23,7 @@ DEPARTMENT = "compsci"
 GROUP_NAME = "mygroup"
 FILESET_NAME = "myfileset"
 OWNER_ID = "someowner"
-GROUP_ID = "rdf-somegroup"
+GROUP_ID = r"IC\\rdf-somegroup"
 BLOCK_QUOTA = "123456T"
 FILES_QUOTA = "654321T"
 PERMISSIONS = "755"
@@ -443,38 +447,119 @@ def test__create_fileset(completed_job_status, request_mock):
     )
 
 
-def test_create_fileset(mocker):
-    """Test that create_fileset wrapper works correctly."""
-    client = GPFSClient()
-    _create_fileset_mock = mocker.patch.object(
-        client, "_create_fileset", autospec=True, return_value=None
-    )
+class TestCreateFileset:
+    """Test the create_fileset wrapper method."""
 
-    response = client.create_fileset(
-        filesystem_name=FILESYSTEM_NAME,
-        fileset_name=FILESET_NAME,
-        owner_id=OWNER_ID,
-        group_id=GROUP_ID,
-        path=(
-            f"{FILESYSTEM_MOUNT_PATH}/{TOP_LEVEL_DIRECTORIES}/{FACULTY}/"
-            f"{DEPARTMENT}/{GROUP_NAME}/{FILESET_NAME}"
-        ),
-        permissions=PERMISSIONS,
-        parent_fileset=PARENT_FILESET,
+    FILESET_PATH = (
+        f"{FILESYSTEM_MOUNT_PATH}/{TOP_LEVEL_DIRECTORIES}/{FACULTY}/"
+        f"{DEPARTMENT}/{GROUP_NAME}/{FILESET_NAME}"
     )
+    """Absolute path to the fileset for use in tests."""
 
-    _create_fileset_mock.assert_called_once_with(
-        filesystemName=FILESYSTEM_NAME,
-        filesetName=FILESET_NAME,
-        owner=f"{OWNER_ID}:{GROUP_ID}",
-        path=f"{FILESYSTEM_MOUNT_PATH}/{TOP_LEVEL_DIRECTORIES}/{FACULTY}/{DEPARTMENT}/{GROUP_NAME}/{FILESET_NAME}",
-        permissions=PERMISSIONS,
-        inodeSpace=PARENT_FILESET,
-        permissionChangeMode="chmodAndSetAcl",
-        iamMode="advisory",
-    )
+    @pytest.fixture
+    def client(self):
+        """Fixture for a GPFSClient instance."""
+        return GPFSClient()
 
-    assert response is None
+    @pytest.fixture
+    def _create_fileset_mock(self, mocker, client):
+        """Fixture for mocking the _create_fileset method."""
+        return mocker.patch.object(client, "_create_fileset", autospec=True)
+
+    def test_success(self, client, _create_fileset_mock):
+        """Test that create_fileset wrapper works correctly."""
+        return_value = "return_value"
+        _create_fileset_mock.return_value = return_value
+
+        response = client.create_fileset(
+            filesystem_name=FILESYSTEM_NAME,
+            fileset_name=FILESET_NAME,
+            owner_id=OWNER_ID,
+            group_id=GROUP_ID,
+            path=self.FILESET_PATH,
+            permissions=PERMISSIONS,
+            parent_fileset=PARENT_FILESET,
+        )
+
+        _create_fileset_mock.assert_called_once_with(
+            filesystemName=FILESYSTEM_NAME,
+            filesetName=FILESET_NAME,
+            owner=f"{OWNER_ID}:{GROUP_ID}",
+            path=self.FILESET_PATH,
+            permissions=PERMISSIONS,
+            inodeSpace=PARENT_FILESET,
+            permissionChangeMode="chmodAndSetAcl",
+            iamMode="advisory",
+        )
+
+        assert response is return_value
+
+    def test_http_error(self, client, _create_fileset_mock):
+        """Test that create_fileset wrapper raises an error on HTTP error."""
+        response_json = dict(message="error_text")
+        _create_fileset_mock.side_effect = requests.HTTPError(
+            "HTTP error",
+            response=make_response(response_json),
+        )
+
+        with pytest.raises(
+            FilesetCreationError,
+            match=str(response_json),
+        ):
+            client.create_fileset(
+                filesystem_name=FILESYSTEM_NAME,
+                fileset_name=FILESET_NAME,
+                owner_id=OWNER_ID,
+                group_id=GROUP_ID,
+                path=self.FILESET_PATH,
+                permissions=PERMISSIONS,
+                parent_fileset=PARENT_FILESET,
+            )
+
+    def test_unknown_group_error(self, client, _create_fileset_mock):
+        """Test that create_fileset wrapper raises an error on unknown group."""
+        error_message = (
+            "Input validation failed: EFSSP0010C CLI parser: "
+            f'The object "{GROUP_ID}" specified for "group" does not exist.'
+        )
+        response_json = dict(status=dict(message=error_message))
+        _create_fileset_mock.side_effect = requests.HTTPError(
+            "HTTP error",
+            response=make_response(response_json),
+        )
+
+        with pytest.raises(
+            UnknownGroupDuringFilesetCreation,
+            match="While creating the fileset, GPFS was not able to find the owning",
+        ):
+            client.create_fileset(
+                filesystem_name=FILESYSTEM_NAME,
+                fileset_name=FILESET_NAME,
+                owner_id=OWNER_ID,
+                group_id=GROUP_ID,
+                path=self.FILESET_PATH,
+                permissions=PERMISSIONS,
+                parent_fileset=PARENT_FILESET,
+            )
+
+    def test_processing_error(self, client, _create_fileset_mock):
+        """Test that create_fileset wrapper raises an error on processing error."""
+        error_content = "Processing error"
+        _create_fileset_mock.side_effect = ErrorWhenProcessingJob(error_content)
+
+        with pytest.raises(FilesetCreationError, match=error_content):
+            client.create_fileset(
+                filesystem_name=FILESYSTEM_NAME,
+                fileset_name=FILESET_NAME,
+                owner_id=OWNER_ID,
+                group_id=GROUP_ID,
+                path=(
+                    f"{FILESYSTEM_MOUNT_PATH}/{TOP_LEVEL_DIRECTORIES}/{FACULTY}/"
+                    f"{DEPARTMENT}/{GROUP_NAME}/{FILESET_NAME}"
+                ),
+                permissions=PERMISSIONS,
+                parent_fileset=PARENT_FILESET,
+            )
 
 
 def test__set_quota(completed_job_status, request_mock):
