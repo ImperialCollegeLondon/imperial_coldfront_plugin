@@ -27,6 +27,7 @@ from imperial_coldfront_plugin.models import (
 from .emails import (
     Discrepancy,
     DiscrepancyCheckResult,
+    QuotaConsistencyCheckResult,
     QuotaDiscrepancy,
     notify_platforms_to_manually_delete_allocation,
     send_allocation_deletion_notification,
@@ -552,16 +553,22 @@ def zero_allocation_gpfs_quota(allocation_id: int) -> None:
     )
 
 
-def check_quota_consistency(send_email: bool = True) -> None:
+def check_quota_consistency(
+    send_email: bool = True,
+) -> QuotaConsistencyCheckResult | None:
     """Check consistency of file and storage quotas between allocations and filesets.
 
     Compares the active allocations to ensure the matching filesets have the same
     storage and file quotas. If discrepancies are found, a notification email is sent
     to admins. Also sends a notification if any allocations are found that do not have a
     matching fileset in GPFS.
+
+    Returns:
+        A QuotaConsistencyCheckResult object containing the discrepancies and missing
+        filesets, or None if GPFS is not enabled.
     """
     if not settings.GPFS_ENABLED:
-        return
+        return None
 
     allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active",
@@ -623,6 +630,10 @@ def check_quota_consistency(send_email: bool = True) -> None:
 
     if missing_filesets and send_email:
         send_fileset_not_found_notification(missing_filesets)
+
+    return QuotaConsistencyCheckResult(
+        discrepancies=discrepancies, missing_filesets=missing_filesets
+    )
 
 
 def unlink_expired_allocation_filesets() -> None:

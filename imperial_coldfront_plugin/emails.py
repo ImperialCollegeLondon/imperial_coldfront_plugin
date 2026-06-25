@@ -37,6 +37,19 @@ class DiscrepancyCheckResult:
         return bool(self.membership_discrepancies or self.missing_ldap_groups)
 
 
+@dataclass
+class QuotaConsistencyCheckResult:
+    """Result of a quota consistency check."""
+
+    discrepancies: list["QuotaDiscrepancy"]
+    missing_filesets: list[str]
+
+    @property
+    def discrepancies_found(self) -> bool:
+        """Whether any discrepancies were found."""
+        return bool(self.discrepancies or self.missing_filesets)
+
+
 def send_discrepancy_notification(
     check_result: DiscrepancyCheckResult, source: str
 ) -> None:
