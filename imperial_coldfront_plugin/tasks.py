@@ -429,7 +429,8 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
         project_owner = allocation.project.pi
 
         logger.info(
-            f"Sending expiry warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            f"{'Sending' if send_email else 'Dry run: would send'} expiry "
+            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
         )
         if send_email:
             send_allocation_expiry_warning(
@@ -446,7 +447,8 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
         project_owner = allocation.project.pi
 
         logger.info(
-            f"Sending removal warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            f"{'Sending' if send_email else 'Dry run: would send'} removal "
+            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
         )
         if send_email:
             send_allocation_removal_warning(
@@ -463,7 +465,8 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
         project_owner = allocation.project.pi
 
         logger.info(
-            f"Sending deletion warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            f"{'Sending' if send_email else 'Dry run: would send'} deletion "
+            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
         )
         if send_email:
             send_allocation_deletion_warning(
@@ -478,7 +481,10 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
     for allocation in deletion_notification_allocations:
         project_owner = allocation.project.pi
 
-        logger.info(f"Sending deletion notification for allocation {allocation.pk}")
+        logger.info(
+            f"{'Sending' if send_email else 'Dry run: would send'} deletion "
+            f"notification for allocation {allocation.pk}"
+        )
         if send_email:
             send_allocation_deletion_notification(allocation.pk, project_owner.email)
 
