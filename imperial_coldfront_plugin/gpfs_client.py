@@ -285,7 +285,7 @@ class GPFSClient(Consumer):
             message = e.response.json().get("status", dict()).get("message", "")
             if UNKNOWN_GROUP_MESSAGE_REGEX.match(message):
                 raise UnknownGroupDuringFilesetCreation(
-                    "While creating the fileset, GPFS was not able to find the owning"
+                    "While creating the fileset, GPFS was not able to find the owning "
                     "group in Active Directory. This may be because the group has not "
                     "yet been created or due to synchronisation issues between GPFS "
                     "and Active Directory."
