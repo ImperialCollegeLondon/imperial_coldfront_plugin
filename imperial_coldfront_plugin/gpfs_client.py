@@ -282,7 +282,8 @@ class GPFSClient(Consumer):
             )
             return response
         except requests.HTTPError as e:
-            message = e.response.json().get("status", dict()).get("message", "")
+            response_json = e.response.json()
+            message = response_json.get("status", dict()).get("message", "")
             if UNKNOWN_GROUP_MESSAGE_REGEX.match(message):
                 raise UnknownGroupDuringFilesetCreation(
                     "While creating the fileset, GPFS was not able to find the owning "
@@ -291,7 +292,7 @@ class GPFSClient(Consumer):
                     "and Active Directory."
                 ) from e
             raise FilesetCreationError(
-                f"Error creating fileset '{fileset_name}' - {e.response.json()}"
+                f"Error creating fileset '{fileset_name}' - {response_json}"
             ) from e
         except ErrorWhenProcessingJob as e:
             raise FilesetCreationError(
