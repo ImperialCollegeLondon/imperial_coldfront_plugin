@@ -604,3 +604,32 @@ def rdf_or_hx2_allocation(request):
 def rdf_or_hx2_allocation_user(request):
     """Fixture to provide an AllocationUser for either an RDF or HX2 allocation."""
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def project_pi(project):
+    """Return the PI of the project."""
+    return project.pi
+
+
+@pytest.fixture
+def project_manager(
+    project, user_factory, project_user_active_status, project_user_role_manager
+):
+    """Return a user with the manager role in the project."""
+    from coldfront.core.project.models import ProjectUser
+
+    manager = user_factory()
+    ProjectUser.objects.create(
+        project=project,
+        user=manager,
+        status=project_user_active_status,
+        role=project_user_role_manager,
+    )
+    return manager
+
+
+@pytest.fixture(params=["project_pi", "superuser", "project_manager"])
+def manager_pi_or_superuser(request):
+    """Fixture providing a PI, superuser, or manager of the project."""
+    return request.getfixturevalue(request.param)

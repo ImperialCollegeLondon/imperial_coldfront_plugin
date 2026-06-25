@@ -46,6 +46,7 @@ from .forms import (
 from .microsoft_graph_client import get_graph_api_client
 from .models import CreditTransaction, HX2Allocation, ICLProject
 from .policy import (
+    check_project_manager_or_pi_or_superuser,
     check_project_pi_or_superuser,
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
@@ -498,7 +499,7 @@ def project_credit_transactions(
 ) -> HttpResponse:
     """Display all credit transactions for a project with running balance."""
     project = get_object_or_404(Project, pk=pk)
-    check_project_pi_or_superuser(project, request.user)
+    check_project_manager_or_pi_or_superuser(project, request.user)
 
     transactions = CreditTransaction.objects.filter(project=project).order_by(
         "timestamp", "id"
@@ -513,6 +514,7 @@ def project_credit_transactions(
                 "transaction": transaction,
                 "running_balance": running,
                 "authoriser": transaction.authoriser,
+                "transaction_type": transaction.transaction_type,
             }
         )
 

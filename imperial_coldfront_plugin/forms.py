@@ -432,7 +432,7 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
         """Meta class for the form."""
 
         model = CreditTransaction
-        fields = ("project", "amount", "description")
+        fields = ("project", "amount", "description", "transaction_type")
 
     project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
         queryset=ICLProject.objects.filter(status__name="Active"),
