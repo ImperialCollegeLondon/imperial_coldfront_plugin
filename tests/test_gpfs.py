@@ -220,6 +220,33 @@ def test_create_fileset_set_quota_existing_directory(
     )
 
 
+def test_create_fileset_set_quota_backoff(client_mock, fileset_path_info, settings):
+    """Test client.create_fileset retries on UnknownGroupDuringFilesetCreation."""
+    # __name__ used by the backoff library logging so needs to exist on the mock
+    client_mock.create_fileset.__name__ = "create_fileset"
+    # 2 errors then a success
+    client_mock.create_fileset.side_effect = [
+        UnknownGroupDuringFilesetCreation("Transient error"),
+        UnknownGroupDuringFilesetCreation("Transient error"),
+        None,
+    ]
+
+    create_fileset_set_quota(
+        fileset_path_info,
+        OWNER_ID,
+        GROUP_ID,
+        settings.GPFS_FILESET_POSIX_PERMISSIONS,
+        settings.GPFS_FILESET_ACL,
+        settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
+        settings.GPFS_PARENT_DIRECTORY_ACL,
+        BLOCK_QUOTA,
+        FILES_QUOTA,
+    )
+
+    # check the method wrapped by backoff was called three times
+    assert len(client_mock.create_fileset.call_args_list) == 3
+
+
 def make_response(data: dict[str, object]) -> Mock:
     """Helper to make a mock response with .json() method."""
     response_mock = Mock()

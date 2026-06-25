@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict
 
+import backoff
 import requests
 from django.conf import settings
 from uplink import (
@@ -764,7 +765,14 @@ def create_fileset_set_quota(
         f"Creating fileset '{fileset_path_info.fileset_name}' at "
         f"'{fileset_path_info.fileset_absolute_path}'."
     )
-    client.create_fileset(
+
+    create_fileset_with_exponential_backoff = backoff.on_exception(
+        backoff.expo,
+        UnknownGroupDuringFilesetCreation,
+        max_time=settings.GPFS_AD_SYNC_TIMEOUT_SECONDS,
+    )(client.create_fileset)
+
+    create_fileset_with_exponential_backoff(
         fileset_path_info.filesystem_name,
         fileset_path_info.fileset_name,
         owner_id,

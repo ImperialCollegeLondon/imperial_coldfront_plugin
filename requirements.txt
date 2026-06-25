@@ -13,6 +13,8 @@ asgiref==3.7.2
     #   coldfront
     #   django
     #   django-simple-history
+backoff==2.2.1
+    # via imperial_coldfront_plugin (pyproject.toml)
 bibtexparser==1.4.1
     # via
     #   coldfront
