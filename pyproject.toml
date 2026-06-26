@@ -16,6 +16,7 @@ dependencies = [
     "uplink",
     "ldap3",
     "pint",
+    "backoff",
 ]
 
 [project.optional-dependencies]

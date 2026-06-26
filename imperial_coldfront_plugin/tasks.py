@@ -1,7 +1,6 @@
 """Plugin tasks."""
 
 import logging
-import time
 from datetime import date, timedelta
 
 from coldfront.core.allocation.models import (
@@ -206,8 +205,6 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
             value=fileset_path_info.fileset_absolute_path,
         )
         if settings.GPFS_ENABLED:
-            # Wait to make sure that GFPS server has picked up changes in AD
-            time.sleep(settings.GPFS_ALLOCATION_CREATION_SLEEP)
             try:
                 logger.info(
                     "Creating GPFS fileset and setting quota for "
