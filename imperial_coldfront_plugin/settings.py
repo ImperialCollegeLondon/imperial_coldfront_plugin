@@ -187,7 +187,7 @@ RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = ENV.list(
 """Days after expiry to send deletion notifications."""
 
 
-def validate_rdf_allocation_lifecycle_settings():
+def validate_rdf_allocation_lifecycle_settings() -> None:
     """Validate the RDF allocation lifecycle settings are consistent.
 
     Raises:
