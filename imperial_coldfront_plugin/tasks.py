@@ -27,6 +27,7 @@ from imperial_coldfront_plugin.models import (
 from .emails import (
     Discrepancy,
     DiscrepancyCheckResult,
+    QuotaConsistencyCheckResult,
     QuotaDiscrepancy,
     notify_platforms_to_manually_delete_allocation,
     send_allocation_deletion_notification,
@@ -269,7 +270,9 @@ def find_discrepancies_helper(
     )
 
 
-def check_rdf_ldap_consistency() -> DiscrepancyCheckResult | None:
+def check_rdf_ldap_consistency(
+    send_email: bool = True,
+) -> DiscrepancyCheckResult | None:
     """Check the consistency of LDAP groups with the RDF Active allocations."""
     if not settings.LDAP_ENABLED:
         return None
@@ -282,13 +285,15 @@ def check_rdf_ldap_consistency() -> DiscrepancyCheckResult | None:
 
     check_result = find_discrepancies_helper(allocations, ldap_groups)
 
-    if check_result.discrepancies_found:
+    if check_result.discrepancies_found and send_email:
         send_discrepancy_notification(check_result, source="RDF")
 
     return check_result
 
 
-def check_hx2_ldap_consistency() -> DiscrepancyCheckResult | None:
+def check_hx2_ldap_consistency(
+    send_email: bool = True,
+) -> DiscrepancyCheckResult | None:
     """Check the consistency of LDAP groups with the HX2 allocations in the database."""
     if not settings.LDAP_ENABLED:
         return None
@@ -301,7 +306,7 @@ def check_hx2_ldap_consistency() -> DiscrepancyCheckResult | None:
 
     check_result = find_discrepancies_helper(allocations, ldap_groups)
 
-    if check_result.discrepancies_found:
+    if check_result.discrepancies_found and send_email:
         send_discrepancy_notification(check_result, source="HX2")
 
     return check_result
@@ -385,7 +390,7 @@ def update_allocation_status() -> None:
         )
 
 
-def check_rdf_allocation_expiry_notifications() -> None:
+def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
     """Check RDF allocations and send appropriate expiry notifications."""
     if not settings.ENABLE_RDF_ALLOCATION_LIFECYCLE:
         return
@@ -422,11 +427,13 @@ def check_rdf_allocation_expiry_notifications() -> None:
         project_owner = allocation.project.pi
 
         logger.info(
-            f"Sending expiry warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            f"{'Sending' if send_email else 'Dry run: would send'} expiry "
+            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
         )
-        send_allocation_expiry_warning(
-            allocation.pk, project_owner.email, days_until_expiry
-        )
+        if send_email:
+            send_allocation_expiry_warning(
+                allocation.pk, project_owner.email, days_until_expiry
+            )
 
     # Query for removal warnings
     removal_allocations = RDFAllocation.objects.filter(
@@ -438,11 +445,13 @@ def check_rdf_allocation_expiry_notifications() -> None:
         project_owner = allocation.project.pi
 
         logger.info(
-            f"Sending removal warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            f"{'Sending' if send_email else 'Dry run: would send'} removal "
+            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
         )
-        send_allocation_removal_warning(
-            allocation.pk, project_owner.email, days_until_expiry
-        )
+        if send_email:
+            send_allocation_removal_warning(
+                allocation.pk, project_owner.email, days_until_expiry
+            )
 
     # Query for deletion warnings
     deletion_warning_allocations = RDFAllocation.objects.filter(
@@ -454,11 +463,13 @@ def check_rdf_allocation_expiry_notifications() -> None:
         project_owner = allocation.project.pi
 
         logger.info(
-            f"Sending deletion warning for allocation {allocation.pk} ({days_until_expiry} days)"  # noqa:E501
+            f"{'Sending' if send_email else 'Dry run: would send'} deletion "
+            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
         )
-        send_allocation_deletion_warning(
-            allocation.pk, project_owner.email, days_until_expiry
-        )
+        if send_email:
+            send_allocation_deletion_warning(
+                allocation.pk, project_owner.email, days_until_expiry
+            )
 
     # Query for deletion notifications
     deletion_notification_allocations = RDFAllocation.objects.filter(
@@ -468,8 +479,12 @@ def check_rdf_allocation_expiry_notifications() -> None:
     for allocation in deletion_notification_allocations:
         project_owner = allocation.project.pi
 
-        logger.info(f"Sending deletion notification for allocation {allocation.pk}")
-        send_allocation_deletion_notification(allocation.pk, project_owner.email)
+        logger.info(
+            f"{'Sending' if send_email else 'Dry run: would send'} deletion "
+            f"notification for allocation {allocation.pk}"
+        )
+        if send_email:
+            send_allocation_deletion_notification(allocation.pk, project_owner.email)
 
     logger.info(
         f"Sent {expiry_allocations.count()} expiry warnings, "
@@ -538,16 +553,22 @@ def zero_allocation_gpfs_quota(allocation_id: int) -> None:
     )
 
 
-def check_quota_consistency() -> None:
+def check_quota_consistency(
+    send_email: bool = True,
+) -> QuotaConsistencyCheckResult | None:
     """Check consistency of file and storage quotas between allocations and filesets.
 
     Compares the active allocations to ensure the matching filesets have the same
     storage and file quotas. If discrepancies are found, a notification email is sent
     to admins. Also sends a notification if any allocations are found that do not have a
     matching fileset in GPFS.
+
+    Returns:
+        A QuotaConsistencyCheckResult object containing the discrepancies and missing
+        filesets, or None if GPFS is not enabled.
     """
     if not settings.GPFS_ENABLED:
-        return
+        return None
 
     allocations = RDFAllocation.objects.filter(
         resources__name="RDF Active",
@@ -604,11 +625,15 @@ def check_quota_consistency() -> None:
             # The allocation was not found in GPFS - notify admins
             missing_filesets.append(shortname)
 
-    if discrepancies:
+    if discrepancies and send_email:
         send_quota_discrepancy_notification(discrepancies)
 
-    if missing_filesets:
+    if missing_filesets and send_email:
         send_fileset_not_found_notification(missing_filesets)
+
+    return QuotaConsistencyCheckResult(
+        discrepancies=discrepancies, missing_filesets=missing_filesets
+    )
 
 
 def unlink_expired_allocation_filesets() -> None:
@@ -651,7 +676,7 @@ def unlink_expired_allocation_filesets() -> None:
             logger.exception(f"Error unlinking fileset for allocation {shortname}")
 
 
-def check_hx2_user_group_consistency() -> Discrepancy | None:
+def check_hx2_user_group_consistency(send_email: bool = True) -> Discrepancy | None:
     """Check consistency of user group memberships for HX2 allocations."""
     if not settings.LDAP_ENABLED:
         return None
@@ -684,6 +709,7 @@ def check_hx2_user_group_consistency() -> Discrepancy | None:
         extra_members=extra_members,
     )
 
-    send_hx2_access_group_discrepancy_notification(check_result)
+    if send_email:
+        send_hx2_access_group_discrepancy_notification(check_result)
 
     return check_result
