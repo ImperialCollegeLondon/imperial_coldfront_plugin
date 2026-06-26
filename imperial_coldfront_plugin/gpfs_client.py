@@ -1,11 +1,13 @@
 """Interface for interacting with the GPFS API."""
 
 import logging
+import re
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict
 
+import backoff
 import requests
 from django.conf import settings
 from uplink import (
@@ -27,6 +29,11 @@ from uplink.retry.when import RetryPredicate, status_5xx
 
 from .acl import ACL
 
+UNKNOWN_GROUP_MESSAGE_REGEX = re.compile(
+    r'Input validation failed: EFSSP0010C CLI parser: The object "\S+" '
+    'specified for "group" does not exist.'
+)
+
 
 class ErrorWhenProcessingJob(Exception):
     """Handles errors in asynchronous jobs."""
@@ -42,6 +49,10 @@ class JobResponseData(TypedDict):
     status: str
     jobId: str
     result: dict[str, str]
+
+
+class UnknownGroupDuringFilesetCreation(Exception):
+    """Raised when an unknown group is specified during fileset creation."""
 
 
 class JobRunning(RetryPredicate):
@@ -271,8 +282,17 @@ class GPFSClient(Consumer):
             )
             return response
         except requests.HTTPError as e:
+            response_json = e.response.json()
+            message = response_json.get("status", dict()).get("message", "")
+            if UNKNOWN_GROUP_MESSAGE_REGEX.match(message):
+                raise UnknownGroupDuringFilesetCreation(
+                    "While creating the fileset, GPFS was not able to find the owning "
+                    "group in Active Directory. This may be because the group has not "
+                    "yet been created or due to synchronisation issues between GPFS "
+                    "and Active Directory."
+                ) from e
             raise FilesetCreationError(
-                f"Error creating fileset '{fileset_name}' - {e.response.json()}"
+                f"Error creating fileset '{fileset_name}' - {response_json}"
             ) from e
         except ErrorWhenProcessingJob as e:
             raise FilesetCreationError(
@@ -746,7 +766,14 @@ def create_fileset_set_quota(
         f"Creating fileset '{fileset_path_info.fileset_name}' at "
         f"'{fileset_path_info.fileset_absolute_path}'."
     )
-    client.create_fileset(
+
+    create_fileset_with_exponential_backoff = backoff.on_exception(
+        backoff.expo,
+        UnknownGroupDuringFilesetCreation,
+        max_time=settings.GPFS_AD_SYNC_TIMEOUT_SECONDS,
+    )(client.create_fileset)
+
+    create_fileset_with_exponential_backoff(
         fileset_path_info.filesystem_name,
         fileset_path_info.fileset_name,
         owner_id,

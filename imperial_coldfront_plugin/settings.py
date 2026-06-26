@@ -206,8 +206,8 @@ DEPARTMENTS_IN_FACULTY = {
     "fons": ["physics", "chemistry"],
 }
 
-GPFS_ALLOCATION_CREATION_SLEEP = ENV.int("GPFS_ALLOCATION_CREATION_SLEEP", default=30)
-"""Number of seconds to sleep before creating a GPFS fileset."""
+GPFS_AD_SYNC_TIMEOUT_SECONDS = ENV.int("GPFS_AD_SYNC_TIMEOUT_SECONDS", default=600)
+"""Maximum wait time configured for exponential backoff retries for fileset creation."""
 
 ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=False)
 """Feature flag to enable or disable creation of user groups for allocations."""
