@@ -111,7 +111,6 @@ def pytest_configure():
             GID_RANGES=dict(
                 rdf=[range(1031386, 1031405)], hx2=[range(1031406, 1031425)]
             ),
-            GPFS_ALLOCATION_CREATION_SLEEP=0,
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
             ENABLE_USER_GROUP_CREATION=True,
             RDF_ASK_TICKET_URL="http://example.com/ticket",

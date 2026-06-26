@@ -18,6 +18,10 @@ asgiref==3.7.2
     #   django-stubs
 attrs==24.3.0
     # via pytest-mypy
+backoff==2.2.1
+    # via
+    #   -c requirements.txt
+    #   imperial_coldfront_plugin (pyproject.toml)
 beautifulsoup4==4.14.3
     # via imperial_coldfront_plugin (pyproject.toml)
 bibtexparser==1.4.1
