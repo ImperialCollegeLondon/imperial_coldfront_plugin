@@ -2,7 +2,7 @@
 
 import textwrap
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import Literal
 
 from django.conf import settings
 from django.core.mail import EmailMessage, mail_admins, send_mail
@@ -35,6 +35,29 @@ class DiscrepancyCheckResult:
     def discrepancies_found(self) -> bool:
         """Whether any discrepancies were found."""
         return bool(self.membership_discrepancies or self.missing_ldap_groups)
+
+
+@dataclass
+class QuotaDiscrepancy:
+    """Structure for holding discrepancies found during quota consistency check."""
+
+    fileset: str
+    type: Literal["storage", "files"]
+    attribute_value: int
+    fileset_value: int
+
+
+@dataclass
+class QuotaConsistencyCheckResult:
+    """Result of a quota consistency check."""
+
+    discrepancies: list[QuotaDiscrepancy]
+    missing_filesets: list[str]
+
+    @property
+    def discrepancies_found(self) -> bool:
+        """Whether any discrepancies were found."""
+        return bool(self.discrepancies or self.missing_filesets)
 
 
 def send_discrepancy_notification(
@@ -228,16 +251,6 @@ def notify_platforms_to_manually_delete_allocation(
     )
 
 
-class QuotaDiscrepancy(TypedDict):
-    """Structure for holding discrepancies found during quota consistency check."""
-
-    shortname: str
-    attribute_storage_quota: int | None
-    fileset_storage_quota: float | None
-    attribute_files_quota: int | None
-    fileset_files_quota: float | None
-
-
 def send_quota_discrepancy_notification(discrepancies: list[QuotaDiscrepancy]) -> None:
     """Send quota discrepancy notification to project owner.
 
@@ -256,24 +269,14 @@ def send_quota_discrepancy_notification(discrepancies: list[QuotaDiscrepancy]) -
     )
 
     for discrepancy in discrepancies:
-        shortname = discrepancy["shortname"]
+        shortname = discrepancy.fileset
         message += f"\t- Allocation shortname: {shortname}\n"
 
-        if discrepancy["attribute_storage_quota"]:
-            attribute_storage_quota = discrepancy["attribute_storage_quota"]
-            fileset_storage_quota = discrepancy["fileset_storage_quota"]
-            message += (
-                f"\t\tAllocation storage quota of {attribute_storage_quota}, "
-                f"GPFS storage quota of {fileset_storage_quota}.\n"
-            )
-
-        if discrepancy["attribute_files_quota"]:
-            attribute_files_quota = discrepancy["attribute_files_quota"]
-            fileset_files_quota = discrepancy["fileset_files_quota"]
-            message += (
-                f"\t\tAllocation files quota of {attribute_files_quota}, "
-                f"GPFS files quota of {fileset_files_quota}.\n"
-            )
+        message += (
+            f"\t\tAllocation {discrepancy.type} quota of "
+            f"{discrepancy.attribute_value}, GPFS {discrepancy.type} quota of "
+            f"{discrepancy.fileset_value}.\n"
+        )
 
     mail_admins(
         subject="Coldfront Quota Consistency Check - Discrepancies Found",

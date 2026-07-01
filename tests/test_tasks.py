@@ -14,7 +14,11 @@ from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.utils import timezone
 
-from imperial_coldfront_plugin.emails import Discrepancy, DiscrepancyCheckResult
+from imperial_coldfront_plugin.emails import (
+    Discrepancy,
+    DiscrepancyCheckResult,
+    QuotaDiscrepancy,
+)
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
@@ -556,6 +560,30 @@ class TestCheckRDFLdapConsistency:
         assert result == DiscrepancyCheckResult([], [rdf_allocation_ldap_name])
         notify_mock.assert_called_once_with(result, source="RDF")
 
+    def test_no_email_when_send_email_false(
+        self,
+        rdf_allocation,
+        rdf_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        rdf_allocation_ldap_name,
+    ):
+        """Test that no email is sent when send_email is False."""
+        username = rdf_allocation_user.user.username
+        ldap_group_search_mock.return_value = {rdf_allocation_ldap_name: []}
+
+        result = check_rdf_ldap_consistency(send_email=False)
+        membership_discrepancies = result.membership_discrepancies
+
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == rdf_allocation_ldap_name
+        assert discrepancy.project_name == rdf_allocation.project.title
+        assert discrepancy.missing_members == [username]
+        assert not discrepancy.extra_members
+
+        notify_mock.assert_not_called()
+
 
 class TestCheckHX2LdapConsistency:
     """Tests for check_hx2_ldap_consistency task."""
@@ -639,6 +667,30 @@ class TestCheckHX2LdapConsistency:
 
         assert result == DiscrepancyCheckResult([], [hx2_allocation.ldap_shortname])
         notify_mock.assert_called_once_with(result, source="HX2")
+
+    def test_no_email_when_send_email_false(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+    ):
+        """Test that no email is sent when send_email is False."""
+        username = hx2_allocation_user.user.username
+        ldap_name = hx2_allocation.ldap_shortname
+        ldap_group_search_mock.return_value = {ldap_name: []}
+
+        result = check_hx2_ldap_consistency(send_email=False)
+        membership_discrepancies = result.membership_discrepancies
+
+        assert len(membership_discrepancies) == 1
+        discrepancy = membership_discrepancies[0]
+        assert discrepancy.group_name == ldap_name
+        assert discrepancy.project_name == hx2_allocation.project.title
+        assert discrepancy.missing_members == [username]
+        assert not discrepancy.extra_members
+
+        notify_mock.assert_not_called()
 
 
 class TestRemoveLDAPGroupMembers:
@@ -1057,13 +1109,12 @@ class TestCheckQuotaConsistency:
                 500.0,
                 "shorty",
                 [
-                    {
-                        "shortname": "shorty",
-                        "attribute_storage_quota": 1,
-                        "fileset_storage_quota": 2.0,
-                        "attribute_files_quota": None,
-                        "fileset_files_quota": None,
-                    }
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="storage",
+                        attribute_value=1,
+                        fileset_value=2,
+                    )
                 ],
             ),
             # Case 3: Files quota discrepancy only
@@ -1074,13 +1125,12 @@ class TestCheckQuotaConsistency:
                 600.0,
                 "shorty",
                 [
-                    {
-                        "shortname": "shorty",
-                        "attribute_storage_quota": None,
-                        "fileset_storage_quota": None,
-                        "attribute_files_quota": 500,
-                        "fileset_files_quota": 600.0,
-                    }
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="files",
+                        attribute_value=500,
+                        fileset_value=600,
+                    )
                 ],
             ),
             # Case 4: Both storage and files quota discrepancies
@@ -1091,13 +1141,18 @@ class TestCheckQuotaConsistency:
                 600.0,
                 "shorty",
                 [
-                    {
-                        "shortname": "shorty",
-                        "attribute_storage_quota": 1,
-                        "fileset_storage_quota": 2.0,
-                        "attribute_files_quota": 500,
-                        "fileset_files_quota": 600.0,
-                    }
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="storage",
+                        attribute_value=1,
+                        fileset_value=2,
+                    ),
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="files",
+                        attribute_value=500,
+                        fileset_value=600,
+                    ),
                 ],
             ),
             # Case 5: Allocation not found in GPFS
@@ -1163,6 +1218,62 @@ class TestCheckQuotaConsistency:
             send_fileset_not_found_notification_mock.assert_not_called()
         else:
             send_fileset_not_found_notification_mock.assert_called_once_with(["shorty"])
+
+    def test_no_email_when_send_email_false(
+        self,
+        project,
+        rdf_allocation,
+        rdf_allocation_factory,
+        send_quota_discrepancy_notification_mock,
+        send_fileset_not_found_notification_mock,
+        retrieve_all_fileset_quotas_mock,
+        allocation_attribute_factory,
+    ):
+        """Test that no email is sent when send_email is False."""
+        from imperial_coldfront_plugin.tasks import check_quota_consistency
+
+        discrepancy_allocation = rdf_allocation
+        missing_fileset_allocation = rdf_allocation_factory(
+            project=project,
+            shortname="missing_shortname",
+            gid=12345,
+        )
+
+        allocation_attribute_factory(
+            allocation=discrepancy_allocation,
+            name="Storage Quota (TB)",
+            value=1,
+        )
+
+        allocation_attribute_factory(
+            allocation=discrepancy_allocation,
+            name="Files Quota",
+            value=500,
+        )
+
+        allocation_attribute_factory(
+            allocation=missing_fileset_allocation,
+            name="Storage Quota (TB)",
+            value=2,
+        )
+
+        allocation_attribute_factory(
+            allocation=missing_fileset_allocation,
+            name="Files Quota",
+            value=1000,
+        )
+
+        retrieve_all_fileset_quotas_mock.return_value = {
+            "shorty": {
+                "files_limit": 700.0,
+                "block_limit_tb": 3.0,
+            }
+        }
+
+        check_quota_consistency(send_email=False)
+
+        send_quota_discrepancy_notification_mock.assert_not_called()
+        send_fileset_not_found_notification_mock.assert_not_called()
 
 
 class TestUnlinkExpiredAllocationFilesets:
@@ -1412,3 +1523,26 @@ class TestCheckHX2UserGroupConsistency:
             match=r"Unable to find HX2 access group in AD during consistency check.",
         ):
             check_hx2_user_group_consistency()
+
+    def test_no_email_when_send_email_false(
+        self,
+        hx2_allocation,
+        hx2_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        settings,
+    ):
+        """Test that no email is sent when send_email is False."""
+        username = hx2_allocation_user.user.username
+        ldap_name = settings.LDAP_HX2_ACCESS_GROUP_NAME
+        ldap_group_search_mock.return_value = {ldap_name: []}
+
+        discrepancy = check_hx2_user_group_consistency(send_email=False)
+        assert discrepancy == Discrepancy(
+            group_name=ldap_name,
+            project_name="",
+            missing_members=[username],
+            extra_members=[],
+        )
+
+        notify_mock.assert_not_called()

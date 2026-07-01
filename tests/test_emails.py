@@ -10,6 +10,7 @@ from django.test import override_settings
 from imperial_coldfront_plugin.emails import (
     Discrepancy,
     DiscrepancyCheckResult,
+    QuotaDiscrepancy,
     notify_platforms_to_manually_delete_allocation,
     send_allocation_deletion_notification,
     send_allocation_deletion_warning,
@@ -31,27 +32,30 @@ def admin_email(settings):
 def test_send_quota_discrepancy_notification():
     """Test the quota discrepancy email."""
     discrepancies = [
-        {
-            "shortname": "bio-research-01",
-            "attribute_storage_quota": 500,
-            "fileset_storage_quota": 550,
-            "attribute_files_quota": 1000000,
-            "fileset_files_quota": 1200000,
-        },
-        {
-            "shortname": "physics-dept-lab",
-            "attribute_storage_quota": 2,
-            "fileset_storage_quota": 2.5,
-            "attribute_files_quota": None,
-            "fileset_files_quota": None,
-        },
-        {
-            "shortname": "chem-analysis",
-            "attribute_storage_quota": None,
-            "fileset_storage_quota": None,
-            "attribute_files_quota": 500000,
-            "fileset_files_quota": 600000,
-        },
+        QuotaDiscrepancy(
+            fileset="bio-research-01",
+            type="storage",
+            attribute_value=500,
+            fileset_value=550,
+        ),
+        QuotaDiscrepancy(
+            fileset="bio-research-01",
+            type="files",
+            attribute_value=1000000,
+            fileset_value=1200000,
+        ),
+        QuotaDiscrepancy(
+            fileset="physics-dept-lab",
+            type="storage",
+            attribute_value=2,
+            fileset_value=3,
+        ),
+        QuotaDiscrepancy(
+            fileset="chem-analysis",
+            type="files",
+            attribute_value=500000,
+            fileset_value=600000,
+        ),
     ]
 
     expected_message = """\
@@ -64,9 +68,10 @@ The following discrepancies were detected between Coldfront and GPFS:
 
 \t- Allocation shortname: bio-research-01
 \t\tAllocation storage quota of 500, GPFS storage quota of 550.
+\t- Allocation shortname: bio-research-01
 \t\tAllocation files quota of 1000000, GPFS files quota of 1200000.
 \t- Allocation shortname: physics-dept-lab
-\t\tAllocation storage quota of 2, GPFS storage quota of 2.5.
+\t\tAllocation storage quota of 2, GPFS storage quota of 3.
 \t- Allocation shortname: chem-analysis
 \t\tAllocation files quota of 500000, GPFS files quota of 600000.
 """
