@@ -9,9 +9,9 @@ from string import ascii_lowercase, digits
 import django_stubs_ext
 import pint
 from coldfront.config.env import ENV
-from django.core.exceptions import ImproperlyConfigured
 
 from .acl import ACL, ACLEntry
+from .settings_validation import validate_schedules
 
 django_stubs_ext.monkeypatch()
 
@@ -167,94 +167,32 @@ RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = ENV.int(
 
 # RDF Allocation Expiry Notification Schedules
 RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = ENV.list(
-    "RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE", default=[90, 60, 30, 7, 1]
+    "RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE", default=[90, 60, 30, 7, 1], cast=int
 )
 """Days before expiry to send expiry warning notifications."""
 
 RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = ENV.list(
-    "RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE", default=[0, -3, -6]
+    "RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE", default=[0, -3, -6], cast=int
 )
 """Days relative to expiry to send removal warning notifications."""
 
 RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = ENV.list(
-    "RDF_ALLOCATION_DELETION_WARNING_SCHEDULE", default=[-7, -10, -13]
+    "RDF_ALLOCATION_DELETION_WARNING_SCHEDULE", default=[-7, -10, -13], cast=int
 )
 """Days after expiry to send deletion warning notifications."""
 
 RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = ENV.list(
-    "RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE", default=[-14]
+    "RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE", default=[-14], cast=int
 )
 """Days after expiry to send deletion notifications."""
 
-
-def validate_rdf_allocation_lifecycle_settings() -> None:
-    """Validate the RDF allocation lifecycle settings are consistent.
-
-    Raises:
-        ImproperlyConfigured: If the settings are inconsistent.
-    """
-    if not ENABLE_RDF_ALLOCATION_LIFECYCLE:
-        return
-
-    for val in RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE:
-        if val <= 1:
-            raise ImproperlyConfigured(
-                f"RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE contains a value {val}, "
-                "but it should contain only values >=1."
-            )
-
-    for val in RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE:
-        if val > 0:
-            raise ImproperlyConfigured(
-                f"RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE contains a value {val}, "
-                "but it should contain only values <=0."
-            )
-
-    for val in RDF_ALLOCATION_DELETION_WARNING_SCHEDULE:
-        if val > 0:
-            raise ImproperlyConfigured(
-                f"RDF_ALLOCATION_DELETION_WARNING_SCHEDULE contains a value {val}, "
-                "but it should contain only values <=0."
-            )
-
-    for val in RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE:
-        if val > 0:
-            raise ImproperlyConfigured(
-                f"RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE contains a value {val},"
-                "but it should contain only values <=0."
-            )
-
-    max_expiry_warning = max(RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE)
-    max_removal_warning = max(RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE)
-    max_deletion_warning = max(RDF_ALLOCATION_DELETION_WARNING_SCHEDULE)
-    max_deletion_notification = max(RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE)
-
-    if not (max_expiry_warning > max_removal_warning):
-        raise ImproperlyConfigured(
-            f"RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE must have a maximum value "
-            f"(current: {max_expiry_warning}) greater than the maximum value of "
-            f"RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE (current: {max_removal_warning})."
-        )
-
-    if not (max_removal_warning > max_deletion_warning):
-        raise ImproperlyConfigured(
-            f"RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE must have a maximum value "
-            f"(current: {max_removal_warning}) greater than the maximum value of "
-            f"RDF_ALLOCATION_DELETION_WARNING_SCHEDULE (current: "
-            f"{max_deletion_warning})."
-        )
-
-    if not (max_deletion_warning > max_deletion_notification):
-        raise ImproperlyConfigured(
-            f"RDF_ALLOCATION_DELETION_WARNING_SCHEDULE must have a maximum value "
-            f"(current: {max_deletion_warning}) greater than the maximum value of "
-            f"RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE (current: "
-            f"{max_deletion_notification})."
-        )
-
-
-validate_rdf_allocation_lifecycle_settings()
-
+if ENABLE_RDF_ALLOCATION_LIFECYCLE:
+    validate_schedules(
+        RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE,
+        RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE,
+        RDF_ALLOCATION_DELETION_WARNING_SCHEDULE,
+        RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE,
+    )
 
 # Mappings for faculty and department names and shortnames for development purposes.
 # These should be overridden in prod via prod_settings.py.
