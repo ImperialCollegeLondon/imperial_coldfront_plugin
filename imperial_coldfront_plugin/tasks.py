@@ -426,11 +426,11 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
         days_until_expiry = (allocation.end_date - today).days
         project_owner = allocation.project.pi
 
-        logger.info(
-            f"{'Sending' if send_email else 'Dry run: would send'} expiry "
-            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
-        )
         if send_email:
+            logger.info(
+                "Sending expiry warning for allocation "
+                f"{allocation.pk} ({days_until_expiry} days)"
+            )
             send_allocation_expiry_warning(
                 allocation.pk, project_owner.email, days_until_expiry
             )
@@ -444,11 +444,11 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
         days_until_expiry = (allocation.end_date - today).days
         project_owner = allocation.project.pi
 
-        logger.info(
-            f"{'Sending' if send_email else 'Dry run: would send'} removal "
-            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
-        )
         if send_email:
+            logger.info(
+                "Sending removal warning for allocation "
+                f"{allocation.pk} ({days_until_expiry} days)"
+            )
             send_allocation_removal_warning(
                 allocation.pk, project_owner.email, days_until_expiry
             )
@@ -462,11 +462,11 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
         days_until_expiry = (allocation.end_date - today).days
         project_owner = allocation.project.pi
 
-        logger.info(
-            f"{'Sending' if send_email else 'Dry run: would send'} deletion "
-            f"warning for allocation {allocation.pk} ({days_until_expiry} days)"
-        )
         if send_email:
+            logger.info(
+                "Sending deletion warning for allocation "
+                f"{allocation.pk} ({days_until_expiry} days)"
+            )
             send_allocation_deletion_warning(
                 allocation.pk, project_owner.email, days_until_expiry
             )
@@ -479,15 +479,12 @@ def check_rdf_allocation_expiry_notifications(send_email: bool = True) -> None:
     for allocation in deletion_notification_allocations:
         project_owner = allocation.project.pi
 
-        logger.info(
-            f"{'Sending' if send_email else 'Dry run: would send'} deletion "
-            f"notification for allocation {allocation.pk}"
-        )
         if send_email:
+            logger.info(f"Sending deletion notification for allocation {allocation.pk}")
             send_allocation_deletion_notification(allocation.pk, project_owner.email)
 
     logger.info(
-        f"Sent {expiry_allocations.count()} expiry warnings, "
+        f"Identified {expiry_allocations.count()} expiry warnings, "
         f"{removal_allocations.count()} removal warnings, "
         f"{deletion_warning_allocations.count()} deletion warnings, "
         f"{deletion_notification_allocations.count()} deletion notifications"
@@ -584,42 +581,32 @@ def check_quota_consistency(
 
     for allocation in allocations:
         shortname = allocation.shortname
-        storage_attribute_quota: int = allocation.storage_quota_tb
-        files_attribute_quota: int = allocation.files_quota
+        storage_attribute_quota = allocation.storage_quota_tb
+        files_attribute_quota = allocation.files_quota
 
         if shortname in usages:
             # Check for discrepancies between the allocation and fileset for both
             # storage and file quotas.
-            storage_quota_discrepancy = (
-                storage_attribute_quota != usages[shortname]["block_limit_tb"]
-            )
-            file_quota_discrepancy = (
-                files_attribute_quota != usages[shortname]["files_limit"]
-            )
-            if storage_quota_discrepancy or file_quota_discrepancy:
-                # If either are not consistent, create a discrepancy record.
+            storage_fileset_quota = int(usages[shortname]["block_limit_tb"])
+            if storage_attribute_quota != storage_fileset_quota:
                 discrepancies.append(
-                    {
-                        "shortname": shortname,
-                        "attribute_storage_quota": (
-                            storage_attribute_quota
-                            if storage_quota_discrepancy
-                            else None
-                        ),
-                        "fileset_storage_quota": (
-                            usages[shortname]["block_limit_tb"]
-                            if storage_quota_discrepancy
-                            else None
-                        ),
-                        "attribute_files_quota": (
-                            files_attribute_quota if file_quota_discrepancy else None
-                        ),
-                        "fileset_files_quota": (
-                            usages[shortname]["files_limit"]
-                            if file_quota_discrepancy
-                            else None
-                        ),
-                    }
+                    QuotaDiscrepancy(
+                        type="storage",
+                        fileset=shortname,
+                        attribute_value=storage_attribute_quota,
+                        fileset_value=storage_fileset_quota,
+                    )
+                )
+
+            files_fileset_quota = int(usages[shortname]["files_limit"])
+            if files_attribute_quota != files_fileset_quota:
+                discrepancies.append(
+                    QuotaDiscrepancy(
+                        type="files",
+                        fileset=shortname,
+                        attribute_value=files_attribute_quota,
+                        fileset_value=files_fileset_quota,
+                    )
                 )
         else:
             # The allocation was not found in GPFS - notify admins

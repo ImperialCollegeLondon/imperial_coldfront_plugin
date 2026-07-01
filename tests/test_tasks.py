@@ -14,7 +14,11 @@ from coldfront.core.resource.models import Resource
 from django.conf import settings
 from django.utils import timezone
 
-from imperial_coldfront_plugin.emails import Discrepancy, DiscrepancyCheckResult
+from imperial_coldfront_plugin.emails import (
+    Discrepancy,
+    DiscrepancyCheckResult,
+    QuotaDiscrepancy,
+)
 from imperial_coldfront_plugin.forms import RDFAllocationForm
 from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
@@ -1105,13 +1109,12 @@ class TestCheckQuotaConsistency:
                 500.0,
                 "shorty",
                 [
-                    {
-                        "shortname": "shorty",
-                        "attribute_storage_quota": 1,
-                        "fileset_storage_quota": 2.0,
-                        "attribute_files_quota": None,
-                        "fileset_files_quota": None,
-                    }
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="storage",
+                        attribute_value=1,
+                        fileset_value=2,
+                    )
                 ],
             ),
             # Case 3: Files quota discrepancy only
@@ -1122,13 +1125,12 @@ class TestCheckQuotaConsistency:
                 600.0,
                 "shorty",
                 [
-                    {
-                        "shortname": "shorty",
-                        "attribute_storage_quota": None,
-                        "fileset_storage_quota": None,
-                        "attribute_files_quota": 500,
-                        "fileset_files_quota": 600.0,
-                    }
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="files",
+                        attribute_value=500,
+                        fileset_value=600,
+                    )
                 ],
             ),
             # Case 4: Both storage and files quota discrepancies
@@ -1139,13 +1141,18 @@ class TestCheckQuotaConsistency:
                 600.0,
                 "shorty",
                 [
-                    {
-                        "shortname": "shorty",
-                        "attribute_storage_quota": 1,
-                        "fileset_storage_quota": 2.0,
-                        "attribute_files_quota": 500,
-                        "fileset_files_quota": 600.0,
-                    }
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="storage",
+                        attribute_value=1,
+                        fileset_value=2,
+                    ),
+                    QuotaDiscrepancy(
+                        fileset="shorty",
+                        type="files",
+                        attribute_value=500,
+                        fileset_value=600,
+                    ),
                 ],
             ),
             # Case 5: Allocation not found in GPFS
