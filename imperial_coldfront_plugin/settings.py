@@ -11,6 +11,7 @@ import pint
 from coldfront.config.env import ENV
 
 from .acl import ACL, ACLEntry
+from .settings_validation import validate_schedules
 
 django_stubs_ext.monkeypatch()
 
@@ -141,32 +142,57 @@ ALLOCATION_SHORTNAME_MAX_LENGTH = 12
 ALLOCATION_DEFAULT_PERIOD_DAYS = 365
 """Days from current date for the initial form default end date for an allocation."""
 
-# RDF Allocation Expiry Notification Schedules
-RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = [90, 60, 30, 7, 1]
-"""Days before expiry to send expiry warning notifications."""
-
-RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = [0, -3, -6]
-"""Days relative to expiry to send removal warning notifications."""
-
-RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = [-7, -10, -13]
-"""Days after expiry to send deletion warning notifications."""
-
-RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = [-14]
-"""Days after expiry to send deletion notifications."""
-
 SHOW_CREDIT_BALANCE = ENV.bool("SHOW_CREDIT_BALANCE", default=False)
 """Whether to display the credit balance section on project detail pages."""
-
-RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS = 7
-"""Number of days after allocation expires to mark as removed."""
-
-RDF_ALLOCATION_EXPIRY_DELETION_DAYS = 14
-"""Number of days after an allocation expiry to mark as deleted."""
 
 ENABLE_RDF_ALLOCATION_LIFECYCLE = ENV.bool(
     "ENABLE_RDF_ALLOCATION_LIFECYCLE", default=False
 )
 """Feature flag to enable or disable the allocation lifecycle management."""
+
+RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS = ENV.int(
+    "RDF_ALLOCATION_EXPIRY_REMOVAL_DAYS", default=7
+)
+"""Number of days after allocation expires to mark as removed."""
+
+RDF_ALLOCATION_EXPIRY_DELETION_DAYS = ENV.int(
+    "RDF_ALLOCATION_EXPIRY_DELETION_DAYS", default=14
+)
+"""Number of days after an allocation expiry to mark as deleted."""
+
+RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = ENV.int(
+    "RDF_ALLOCATION_EXPIRY_UNLINK_DAYS", default=7
+)
+"""Number of days after an allocation expires to unlink from project."""
+
+# RDF Allocation Expiry Notification Schedules
+RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE = ENV.list(
+    "RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE", default=[90, 60, 30, 7, 1], cast=int
+)
+"""Days before expiry to send expiry warning notifications."""
+
+RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE = ENV.list(
+    "RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE", default=[0, -3, -6], cast=int
+)
+"""Days relative to expiry to send removal warning notifications."""
+
+RDF_ALLOCATION_DELETION_WARNING_SCHEDULE = ENV.list(
+    "RDF_ALLOCATION_DELETION_WARNING_SCHEDULE", default=[-7, -10, -13], cast=int
+)
+"""Days after expiry to send deletion warning notifications."""
+
+RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE = ENV.list(
+    "RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE", default=[-14], cast=int
+)
+"""Days after expiry to send deletion notifications."""
+
+if ENABLE_RDF_ALLOCATION_LIFECYCLE:
+    validate_schedules(
+        RDF_ALLOCATION_EXPIRY_WARNING_SCHEDULE,
+        RDF_ALLOCATION_REMOVAL_WARNING_SCHEDULE,
+        RDF_ALLOCATION_DELETION_WARNING_SCHEDULE,
+        RDF_ALLOCATION_DELETION_NOTIFICATION_SCHEDULE,
+    )
 
 # Mappings for faculty and department names and shortnames for development purposes.
 # These should be overridden in prod via prod_settings.py.
@@ -191,9 +217,6 @@ DEPARTMENTS_IN_FACULTY = {
 
 GPFS_AD_SYNC_TIMEOUT_SECONDS = ENV.int("GPFS_AD_SYNC_TIMEOUT_SECONDS", default=600)
 """Maximum wait time configured for exponential backoff retries for fileset creation."""
-
-RDF_ALLOCATION_EXPIRY_UNLINK_DAYS = 7
-"""Number of days after an allocation expires to unlink from project."""
 
 ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=False)
 """Feature flag to enable or disable creation of user groups for allocations."""
