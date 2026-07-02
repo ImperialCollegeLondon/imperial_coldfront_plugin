@@ -6,7 +6,7 @@
       <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="mb-0">
           <i class="fas fa-coins" aria-hidden="true"></i>
-          {{ project.title }} — Credit Transactions
+          {{ project.title }} — RCS Credit Transactions
         </h3>
         <a class="btn btn-sm btn-outline-secondary"
            href="{% url 'project-detail' project.pk %}">Back to Group</a>
@@ -27,7 +27,7 @@
             <tbody>
               {% for row in rows %}
                 <tr>
-                  <td>{{ row.transaction.timestamp|date:"Y-m-d H:i" }}</td>
+                  <td>{{ row.transaction.timestamp|date:"Y-m-d" }}</td>
                   <td>{{ row.transaction.description }}</td>
                   <td>{{ row.transaction.authoriser }}</td>
                   <td>{{ row.transaction.get_transaction_type_display }}</td>
