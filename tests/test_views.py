@@ -398,7 +398,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
                 allocation_shortname=rdf_allocation_shortname,
                 description="A longer description text.",
                 create_credit_transaction="on",
-                credit_transaction_description="Auto debit for this allocation",
             ),
         )
 
@@ -408,10 +407,6 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         form_data = called_args[0]
         authoriser = called_args[1]
         assert form_data["create_credit_transaction"] is True
-        assert (
-            form_data["credit_transaction_description"]
-            == "Auto debit for this allocation"
-        )
         assert authoriser == superuser.username
 
     def test_post_feature_flag_enabled_blocks_insufficient_credit(

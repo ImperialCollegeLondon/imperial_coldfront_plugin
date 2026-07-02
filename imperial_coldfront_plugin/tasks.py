@@ -101,7 +101,6 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
         settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT
         and form_data.get("create_credit_transaction", True)
     )
-    credit_transaction_description = form_data.get("credit_transaction_description", "")
 
     shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
     location_attribute_type = AllocationAttributeType.objects.get(
@@ -131,7 +130,7 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
                 size_tb=storage_size_tb,
                 start_date=form_data["start_date"],
                 end_date=form_data["end_date"],
-                description=credit_transaction_description,
+                description=f"Creation of RDF allocation - {shortname}",
                 authoriser=authoriser,
             )
 

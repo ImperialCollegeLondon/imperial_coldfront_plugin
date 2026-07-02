@@ -297,6 +297,7 @@ class TestCreateRDFAllocation:
             create_credit_transaction=True,
             credit_transaction_description="Auto debit for RDF allocation",
         )
+        shortname = rdf_form_data["allocation_shortname"]
 
         form = RDFAllocationForm(data=rdf_form_data)
         assert form.is_valid(), f"Form errors: {form.errors}"
@@ -305,7 +306,7 @@ class TestCreateRDFAllocation:
 
         debit_transaction = CreditTransaction.objects.get(
             project=project,
-            description="Auto debit for RDF allocation",
+            description=f"Creation of RDF allocation - {shortname}",
             authoriser="adminuser",
             transaction_type=CreditTransaction.TransactionType.STORAGE,
         )

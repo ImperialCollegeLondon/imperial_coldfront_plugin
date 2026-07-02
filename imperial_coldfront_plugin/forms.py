@@ -134,7 +134,6 @@ class AllocationFormData(TypedDict):
     dart_id: str
     allocation_shortname: str
     create_credit_transaction: NotRequired[bool]
-    credit_transaction_description: NotRequired[str]
 
 
 class RDFAllocationForm(forms.Form):
@@ -182,19 +181,12 @@ class RDFAllocationForm(forms.Form):
             "Create a debit transaction from the requested storage size and duration."
         ),
     )
-    credit_transaction_description = forms.CharField(
-        required=False,
-        max_length=255,
-        widget=forms.Textarea(attrs={"rows": 3}),
-        help_text="Description to store on the generated credit transaction.",
-    )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialise form and hide auto-credit fields when feature is disabled."""
         super().__init__(*args, **kwargs)
         if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
             self.fields["create_credit_transaction"].widget = forms.HiddenInput()
-            self.fields["credit_transaction_description"].widget = forms.HiddenInput()
 
     def clean_dart_id(self) -> str:
         """Validate provided Dart ID."""
@@ -235,10 +227,6 @@ class RDFAllocationForm(forms.Form):
 
         if not cleaned_data.get("create_credit_transaction"):
             return cleaned_data
-
-        cleaned_data["credit_transaction_description"] = (
-            cleaned_data.get("credit_transaction_description") or ""
-        ).strip()
 
         project = cleaned_data.get("project")
         size = cleaned_data.get("size")

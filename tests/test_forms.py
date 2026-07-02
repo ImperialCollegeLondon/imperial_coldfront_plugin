@@ -144,7 +144,7 @@ def test_rdf_allocation_end_date_initial_value(rdf_form_data, settings):
     )
 
 
-def test_rdf_allocation_form_auto_credit_fields_hidden_when_feature_disabled(settings):
+def test_rdf_allocation_form_auto_credit_field_hidden_when_feature_disabled(settings):
     """Test auto-credit fields use HiddenInput when the feature flag is disabled."""
     settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = False
 
@@ -153,35 +153,16 @@ def test_rdf_allocation_form_auto_credit_fields_hidden_when_feature_disabled(set
     assert isinstance(
         form.fields["create_credit_transaction"].widget, forms.HiddenInput
     )
-    assert isinstance(
-        form.fields["credit_transaction_description"].widget, forms.HiddenInput
-    )
 
 
-def test_rdf_allocation_form_auto_credit_fields_present_when_feature_enabled(settings):
-    """Test auto-credit fields are present when the feature flag is enabled."""
+def test_rdf_allocation_form_auto_credit_field_present_when_feature_enabled(settings):
+    """Test auto-credit field is present when the feature flag is enabled."""
     settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
 
     form = RDFAllocationForm()
 
     assert "create_credit_transaction" in form.fields
     assert form.fields["create_credit_transaction"].initial
-    assert "credit_transaction_description" in form.fields
-
-
-def test_rdf_allocation_description_not_required_when_auto_credit_disabled(
-    settings, rdf_form_data
-):
-    """Test description is optional when auto-credit checkbox is unticked."""
-    settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
-
-    rdf_form_data.update(
-        create_credit_transaction=False,
-        credit_transaction_description="",
-    )
-    form = RDFAllocationForm(data=rdf_form_data)
-
-    assert form.is_valid(), f"Form errors: {form.errors}"
 
 
 def test_rdf_allocation_rejects_end_date_before_start_date(settings, rdf_form_data):
@@ -209,7 +190,6 @@ def test_rdf_allocation_rejects_when_project_has_insufficient_credit(
         end_date=datetime.now().date(),
         size=10,
         create_credit_transaction=True,
-        credit_transaction_description="Auto debit for allocation",
     )
     form = RDFAllocationForm(data=rdf_form_data)
 
@@ -235,7 +215,6 @@ def test_rdf_allocation_accepts_when_project_has_sufficient_credit(
         end_date=datetime.now().date(),
         size=1,
         create_credit_transaction=True,
-        credit_transaction_description="Auto debit for allocation",
     )
     form = RDFAllocationForm(data=rdf_form_data)
 
