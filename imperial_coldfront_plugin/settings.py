@@ -243,3 +243,6 @@ ENABLE_RDF_ALLOCATION_AUTO_CREDIT = ENV.bool(
     "ENABLE_RDF_ALLOCATION_AUTO_CREDIT", default=False
 )
 """Feature flag to enable or disable automatic credit debits for RDF allocations."""
+
+CREDITS_HELP_URL = ENV.str("CREDITS_HELP_URL", default="")
+"""URL of the help page for credits."""
