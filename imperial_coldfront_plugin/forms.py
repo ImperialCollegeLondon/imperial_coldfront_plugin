@@ -178,8 +178,10 @@ class RDFAllocationForm(forms.Form):
         required=False,
         initial=True,
         help_text=(
-            "Create a debit transaction from the requested storage size and duration."
+            "Debit the project's RCS credits for "
+            f"{settings.SERVICE_CHARGING_RATES['rdf_active']}."
         ),
+        label="Apply RCS credit charge",
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
