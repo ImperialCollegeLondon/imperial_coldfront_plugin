@@ -397,6 +397,7 @@ class CreditTransaction(models.Model):
 
         STORAGE = "STG", "Storage"
         DONATION = "DON", "Donation"
+        CREDIT = "CRD", "Credit"
         OTHER = "OTH", "Other"
 
     timestamp = models.DateTimeField(auto_now_add=True)
