@@ -295,7 +295,6 @@ class TestCreateRDFAllocation:
             end_date=timezone.now().date(),
             size=1,
             create_credit_transaction=True,
-            credit_transaction_description="Auto debit for RDF allocation",
         )
         shortname = rdf_form_data["allocation_shortname"]
 

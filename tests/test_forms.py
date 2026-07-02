@@ -145,7 +145,7 @@ def test_rdf_allocation_end_date_initial_value(rdf_form_data, settings):
 
 
 def test_rdf_allocation_form_auto_credit_field_hidden_when_feature_disabled(settings):
-    """Test auto-credit fields use HiddenInput when the feature flag is disabled."""
+    """Test auto-credit field uses HiddenInput when the feature flag is disabled."""
     settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = False
 
     form = RDFAllocationForm()

@@ -183,7 +183,7 @@ class RDFAllocationForm(forms.Form):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialise form and hide auto-credit fields when feature is disabled."""
+        """Initialise form and hide auto-credit field when feature is disabled."""
         super().__init__(*args, **kwargs)
         if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
             self.fields["create_credit_transaction"].widget = forms.HiddenInput()
