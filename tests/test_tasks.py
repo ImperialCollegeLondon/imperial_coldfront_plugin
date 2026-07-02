@@ -307,6 +307,7 @@ class TestCreateRDFAllocation:
             project=project,
             description="Auto debit for RDF allocation",
             authoriser="adminuser",
+            transaction_type=CreditTransaction.TransactionType.STORAGE,
         )
         assert debit_transaction.amount == -1
 

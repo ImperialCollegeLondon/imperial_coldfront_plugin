@@ -75,7 +75,7 @@ def _create_rdf_allocation_debit_transaction(
         amount=debit,
         description=description,
         authoriser=authoriser,
-        type=CreditTransaction.TransactionType.STORAGE,
+        transaction_type=CreditTransaction.TransactionType.STORAGE,
     )
     return locked_project
 
