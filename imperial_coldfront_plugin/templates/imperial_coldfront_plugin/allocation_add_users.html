@@ -45,28 +45,28 @@
             <button type="submit" class="btn btn-primary">
               <i class="fas fa-user-plus"></i> Add Selected Users to Allocation
             </button>
-          <a class="btn btn-secondary"
-             href="{% url 'allocation-detail' allocation.pk %}"
-             role="button"><i class="fas fa-long-arrow-left" aria-hidden="true"></i>
-        Back to Allocation</a>
-        <br>
+            <a class="btn btn-secondary"
+               href="{% url 'allocation-detail' allocation.pk %}"
+               role="button"><i class="fas fa-long-arrow-left" aria-hidden="true"></i>
+            Back to Allocation</a>
+            <br>
+          </div>
+        </form>
       </div>
-    </form>
-  </div>
-</div>
-{% else %}
-<a class="btn btn-secondary mb-3"
-   href="{% url 'allocation-detail' allocation.pk %}"
-   role="button"><i class="fas fa-long-arrow-left" aria-hidden="true"></i> Back to Allocation</a>
-<div class="alert alert-info">
-  All eligible users in group are already in this allocation!
-  {% if allocation.get_parent_resource.name == "HX2" %}
-    Note that users may not be eligible to be added to this allocation if they are
-    already a member of another HX2 Allocation.
+    </div>
+  {% else %}
+    <a class="btn btn-secondary mb-3"
+       href="{% url 'allocation-detail' allocation.pk %}"
+       role="button"><i class="fas fa-long-arrow-left" aria-hidden="true"></i> Back to Allocation</a>
+    <div class="alert alert-info">
+      All eligible users in group are already in this allocation!
+      {% if allocation.get_parent_resource.name == "HX2" %}
+        Note that users may not be eligible to be added to this allocation if they are
+        already a member of another HX2 Allocation.
+      {% endif %}
+    </div>
   {% endif %}
-</div>
-{% endif %}
-<script>
+  <script>
   $("#selectAll").click(function () {
     $("input[name^='userform-']").prop('checked', $(this).prop('checked'));
   });
@@ -77,5 +77,5 @@
       $("#selectAll").prop('checked', false);
     }
   });
-</script>
+  </script>
 {% endblock content %}
