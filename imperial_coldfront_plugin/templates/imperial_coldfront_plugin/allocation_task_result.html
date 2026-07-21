@@ -13,15 +13,13 @@
         <p>
           In the event of failure the creation process will attempt to clean up any partially created or configured resources to keep Coldfront, Active Directory and GPFS in sync. However these systems should be manually checked to ensure this is the case.
         </p>
-        <p>
-          The following steps are recommended:
-          <ul>
-            <li>Ensure that the AD group 'rdf-{{ shortname }}' does not exist.</li>
-            <li>Ensure that the GPFS fileset '{{ shortname }}' does not exist.</li>
-            <li>Resolve the underlying issue (see the backtrace of the failure below and check worker process logs).</li>
-            <li>Attempt creation of the allocation again.</li>
-          </ul>
-        </p>
+        <p>The following steps are recommended:</p>
+        <ul>
+          <li>Ensure that the AD group 'rdf-{{ shortname }}' does not exist.</li>
+          <li>Ensure that the GPFS fileset '{{ shortname }}' does not exist.</li>
+          <li>Resolve the underlying issue (see the backtrace of the failure below and check worker process logs).</li>
+          <li>Attempt creation of the allocation again.</li>
+        </ul>
         <p>Failure backtrace:</p>
         <p style="white-space: pre-wrap;">{{ task.result }}</p>
       {% endif %}

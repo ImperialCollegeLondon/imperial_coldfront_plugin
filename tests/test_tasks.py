@@ -1620,7 +1620,7 @@ class TestCheckGPFSFilesetConsistency:
 
         send_fileset_not_found_notification_mock.assert_not_called()
         send_gpfs_fileset_not_in_coldfront_notification_mock.assert_called_once_with(
-            ["orphan-fileset"]
+            ["known-extra", "orphan-fileset"]
         )
 
     def test_no_email_when_send_email_false(
