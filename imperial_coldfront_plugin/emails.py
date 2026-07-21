@@ -349,3 +349,29 @@ def send_hx2_access_group_discrepancy_notification(discrepancy: Discrepancy) -> 
         subject=subject,
         message=message,
     )
+
+
+def send_gpfs_fileset_not_in_coldfront_notification(fileset_names: list[str]) -> None:
+    """Send notification to admins that GPFS filesets are missing in Coldfront.
+
+    Args:
+        fileset_names: The GPFS fileset names with no corresponding Coldfront
+            allocation.
+    """
+    if not settings.ADMINS:
+        return
+
+    subject = "Coldfront GPFS Consistency Check - Filesets Not Found in Coldfront"
+    message = (
+        "During a regularly scheduled automated check, one or more filesets in GPFS "
+        "were found to have no corresponding active RDF allocation in Coldfront. "
+        "Please investigate and reconcile the two.\n\n"
+        "The following fileset(s) in GPFS had no corresponding active RDF "
+        "allocation in Coldfront:\n"
+    )
+    for fileset_name in fileset_names:
+        message += f"\t- {fileset_name}\n"
+    mail_admins(
+        subject=subject,
+        message=message,
+    )

@@ -77,6 +77,9 @@ GPFS_FILESET_ACL = ACL(
 GPFS_FILES_QUOTA = ENV.int("GPFS_FILES_QUOTA", default=1000)
 """Quota for the fileset."""
 
+GPFS_FILESET_IGNORE_LIST = ENV.list("GPFS_FILESET_IGNORE_LIST", default=[])
+"""Fileset names to ignore when checking for GPFS filesets missing in Coldfront."""
+
 GPFS_ENABLED = bool(GPFS_API_URL and GPFS_API_USERNAME and GPFS_API_PASSWORD)
 """Computed value of whether GPFS integration is enabled."""
 

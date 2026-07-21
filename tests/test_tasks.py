@@ -152,6 +152,14 @@ def send_fileset_not_found_notification_mock(mocker):
 
 
 @pytest.fixture
+def send_gpfs_fileset_not_in_coldfront_notification_mock(mocker):
+    """Mock send_gpfs_fileset_not_in_coldfront_notification."""
+    return mocker.patch(
+        "imperial_coldfront_plugin.tasks.send_gpfs_fileset_not_in_coldfront_notification"
+    )
+
+
+@pytest.fixture
 def retrieve_all_fileset_quotas_mock(mocker):
     """Mock retrieve_all_fileset_quotas."""
     return mocker.patch(
@@ -1591,3 +1599,99 @@ class TestCheckHX2UserGroupConsistency:
         )
 
         notify_mock.assert_not_called()
+
+
+class TestCheckGPFSFilesetConsistency:
+    """Tests for check_gpfs_fileset_consistency task."""
+
+    def test_reports_missing_in_gpfs(
+        self,
+        settings,
+        rdf_allocation,
+        retrieve_all_fileset_quotas_mock,
+        send_fileset_not_found_notification_mock,
+        send_gpfs_fileset_not_in_coldfront_notification_mock,
+    ):
+        """Test allocation filesets missing from GPFS are reported."""
+        from imperial_coldfront_plugin.tasks import check_gpfs_fileset_consistency
+
+        settings.GPFS_ENABLED = True
+        settings.GPFS_FILESYSTEM_NAME = "gpfs"
+        settings.GPFS_FILESET_CONSISTENCY_IGNORE_LIST = []
+        settings.FACULTIES = {"foe": "Faculty of Engineering"}
+
+        retrieve_all_fileset_quotas_mock.return_value = {}
+
+        check_gpfs_fileset_consistency(send_email=True)
+
+        send_fileset_not_found_notification_mock.assert_called_once_with(
+            [rdf_allocation.shortname]
+        )
+        send_gpfs_fileset_not_in_coldfront_notification_mock.assert_not_called()
+
+    def test_reports_missing_in_coldfront_and_applies_ignores(
+        self,
+        settings,
+        rdf_allocation,
+        retrieve_all_fileset_quotas_mock,
+        send_fileset_not_found_notification_mock,
+        send_gpfs_fileset_not_in_coldfront_notification_mock,
+    ):
+        """Test orphan GPFS filesets are reported except configured ignores."""
+        from imperial_coldfront_plugin.tasks import check_gpfs_fileset_consistency
+
+        settings.GPFS_ENABLED = True
+        settings.GPFS_FILESYSTEM_NAME = "gpfs"
+        settings.GPFS_FILESET_CONSISTENCY_IGNORE_LIST = ["known-extra"]
+        settings.FACULTIES = {"foe": "Faculty of Engineering"}
+
+        retrieve_all_fileset_quotas_mock.return_value = {
+            "shorty": {"files_usage": 0, "files_limit": 0, "block_usage_tb": 0},
+            "known-extra": {
+                "files_usage": 0,
+                "files_limit": 0,
+                "block_usage_tb": 0,
+            },
+            "foe": {"files_usage": 0, "files_limit": 0, "block_usage_tb": 0},
+            "orphan-fileset": {
+                "files_usage": 0,
+                "files_limit": 0,
+                "block_usage_tb": 0,
+            },
+        }
+
+        check_gpfs_fileset_consistency(send_email=True)
+
+        send_fileset_not_found_notification_mock.assert_not_called()
+        send_gpfs_fileset_not_in_coldfront_notification_mock.assert_called_once_with(
+            ["orphan-fileset"]
+        )
+
+    def test_no_email_when_send_email_false(
+        self,
+        settings,
+        rdf_allocation,
+        retrieve_all_fileset_quotas_mock,
+        send_fileset_not_found_notification_mock,
+        send_gpfs_fileset_not_in_coldfront_notification_mock,
+    ):
+        """Test no notifications are sent when send_email is False."""
+        from imperial_coldfront_plugin.tasks import check_gpfs_fileset_consistency
+
+        settings.GPFS_ENABLED = True
+        settings.GPFS_FILESYSTEM_NAME = "gpfs"
+        settings.GPFS_FILESET_CONSISTENCY_IGNORE_LIST = []
+        settings.FACULTIES = {"foe": "Faculty of Engineering"}
+
+        retrieve_all_fileset_quotas_mock.return_value = {
+            "orphan-fileset": {
+                "files_usage": 0,
+                "files_limit": 0,
+                "block_usage_tb": 0,
+            }
+        }
+
+        check_gpfs_fileset_consistency(send_email=False)
+
+        send_fileset_not_found_notification_mock.assert_not_called()
+        send_gpfs_fileset_not_in_coldfront_notification_mock.assert_not_called()

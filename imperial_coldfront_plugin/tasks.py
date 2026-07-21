@@ -36,6 +36,7 @@ from .emails import (
     send_allocation_removal_warning,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
+    send_gpfs_fileset_not_in_coldfront_notification,
     send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
@@ -709,3 +710,57 @@ def check_hx2_user_group_consistency(send_email: bool = True) -> Discrepancy | N
         send_hx2_access_group_discrepancy_notification(check_result)
 
     return check_result
+
+
+def check_gpfs_fileset_consistency(send_email: bool = True) -> None:
+    """Check consistency of GPFS filesets with RDF allocations.
+
+    This function checks that each active RDF allocation has a corresponding
+    GPFS fileset.
+    If any discrepancies are found, a notification email is sent to admins.
+    """
+    if not settings.GPFS_ENABLED:
+        return
+
+    logger = logging.getLogger("django-q")
+
+    allocations = RDFAllocation.objects.filter(
+        resources__name="RDF Active",
+        status__name="Active",
+    ).distinct()
+
+    allocation_shortnames = {allocation.shortname for allocation in allocations}
+
+    client = GPFSClient()
+    try:
+        fileset_info = client.retrieve_all_fileset_quotas(
+            filesystem_name=settings.GPFS_FILESYSTEM_NAME
+        )
+    except Exception:
+        logger.exception("Error retrieving fileset information from GPFS.")
+        return
+
+    gpfs_fileset_names = set(fileset_info.keys())
+
+    ignored_gpfs_only_filesets = set(settings.GPFS_FILESET_IGNORE_LIST)
+
+    missing_in_gpfs = sorted(allocation_shortnames - gpfs_fileset_names)
+    missing_in_coldfront = sorted(
+        (gpfs_fileset_names - allocation_shortnames) - ignored_gpfs_only_filesets
+    )
+
+    if missing_in_gpfs:
+        logger.warning(
+            "Active RDF allocations missing GPFS filesets: %s",
+            ", ".join(missing_in_gpfs),
+        )
+        if send_email:
+            send_fileset_not_found_notification(missing_in_gpfs)
+
+    if missing_in_coldfront:
+        logger.warning(
+            "GPFS filesets without active RDF allocations in Coldfront: %s",
+            ", ".join(missing_in_coldfront),
+        )
+        if send_email:
+            send_gpfs_fileset_not_in_coldfront_notification(missing_in_coldfront)
