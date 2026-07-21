@@ -1617,7 +1617,7 @@ class TestCheckGPFSFilesetConsistency:
 
         settings.GPFS_ENABLED = True
         settings.GPFS_FILESYSTEM_NAME = "gpfs"
-        settings.GPFS_FILESET_CONSISTENCY_IGNORE_LIST = []
+        settings.GPFS_FILESET_IGNORE_LIST = []
         settings.FACULTIES = {"foe": "Faculty of Engineering"}
 
         retrieve_all_fileset_quotas_mock.return_value = {}
@@ -1642,7 +1642,7 @@ class TestCheckGPFSFilesetConsistency:
 
         settings.GPFS_ENABLED = True
         settings.GPFS_FILESYSTEM_NAME = "gpfs"
-        settings.GPFS_FILESET_CONSISTENCY_IGNORE_LIST = ["known-extra"]
+        settings.GPFS_FILESET_IGNORE_LIST = ["known-extra"]
         settings.FACULTIES = {"foe": "Faculty of Engineering"}
 
         retrieve_all_fileset_quotas_mock.return_value = {
@@ -1680,7 +1680,7 @@ class TestCheckGPFSFilesetConsistency:
 
         settings.GPFS_ENABLED = True
         settings.GPFS_FILESYSTEM_NAME = "gpfs"
-        settings.GPFS_FILESET_CONSISTENCY_IGNORE_LIST = []
+        settings.GPFS_FILESET_IGNORE_LIST = []
         settings.FACULTIES = {"foe": "Faculty of Engineering"}
 
         retrieve_all_fileset_quotas_mock.return_value = {
