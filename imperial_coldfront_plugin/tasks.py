@@ -715,10 +715,9 @@ def check_hx2_user_group_consistency(send_email: bool = True) -> Discrepancy | N
 def check_gpfs_fileset_consistency(send_email: bool = True) -> None:
     """Check consistency of GPFS filesets with RDF allocations.
 
-    This function checks that each active RDF allocation has a corresponding
-    GPFS fileset.
+    This function checks that each active RDF allocation has a corresponding GPFS fileset.
     If any discrepancies are found, a notification email is sent to admins.
-    """
+    """  # noqa: E501
     if not settings.GPFS_ENABLED:
         return
 
@@ -743,6 +742,7 @@ def check_gpfs_fileset_consistency(send_email: bool = True) -> None:
     gpfs_fileset_names = set(fileset_info.keys())
 
     ignored_gpfs_only_filesets = set(settings.GPFS_FILESET_IGNORE_LIST)
+    ignored_gpfs_only_filesets.update(settings.FACULTIES.keys())
 
     missing_in_gpfs = sorted(allocation_shortnames - gpfs_fileset_names)
     missing_in_coldfront = sorted(
