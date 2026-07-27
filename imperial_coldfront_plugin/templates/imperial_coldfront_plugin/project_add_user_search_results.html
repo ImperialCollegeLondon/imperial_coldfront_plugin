@@ -12,7 +12,7 @@
     {% if usernames_not_found %}
       Username{{ usernames_not_found|length|pluralize }}
       missing from database {{ usernames_not_found|length|pluralize:"is, are" }}: {{
-      usernames_not_found|join:", " }}.
+        usernames_not_found|join:", " }}.
     {% endif %}
     <br />
     {% if users_already_in_project %}
