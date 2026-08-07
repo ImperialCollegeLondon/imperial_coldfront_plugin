@@ -140,3 +140,24 @@ def test_ldap_group_member_search_handles_list_common_name(ldap_connection_mock)
     )
 
     assert ldap_group_member_search(GROUP_NAME) == {GROUP_NAME: [MEMBER_USERNAME]}
+
+
+def test_ldap_group_member_search_cn_list_length_error(ldap_connection_mock):
+    """Test LDAP search results with list-valued cn of length > 1 raise an error."""
+    ldap_connection_mock().search.side_effect = None
+    ldap_connection_mock().search.return_value = (
+        None,
+        None,
+        [
+            {
+                "attributes": {
+                    "cn": [GROUP_NAME, "another_name"],
+                    "member": [_make_dn(MEMBER_USERNAME)],
+                }
+            }
+        ],
+        None,
+    )
+
+    with pytest.raises(ValueError):
+        ldap_group_member_search(GROUP_NAME)
