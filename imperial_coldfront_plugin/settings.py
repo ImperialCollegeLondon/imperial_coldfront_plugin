@@ -112,7 +112,8 @@ LDAP_HX2_ACCESS_GROUP_NAME = ENV.str(
 """Name of the Active Directory group to add users to for HX2 access."""
 
 _GID_RANGES_RDF = ENV.str("GID_RANGE_RDF", default="1031386-1031405")
-_GID_RANGES_HX2 = ENV.str("GID_RANGE_HX2", default="1031406-1031425")
+# leave a gap so 1031406 can be used for the HX2 access group in the local ldap setup
+_GID_RANGES_HX2 = ENV.str("GID_RANGE_HX2", default="1031407-1031425")
 
 
 def string_to_gid_ranges(gid_ranges_str: str) -> list[range]:

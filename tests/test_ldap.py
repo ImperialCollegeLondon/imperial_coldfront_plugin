@@ -7,6 +7,7 @@ from imperial_coldfront_plugin.ldap import (
     LDAPGroupModifyError,
     group_dn_from_name,
     ldap_add_member_to_group,
+    ldap_group_member_search,
     ldap_remove_member_from_group,
 )
 
@@ -119,3 +120,23 @@ def test_ldap_remove_member_from_group_wrong_error_code(ldap_connection_mock):
     )
     with pytest.raises(LDAPGroupModifyError):
         ldap_remove_member_from_group(GROUP_NAME, MEMBER_USERNAME, allow_missing=True)
+
+
+def test_ldap_group_member_search_handles_list_common_name(ldap_connection_mock):
+    """Test that LDAP search results with list-valued common names are normalized."""
+    ldap_connection_mock().search.side_effect = None
+    ldap_connection_mock().search.return_value = (
+        None,
+        None,
+        [
+            {
+                "attributes": {
+                    "cn": [GROUP_NAME],
+                    "member": [_make_dn(MEMBER_USERNAME)],
+                }
+            }
+        ],
+        None,
+    )
+
+    assert ldap_group_member_search(GROUP_NAME) == {GROUP_NAME: [MEMBER_USERNAME]}
