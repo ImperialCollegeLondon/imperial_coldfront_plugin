@@ -247,3 +247,8 @@ ENABLE_RDF_ALLOCATION_AUTO_CREDIT = ENV.bool(
 
 CREDITS_HELP_URL = ENV.str("CREDITS_HELP_URL", default="")
 """URL of the help page for credits."""
+
+LDAP_SUPPRESS_ADDITIONAL_GROUPS = ENV.list(
+    "LDAP_SUPPRESS_ADDITIONAL_GROUPS", default=[]
+)
+"""LDAP groups excluded from additional-group consistency check alerts."""

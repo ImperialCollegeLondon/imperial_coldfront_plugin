@@ -240,8 +240,10 @@ def find_discrepancies_helper(
     """Finds discrepancies between LDAP groups and allocation users."""
     discrepancies: list[Discrepancy] = []
     missing_ldap_groups = []
+    expected_group_names = set()
     for allocation in allocations:
         group_name = allocation.ldap_shortname
+        expected_group_names.add(group_name)
 
         active_users = AllocationUser.objects.filter(
             allocation=allocation, status__name="Active"
@@ -265,8 +267,15 @@ def find_discrepancies_helper(
                     extra_members=list(extra_members),
                 )
             )
+    additional_ldap_groups = sorted(
+        set(ldap_groups)
+        - expected_group_names
+        - set(settings.LDAP_SUPPRESS_ADDITIONAL_GROUPS)
+    )
     return DiscrepancyCheckResult(
-        membership_discrepancies=discrepancies, missing_ldap_groups=missing_ldap_groups
+        membership_discrepancies=discrepancies,
+        missing_ldap_groups=missing_ldap_groups,
+        additional_ldap_groups=additional_ldap_groups,
     )
 
 
