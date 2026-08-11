@@ -53,11 +53,14 @@ class QuotaConsistencyCheckResult:
 
     discrepancies: list[QuotaDiscrepancy]
     missing_filesets: list[str]
+    missing_in_coldfront: list[str]
 
     @property
     def discrepancies_found(self) -> bool:
         """Whether any discrepancies were found."""
-        return bool(self.discrepancies or self.missing_filesets)
+        return bool(
+            self.discrepancies or self.missing_filesets or self.missing_in_coldfront
+        )
 
 
 def send_discrepancy_notification(
