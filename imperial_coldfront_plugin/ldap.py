@@ -271,3 +271,26 @@ def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:
         settings.LDAP_GROUP_OU, f"(gidNumber={gid})", attributes=["cn"]
     )
     return len(response) > 0
+
+
+def ldap_get_group_gid(group_name: str, conn: Connection | None = None) -> int | None:
+    """Get the gidNumber of an LDAP group.
+
+    Args:
+        group_name: The name of the group to look up.
+        conn: Connection to ldap server. If not provided, a new
+            connection will be created.
+
+    Returns:
+        The gidNumber of the group, or None if the group does not exist.
+    """
+    if conn is None:
+        conn = _get_ldap_connection()
+    _, _, response, _ = conn.search(
+        settings.LDAP_GROUP_OU,
+        f"(cn={group_name})",
+        attributes=["gidNumber"],
+    )
+    if not response:
+        return None
+    return int(response[0]["attributes"]["gidNumber"])
