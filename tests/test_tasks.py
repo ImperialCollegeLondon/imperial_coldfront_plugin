@@ -29,6 +29,7 @@ from imperial_coldfront_plugin.tasks import (
     check_rdf_allocation_expiry_notifications,
     check_rdf_ldap_consistency,
     create_rdf_allocation,
+    recover_rdf_allocation,
     unlink_expired_allocation_filesets,
     update_quota_usages_task,
     zero_allocation_gpfs_quota,
@@ -473,6 +474,117 @@ class TestCreateRDFAllocation:
         ldap_delete_group_mock.assert_called_once_with(
             rdf_allocation_ldap_name, allow_missing=True
         )
+
+
+@pytest.fixture
+def recover_rdf_form_data(project):
+    """Fixture to provide recover_rdf_allocation task data."""
+    return dict(
+        project=project,
+        start_date=datetime.now().date(),
+        end_date=datetime.now().date() + timedelta(days=7),
+        size=12,
+        allocation_shortname="recovername",
+        description="Recover allocation description",
+        gid=12345,
+        dart_id="",
+    )
+
+
+class TestRecoverRDFAllocation:
+    """Tests for recover_rdf_allocation task."""
+
+    def test_success_creates_only_coldfront_objects(
+        self,
+        project,
+        settings,
+        recover_rdf_form_data,
+        allocation_dependencies,
+        gpfs_create_fileset_mock,
+        ldap_create_group_mock,
+    ):
+        """Test recovery task create DB objects without provisioning LDAP/GPFS."""
+        settings.GPFS_FILESYSTEM_NAME = "testfs"
+        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
+        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
+
+        shortname = recover_rdf_form_data["allocation_shortname"]
+        fileset_path_info = FilesetPathInfo(
+            settings.GPFS_FILESYSTEM_MOUNT_PATH,
+            settings.GPFS_FILESYSTEM_NAME,
+            settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+            project.faculty,
+            project.department,
+            project.group_id,
+            shortname,
+        )
+
+        before_credit_count = CreditTransaction.objects.count()
+
+        allocation_pk = recover_rdf_allocation(
+            recover_rdf_form_data, authoriser="adminuser"
+        )
+
+        allocation = Allocation.objects.get(pk=allocation_pk)
+        assert allocation.project == project
+        assert allocation.status.name == "Active"
+        assert allocation.justification == recover_rdf_form_data["description"]
+
+        storage_attribute = AllocationAttribute.objects.get(
+            allocation_attribute_type__name="Storage Quota (TB)",
+            allocation=allocation,
+            value=recover_rdf_form_data["size"],
+        )
+        assert storage_attribute.allocationattributeusage.value == 0
+
+        files_attribute = AllocationAttribute.objects.get(
+            allocation_attribute_type__name="Files Quota",
+            allocation=allocation,
+            value=settings.GPFS_FILES_QUOTA,
+        )
+        assert files_attribute.allocationattributeusage.value == 0
+
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="Shortname",
+            allocation=allocation,
+            value=shortname,
+        )
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="GID",
+            allocation=allocation,
+            value=recover_rdf_form_data["gid"],
+        )
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="Filesystem location",
+            allocation=allocation,
+            value=str(fileset_path_info.fileset_absolute_path),
+        )
+        AllocationUser.objects.get(
+            allocation=allocation, user=project.pi, status__name="Active"
+        )
+
+        gpfs_create_fileset_mock.assert_not_called()
+        ldap_create_group_mock.assert_not_called()
+        assert CreditTransaction.objects.count() == before_credit_count
+
+    def test_rollback_on_error(
+        self,
+        mocker,
+        recover_rdf_form_data,
+        allocation_dependencies,
+    ):
+        """Test recovery task rolls back all DB changes on exception."""
+        mocker.patch(
+            "imperial_coldfront_plugin.tasks.AllocationUser.objects.create",
+            side_effect=RuntimeError(),
+        )
+
+        with pytest.raises(RuntimeError):
+            recover_rdf_allocation(recover_rdf_form_data, authoriser="adminuser")
+
+        assert not Allocation.objects.exists()
+        assert not AllocationAttribute.objects.exists()
+        assert not AllocationAttributeUsage.objects.exists()
 
 
 class TestCheckRDFLdapConsistency:
