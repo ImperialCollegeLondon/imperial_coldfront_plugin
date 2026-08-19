@@ -229,7 +229,7 @@ platformdirs==4.9.4
     #   virtualenv
 pluggy==1.5.0
     # via pytest
-pre-commit==4.0.1
+pre-commit==4.6.2
     # via imperial_coldfront_plugin (pyproject.toml)
 pyasn1==0.6.1
     # via
