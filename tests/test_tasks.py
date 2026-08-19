@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from typing import ClassVar
 from unittest.mock import call
 
 import pytest
@@ -24,6 +25,7 @@ from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.models import CreditTransaction
 from imperial_coldfront_plugin.tasks import (
+    check_quota_consistency,
     check_hx2_ldap_consistency,
     check_hx2_user_group_consistency,
     check_rdf_allocation_expiry_notifications,
@@ -1604,6 +1606,15 @@ class TestCheckHX2UserGroupConsistency:
 class TestCheckQuotaFilesetConsistency:
     """Tests for GPFS fileset checks performed by check_quota_consistency."""
 
+    dummy_quota: ClassVar = dict(files_usage=0, block_usage_tb=0, block_limit_tb=0, files_limit=0)
+
+    @pytest.fixture
+    def settings(self, settings):
+        """Fixture to provide settings for the tests."""
+        settings.GPFS_FILESET_IGNORE_LIST = []
+        settings.FACULTIES = {"foe": "Faculty of Engineering"}
+        return settings
+
     def test_reports_missing_in_gpfs(
         self,
         settings,
@@ -1613,13 +1624,6 @@ class TestCheckQuotaFilesetConsistency:
         send_gpfs_fileset_not_in_coldfront_notification_mock,
     ):
         """Test allocation filesets missing from GPFS are reported."""
-        from imperial_coldfront_plugin.tasks import check_quota_consistency
-
-        settings.GPFS_ENABLED = True
-        settings.GPFS_FILESYSTEM_NAME = "gpfs"
-        settings.GPFS_FILESET_IGNORE_LIST = []
-        settings.FACULTIES = {"foe": "Faculty of Engineering"}
-
         retrieve_all_fileset_quotas_mock.return_value = {}
 
         check_quota_consistency(send_email=True)
@@ -1639,12 +1643,7 @@ class TestCheckQuotaFilesetConsistency:
         allocation_attribute_factory,
     ):
         """Test orphan GPFS filesets are reported except configured ignores."""
-        from imperial_coldfront_plugin.tasks import check_quota_consistency
-
-        settings.GPFS_ENABLED = True
-        settings.GPFS_FILESYSTEM_NAME = "gpfs"
         settings.GPFS_FILESET_IGNORE_LIST = ["known-extra"]
-        settings.FACULTIES = {"foe": "Faculty of Engineering"}
 
         allocation_attribute_factory(
             allocation=rdf_allocation,
@@ -1658,23 +1657,10 @@ class TestCheckQuotaFilesetConsistency:
         )
 
         retrieve_all_fileset_quotas_mock.return_value = {
-            "shorty": {
-                "files_usage": 0,
-                "files_limit": 0,
-                "block_usage_tb": 0,
-                "block_limit_tb": 0,
-            },
-            "known-extra": {
-                "files_usage": 0,
-                "files_limit": 0,
-                "block_usage_tb": 0,
-            },
-            "foe": {"files_usage": 0, "files_limit": 0, "block_usage_tb": 0},
-            "orphan-fileset": {
-                "files_usage": 0,
-                "files_limit": 0,
-                "block_usage_tb": 0,
-            },
+            "shorty": self.dummy_quota,
+            "known-extra": self.dummy_quota,
+            "foe": self.dummy_quota,
+            "orphan-fileset": self.dummy_quota,
         }
 
         check_quota_consistency(send_email=True)
@@ -1693,19 +1679,8 @@ class TestCheckQuotaFilesetConsistency:
         send_gpfs_fileset_not_in_coldfront_notification_mock,
     ):
         """Test no notifications are sent when send_email is False."""
-        from imperial_coldfront_plugin.tasks import check_quota_consistency
-
-        settings.GPFS_ENABLED = True
-        settings.GPFS_FILESYSTEM_NAME = "gpfs"
-        settings.GPFS_FILESET_IGNORE_LIST = []
-        settings.FACULTIES = {"foe": "Faculty of Engineering"}
-
         retrieve_all_fileset_quotas_mock.return_value = {
-            "orphan-fileset": {
-                "files_usage": 0,
-                "files_limit": 0,
-                "block_usage_tb": 0,
-            }
+            "orphan-fileset": self.dummy_quota
         }
 
         check_quota_consistency(send_email=False)
