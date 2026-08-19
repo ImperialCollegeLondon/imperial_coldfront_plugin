@@ -25,9 +25,9 @@ from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.models import CreditTransaction
 from imperial_coldfront_plugin.tasks import (
-    check_quota_consistency,
     check_hx2_ldap_consistency,
     check_hx2_user_group_consistency,
+    check_quota_consistency,
     check_rdf_allocation_expiry_notifications,
     check_rdf_ldap_consistency,
     create_rdf_allocation,
@@ -1562,7 +1562,9 @@ class TestCheckHX2UserGroupConsistency:
 class TestCheckQuotaFilesetConsistency:
     """Tests for GPFS fileset checks performed by check_quota_consistency."""
 
-    dummy_quota: ClassVar = dict(files_usage=0, block_usage_tb=0, block_limit_tb=0, files_limit=0)
+    dummy_quota: ClassVar = dict(
+        files_usage=0, block_usage_tb=0, block_limit_tb=0, files_limit=0
+    )
 
     @pytest.fixture
     def settings(self, settings):
