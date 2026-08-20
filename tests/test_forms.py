@@ -232,8 +232,24 @@ def test_rdf_allocation_end_date_initial_value(rdf_form_data, settings):
     """Test that the default end_date is set correctly."""
     form = RDFAllocationForm(data=rdf_form_data)
     assert form["end_date"].initial == datetime.now().date() + timedelta(
-        days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS
+        days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS - 1
     )
+
+
+def test_rdf_allocation_credit_cost_equals_service_charge_rate(settings):
+    """Test that the credit cost for default start/end dates equals rdf_active rate."""
+    from imperial_coldfront_plugin.forms import _initial_end_date, _todays_date
+    from imperial_coldfront_plugin.utils import calculate_rdf_allocation_credit_debit
+
+    start_date = _todays_date()
+    end_date = _initial_end_date()
+    rate = settings.SERVICE_CHARGING_RATES["rdf_active"]
+
+    credit_cost = calculate_rdf_allocation_credit_debit(
+        start_date=start_date, end_date=end_date, size_tb=1
+    )
+
+    assert credit_cost == int(rate.magnitude) * -1  # Debits are negative
 
 
 def test_rdf_allocation_form_auto_credit_field_hidden_when_feature_disabled(settings):

@@ -115,7 +115,7 @@ def _todays_date() -> date:
 
 
 def _initial_end_date() -> date:
-    return _todays_date() + timedelta(days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS)
+    return _todays_date() + timedelta(days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS - 1)
 
 
 def _js_select_widget() -> forms.Select:
