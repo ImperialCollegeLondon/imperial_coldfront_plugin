@@ -40,7 +40,7 @@ from .emails import (
     send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
-from .forms import AllocationFormData
+from .forms import AllocationFormData, RecoverRDFAllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
@@ -231,6 +231,114 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
                 )
                 ldap_delete_group(ldap_name, allow_missing=True)
                 raise
+    return rdf_allocation.pk
+
+
+def recover_rdf_allocation(
+    form_data: RecoverRDFAllocationFormData, authoriser: str = ""
+) -> int:
+    """Create Coldfront database objects for a pre-existing RDF allocation.
+
+    Returns:
+        The primary key of the created Allocation.
+    """
+    logger = logging.getLogger("django-q")
+
+    storage_size_tb = form_data["size"]
+    project = form_data["project"]
+    shortname = form_data["allocation_shortname"]
+    gid = form_data["gid"]
+
+    shortname_attribute_type = AllocationAttributeType.objects.get(name="Shortname")
+    location_attribute_type = AllocationAttributeType.objects.get(
+        name="Filesystem location"
+    )
+    storage_quota_attribute_type = AllocationAttributeType.objects.get(
+        name="Storage Quota (TB)"
+    )
+    files_quota_attribute_type = AllocationAttributeType.objects.get(name="Files Quota")
+    gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
+    rdf_resource = Resource.objects.get(name="RDF Active")
+
+    allocation_active_status = AllocationStatusChoice.objects.get(name="Active")
+    allocation_user_active_status = AllocationUserStatusChoice.objects.get(
+        name="Active"
+    )
+
+    faculty = project.faculty
+    department = project.department
+    group_id = project.group_id
+
+    logger.info(
+        "Recovering Coldfront database entries for existing RDF allocation '%s'.",
+        shortname,
+    )
+    with transaction.atomic():
+        rdf_allocation = RDFAllocation.objects.create(
+            project=project,
+            status=allocation_active_status,
+            start_date=form_data["start_date"],
+            end_date=form_data["end_date"],
+            is_changeable=True,
+            justification=form_data["description"],
+        )
+        rdf_allocation.resources.add(rdf_resource)
+
+        quota_attribute = AllocationAttribute.objects.create(
+            allocation_attribute_type=storage_quota_attribute_type,
+            allocation=rdf_allocation,
+            value=storage_size_tb,
+        )
+        AllocationAttributeUsage.objects.create(
+            allocation_attribute=quota_attribute, value=0
+        )
+
+        files_attribute = AllocationAttribute.objects.create(
+            allocation_attribute_type=files_quota_attribute_type,
+            allocation=rdf_allocation,
+            value=settings.GPFS_FILES_QUOTA,
+        )
+        AllocationAttributeUsage.objects.create(
+            allocation_attribute=files_attribute, value=0
+        )
+
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=shortname_attribute_type,
+            allocation=rdf_allocation,
+            value=shortname,
+        )
+
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=gid_attribute_type,
+            allocation=rdf_allocation,
+            value=gid,
+        )
+
+        fileset_path_info = FilesetPathInfo(
+            filesystem_mount_path=settings.GPFS_FILESYSTEM_MOUNT_PATH,
+            filesystem_name=settings.GPFS_FILESYSTEM_NAME,
+            top_level_directories=settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES,
+            faculty=faculty,
+            department=department,
+            group_id=group_id,
+            fileset_name=shortname,
+        )
+        AllocationAttribute.objects.create(
+            allocation_attribute_type=location_attribute_type,
+            allocation=rdf_allocation,
+            value=fileset_path_info.fileset_absolute_path,
+        )
+
+        AllocationUser.objects.create(
+            allocation=rdf_allocation,
+            user=project.pi,
+            status=allocation_user_active_status,
+        )
+
+    logger.info(
+        f"Successfully recovered Coldfront allocation pk={rdf_allocation.pk} "
+        f"for shortname '{shortname}'."
+    )
     return rdf_allocation.pk
 
 
