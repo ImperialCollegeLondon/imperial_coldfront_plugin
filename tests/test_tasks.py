@@ -614,7 +614,51 @@ class TestCheckRDFLdapConsistency:
 
         result = check_rdf_ldap_consistency()
 
-        assert result == DiscrepancyCheckResult([], [])
+        assert result == DiscrepancyCheckResult([], [], [])
+        notify_mock.assert_not_called()
+
+    def test_additional_ldap_group(
+        self,
+        rdf_allocation,
+        rdf_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        rdf_allocation_ldap_name,
+    ):
+        """Test that a group with no corresponding allocation is reported."""
+        additional_group = "rdfdev-additional"
+        username = rdf_allocation_user.user.username
+        ldap_group_search_mock.return_value = {
+            rdf_allocation_ldap_name: [username],
+            additional_group: [],
+        }
+
+        result = check_rdf_ldap_consistency()
+
+        assert result == DiscrepancyCheckResult([], [], [additional_group])
+        notify_mock.assert_called_once_with(result, source="RDF")
+
+    def test_suppressed_additional_ldap_group(
+        self,
+        rdf_allocation,
+        rdf_allocation_user,
+        ldap_group_search_mock,
+        notify_mock,
+        rdf_allocation_ldap_name,
+        settings,
+    ):
+        """Test that configured additional LDAP groups are ignored."""
+        additional_group = "rdfdev-additional"
+        settings.LDAP_SUPPRESS_ADDITIONAL_GROUPS = [additional_group]
+        username = rdf_allocation_user.user.username
+        ldap_group_search_mock.return_value = {
+            rdf_allocation_ldap_name: [username],
+            additional_group: [],
+        }
+
+        result = check_rdf_ldap_consistency()
+
+        assert result == DiscrepancyCheckResult([], [], [])
         notify_mock.assert_not_called()
 
     def test_missing_members(
@@ -680,7 +724,7 @@ class TestCheckRDFLdapConsistency:
 
         result = check_rdf_ldap_consistency()
 
-        assert result == DiscrepancyCheckResult([], [rdf_allocation_ldap_name])
+        assert result == DiscrepancyCheckResult([], [rdf_allocation_ldap_name], [])
         notify_mock.assert_called_once_with(result, source="RDF")
 
     def test_no_email_when_send_email_false(
@@ -725,7 +769,7 @@ class TestCheckHX2LdapConsistency:
 
         result = check_hx2_ldap_consistency()
 
-        assert result == DiscrepancyCheckResult([], [])
+        assert result == DiscrepancyCheckResult([], [], [])
         notify_mock.assert_not_called()
 
     def test_missing_members(
@@ -788,7 +832,7 @@ class TestCheckHX2LdapConsistency:
 
         result = check_hx2_ldap_consistency()
 
-        assert result == DiscrepancyCheckResult([], [hx2_allocation.ldap_shortname])
+        assert result == DiscrepancyCheckResult([], [hx2_allocation.ldap_shortname], [])
         notify_mock.assert_called_once_with(result, source="HX2")
 
     def test_no_email_when_send_email_false(
