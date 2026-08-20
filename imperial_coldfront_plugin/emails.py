@@ -30,11 +30,16 @@ class DiscrepancyCheckResult:
 
     membership_discrepancies: list[Discrepancy]
     missing_ldap_groups: list[str]
+    additional_ldap_groups: list[str]
 
     @property
     def discrepancies_found(self) -> bool:
         """Whether any discrepancies were found."""
-        return bool(self.membership_discrepancies or self.missing_ldap_groups)
+        return bool(
+            self.membership_discrepancies
+            or self.missing_ldap_groups
+            or self.additional_ldap_groups
+        )
 
 
 @dataclass
@@ -100,6 +105,11 @@ def send_discrepancy_notification(
     if check_result.missing_ldap_groups:
         message += f"\n{source} allocations that do not have corresponding AD group:\n"
         for group in sorted(check_result.missing_ldap_groups):
+            message += f"\t- {group}\n"
+
+    if check_result.additional_ldap_groups:
+        message += f"\nAD groups with no corresponding {source} allocation:\n"
+        for group in sorted(check_result.additional_ldap_groups):
             message += f"\t- {group}\n"
 
     mail_admins(

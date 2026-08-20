@@ -116,6 +116,7 @@ message = Template(
     "\n\n"
     "$membership_discrepancies_text"
     "$missing_ldap_groups_text"
+    "$additional_ldap_groups_text"
 )
 
 
@@ -132,6 +133,7 @@ def test_send_discrepancy_notification_membership_discrepancies(source: str):
             )
         ],
         missing_ldap_groups=[],
+        additional_ldap_groups=[],
     )
 
     membership_discrepancies_text = (
@@ -150,6 +152,7 @@ def test_send_discrepancy_notification_membership_discrepancies(source: str):
         source=source,
         membership_discrepancies_text=membership_discrepancies_text,
         missing_ldap_groups_text="",
+        additional_ldap_groups_text="",
     )
 
 
@@ -159,6 +162,7 @@ def test_send_discrepancy_notification_missing_ldap_groups(source: str):
     check_result = DiscrepancyCheckResult(
         membership_discrepancies=[],
         missing_ldap_groups=["rdfdev-testgroup"],
+        additional_ldap_groups=[],
     )
     missing_ldap_groups_text = (
         f"\n{source} allocations that do not have corresponding AD group:\n"
@@ -172,6 +176,31 @@ def test_send_discrepancy_notification_missing_ldap_groups(source: str):
         source=source,
         membership_discrepancies_text="",
         missing_ldap_groups_text=missing_ldap_groups_text,
+        additional_ldap_groups_text="",
+    )
+
+
+@pytest.mark.parametrize("source", ["RDF", "HX2"])
+def test_send_discrepancy_notification_additional_ldap_groups(source: str):
+    """Test that the discrepancy email includes additional LDAP groups."""
+    check_result = DiscrepancyCheckResult(
+        membership_discrepancies=[],
+        missing_ldap_groups=[],
+        additional_ldap_groups=["rdfdev-additional"],
+    )
+    additional_ldap_groups_text = (
+        f"\nAD groups with no corresponding {source} allocation:\n"
+        "\t- rdfdev-additional\n"
+    )
+
+    send_discrepancy_notification(check_result, source=source)
+
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].body == message.substitute(
+        source=source,
+        membership_discrepancies_text="",
+        missing_ldap_groups_text="",
+        additional_ldap_groups_text=additional_ldap_groups_text,
     )
 
 
