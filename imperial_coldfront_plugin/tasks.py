@@ -36,6 +36,7 @@ from .emails import (
     send_allocation_removal_warning,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
+    send_gpfs_fileset_not_in_coldfront_notification,
     send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
@@ -564,14 +565,12 @@ def check_quota_consistency(
 ) -> QuotaConsistencyCheckResult | None:
     """Check consistency of file and storage quotas between allocations and filesets.
 
-    Compares the active allocations to ensure the matching filesets have the same
-    storage and file quotas. If discrepancies are found, a notification email is sent
-    to admins. Also sends a notification if any allocations are found that do not have a
-    matching fileset in GPFS.
+    Checks that active allocations and GPFS filesets match in both directions and that
+    matching filesets have the same storage and file quotas. If discrepancies are found,
+    notification emails are sent to admins.
 
     Returns:
-        A QuotaConsistencyCheckResult object containing the discrepancies and missing
-        filesets, or None if GPFS is not enabled.
+        The discrepancies and missing filesets, or None if GPFS is unavailable.
     """
     if not settings.GPFS_ENABLED:
         return None
@@ -581,21 +580,30 @@ def check_quota_consistency(
         status__name="Active",
         allocationattribute__allocation_attribute_type__name="Shortname",
     ).distinct()
+    allocation_shortnames = {allocation.shortname for allocation in allocations}
 
     client = GPFSClient()
     usages = client.retrieve_all_fileset_quotas(settings.GPFS_FILESYSTEM_NAME)
 
+    gpfs_fileset_names = set(usages)
+    missing_filesets = sorted(allocation_shortnames - gpfs_fileset_names)
+
+    ignored_gpfs_only_filesets = set(settings.GPFS_FILESET_IGNORE_LIST)
+    ignored_gpfs_only_filesets.update(settings.FACULTIES)
+    missing_in_coldfront = sorted(
+        (gpfs_fileset_names - allocation_shortnames) - ignored_gpfs_only_filesets
+    )
+
     discrepancies: list[QuotaDiscrepancy] = []
-    missing_filesets = []
 
     for allocation in allocations:
         shortname = allocation.shortname
-        storage_attribute_quota = allocation.storage_quota_tb
-        files_attribute_quota = allocation.files_quota
 
         if shortname in usages:
             # Check for discrepancies between the allocation and fileset for both
             # storage and file quotas.
+            storage_attribute_quota = allocation.storage_quota_tb
+            files_attribute_quota = allocation.files_quota
             storage_fileset_quota = int(usages[shortname]["block_limit_tb"])
             if storage_attribute_quota != storage_fileset_quota:
                 discrepancies.append(
@@ -617,18 +625,19 @@ def check_quota_consistency(
                         fileset_value=files_fileset_quota,
                     )
                 )
-        else:
-            # The allocation was not found in GPFS - notify admins
-            missing_filesets.append(shortname)
-
     if discrepancies and send_email:
         send_quota_discrepancy_notification(discrepancies)
 
     if missing_filesets and send_email:
         send_fileset_not_found_notification(missing_filesets)
 
+    if missing_in_coldfront and send_email:
+        send_gpfs_fileset_not_in_coldfront_notification(missing_in_coldfront)
+
     return QuotaConsistencyCheckResult(
-        discrepancies=discrepancies, missing_filesets=missing_filesets
+        discrepancies=discrepancies,
+        missing_filesets=missing_filesets,
+        missing_in_coldfront=missing_in_coldfront,
     )
 
 
