@@ -109,7 +109,9 @@ def pytest_configure():
             GPFS_API_USERNAME="",
             GPFS_API_PASSWORD="",
             GID_RANGES=dict(
-                rdf=[range(1031386, 1031405)], hx2=[range(1031406, 1031425)]
+                rdf=[range(1031386, 1031405)],
+                hx2=[range(1031406, 1031425)],
+                hx3=[range(1031426, 1031435)],
             ),
             ENABLE_RDF_ALLOCATION_LIFECYCLE=True,
             ENABLE_USER_GROUP_CREATION=True,
