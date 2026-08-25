@@ -438,7 +438,7 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
 
 
 class HXAllocationForm(forms.Form):
-    """Form for creating a new HX2 allocation."""
+    """Form for creating a new HX allocation."""
 
     # This filters for projects that don't currently have a HX2 allocation.
     # When functionality for HX3 is added, this filter may need to be removed
@@ -451,19 +451,7 @@ class HXAllocationForm(forms.Form):
     )
 
     HX_CHOICES: ClassVar[list[tuple[str, str]]] = [("hx2", "HX2"), ("hx3", "HX3")]
-    resource_type = forms.ChoiceField(
-        choices=HX_CHOICES,
-        # Remove the widget when HX3 is active, along with the javascript in the
-        # template and the clean function below.
-        widget=forms.Select(attrs={"data-disabled-options": "hx3"}),
-    )
-
-    def clean_resource_type(self) -> str:
-        """Validate that the selected HX type is available."""
-        resource_type = self.cleaned_data["resource_type"]
-        if resource_type == "hx3":
-            raise ValidationError("HX3 allocations are not currently available.")
-        return resource_type
+    resource_type = forms.ChoiceField(choices=HX_CHOICES)
 
 
 class HXAllocationFormData(TypedDict):

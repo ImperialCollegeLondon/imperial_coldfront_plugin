@@ -281,7 +281,7 @@ class TestHomeView:
 def create_hx2allocation_mock(mocker):
     """Mock the create_hx2allocation method."""
     return mocker.patch(
-        "imperial_coldfront_plugin.tasks.HX2Allocation.objects.create_hx2allocation"
+        "imperial_coldfront_plugin.tasks.HXAllocation.objects.create_hxallocation"
     )
 
 
@@ -1625,13 +1625,13 @@ class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
         project,
         project_factory,
         hx2_allocation_user,
-        hx2_allocation_factory,
+        hx_allocation_factory,
     ):
         """Test user eligibility with an existing HX2 allocation."""
         new_project = project_factory(
             pi=hx2_allocation_user.user, group_id="new_project", title="new_project"
         )
-        new_hx2_allocation = hx2_allocation_factory(project=new_project)
+        new_hx2_allocation = hx_allocation_factory(cluster="HX2", project=new_project)
 
         client = auth_client_factory(hx2_allocation_user.user)
         response = client.get(self._get_url(new_hx2_allocation.pk))
@@ -1656,11 +1656,11 @@ class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
         project_user_active_status,
         project_user_role_manager,
         rdf_allocation,
-        hx2_allocation_factory,
+        hx_allocation_factory,
         allocation_user_active_status,
     ):
         """Test that being a member of a non-hx2 allocation does not exclude a user."""
-        hx2_allocation = hx2_allocation_factory(project=project)
+        hx2_allocation = hx_allocation_factory(cluster="HX2", project=project)
         new_user = user_factory()
         ProjectUser.objects.create(
             project=project,
@@ -1694,7 +1694,7 @@ class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
         user_factory,
         auth_client_factory,
         hx2_allocation_user,
-        hx2_allocation_factory,
+        hx_allocation_factory,
         allocation_user_inactive_status,
         project_factory,
         project_user_active_status,
@@ -1706,7 +1706,7 @@ class TestAllocationAddUsersViewHX2Filter(LoginRequiredMixin):
 
         new_pi = user_factory()
         new_project = project_factory(pi=new_pi)
-        new_hx2_allocation = hx2_allocation_factory(project=new_project)
+        new_hx2_allocation = hx_allocation_factory(cluster="HX2", project=new_project)
 
         user = hx2_allocation_user.user
         ProjectUser.objects.create(

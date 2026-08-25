@@ -16,7 +16,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django_q.tasks import async_task
 
-from imperial_coldfront_plugin.models import HX2Allocation, RDFAllocation
+from imperial_coldfront_plugin.models import HXAllocation, RDFAllocation
 
 from .ldap import (
     ldap_add_member_to_group,
@@ -24,7 +24,7 @@ from .ldap import (
     ldap_remove_member_from_group,
 )
 from .tasks import remove_ldap_group_members
-from .utils import rdf_or_hx2_allocation
+from .utils import rdf_or_hx_allocation
 
 
 @receiver(pre_save, sender=AllocationAttribute)
@@ -98,7 +98,7 @@ def project_attribute_ensure_unique_group_id(
 
 
 def _sync_membership_helper(
-    allocation: RDFAllocation | HX2Allocation,
+    allocation: RDFAllocation | HXAllocation,
     allocation_user: AllocationUser,
     ldap_groupname: str,
 ) -> None:
@@ -142,7 +142,7 @@ def allocation_user_sync_ldap_group_membership(
         return
 
     try:
-        allocation = rdf_or_hx2_allocation(instance.allocation)
+        allocation = rdf_or_hx_allocation(instance.allocation)
     except ValueError:
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
@@ -151,7 +151,7 @@ def allocation_user_sync_ldap_group_membership(
 
 
 def _delete_ldap_group_membership_helper(
-    allocation: RDFAllocation | HX2Allocation,
+    allocation: Allocation,
     user: AllocationUser,
     ldap_groupname: str,
 ) -> None:
@@ -190,7 +190,7 @@ def allocation_user_ldap_group_membership_deletion(
         return
 
     try:
-        allocation = rdf_or_hx2_allocation(instance.allocation)
+        allocation = rdf_or_hx_allocation(instance.allocation)
     except ValueError:
         # Instantiating a RDFAllocation checks it's actually a RDFAllocation
         return
@@ -210,10 +210,13 @@ def allocation_user_sync_hx2_access_group(
     if not settings.LDAP_ENABLED:
         return
 
-    try:
-        allocation = HX2Allocation.from_allocation(instance.allocation)
-    except ValueError:
         # Signal applies only to HX2Allocations
+    try:
+        allocation = HXAllocation.from_allocation(instance.allocation)
+    except ValueError:
+        return
+
+    if allocation.cluster != "HX2":
         return
 
     _sync_membership_helper(allocation, instance, settings.LDAP_HX2_ACCESS_GROUP_NAME)
@@ -233,10 +236,13 @@ def allocation_user_hx2_access_group_deletion(
     if not settings.LDAP_ENABLED:
         return
 
+    # Signal applies only to HX2Allocations
     try:
-        allocation = HX2Allocation.from_allocation(instance.allocation)
+        allocation = HXAllocation.from_allocation(instance.allocation)
     except ValueError:
-        # Signal applies only to HX2Allocations
+        return
+
+    if allocation.cluster != "HX2":
         return
 
     _delete_ldap_group_membership_helper(
@@ -245,7 +251,7 @@ def allocation_user_hx2_access_group_deletion(
 
 
 def _remove_ldap_group_members_if_inactive_helper(
-    allocation: RDFAllocation | HX2Allocation,
+    allocation: Allocation,
     group_name: str,
 ) -> None:
     """Helper function to remove all LDAP group members if allocation is not Active."""
@@ -261,10 +267,10 @@ def _remove_ldap_group_members_if_inactive_helper(
 
 @receiver(post_save, sender=Allocation)
 @receiver(post_save, sender=RDFAllocation)
-@receiver(post_save, sender=HX2Allocation)
+@receiver(post_save, sender=HXAllocation)
 def allocation_remove_ldap_group_members_if_inactive(
     sender: object,
-    instance: Allocation | RDFAllocation | HX2Allocation,
+    instance: Allocation | RDFAllocation | HXAllocation,
     **kwargs: object,
 ) -> None:
     """Remove all LDAP group members if allocation is not Active.
@@ -274,7 +280,7 @@ def allocation_remove_ldap_group_members_if_inactive(
     if not settings.LDAP_ENABLED:
         return
     try:
-        allocation = rdf_or_hx2_allocation(instance)
+        allocation = rdf_or_hx_allocation(instance)
     except ValueError:
         return
 
@@ -288,19 +294,23 @@ def allocation_remove_ldap_group_members_if_inactive(
 
 
 @receiver(post_save, sender=Allocation)
-@receiver(post_save, sender=HX2Allocation)
+@receiver(post_save, sender=HXAllocation)
 def allocation_remove_hx2_access_group_if_inactive(
     sender: object,
-    instance: Allocation | HX2Allocation,
+    instance: Allocation | HXAllocation,
     **kwargs: object,
 ) -> None:
     """Remove all members from the HX2 access group if allocation is not Active."""
     if not settings.LDAP_ENABLED:
         return
+
+    # Signal applies only to HX2Allocations
     try:
-        allocation = HX2Allocation.from_allocation(instance)
+        allocation = HXAllocation.from_allocation(instance)
     except ValueError:
-        # Signal applies only to HX2Allocations
+        return
+
+    if allocation.cluster != "HX2":
         return
 
     _remove_ldap_group_members_if_inactive_helper(
@@ -352,19 +362,19 @@ def allocation_user_prevent_multiple_hx2(
         return
 
     try:
-        HX2Allocation.from_allocation(instance.allocation)
+        allocation = HXAllocation.from_allocation(instance.allocation)
     except ValueError:
-        # Signal applies only to HX2Allocations
+        # Signal applies only to HXAllocations
         return
 
-    active_hx2_allocations = AllocationUser.objects.filter(
+    active_hx_allocations = AllocationUser.objects.filter(
         user=instance.user,
         status__name="Active",
-        allocation__resources__name="HX2",
+        allocation__resources__name=allocation.cluster,
         allocation__status__name="Active",
     ).exclude(pk=instance.pk)
 
-    if active_hx2_allocations.exists():
+    if active_hx_allocations.exists():
         raise ValueError(
             f"User {instance.user.username} is already active on a HX2 allocation."
         )

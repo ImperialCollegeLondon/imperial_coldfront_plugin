@@ -542,30 +542,25 @@ def signals_async_task_mock(mocker):
 
 
 @pytest.fixture
-def hx2_resource(db):
-    """Get HX2 Resource instance."""
-    from coldfront.core.resource.models import Resource
-
-    return Resource.objects.get(name="HX2")
-
-
-@pytest.fixture
-def hx2_allocation_factory(
+def hx_allocation_factory(
     allocation_active_status,
-    hx2_resource,
     allocation_dependencies,
 ):
     """Factory for creating HX2Allocation instances."""
+    from coldfront.core.resource.models import Resource
 
     def create_hx2_allocation(
-        project, status=allocation_active_status, start_date=datetime.date.today()
+        cluster,
+        project,
+        status=allocation_active_status,
+        start_date=datetime.date.today(),
     ):
-        from imperial_coldfront_plugin.models import HX2Allocation
+        from imperial_coldfront_plugin.models import HXAllocation
 
-        allocation = HX2Allocation.objects.create(
+        allocation = HXAllocation.objects.create(
             project=project, status=status, start_date=start_date
         )
-        allocation.resources.add(hx2_resource)
+        allocation.resources.add(Resource.objects.get(name=cluster))
         return allocation
 
     return create_hx2_allocation
@@ -574,25 +569,49 @@ def hx2_allocation_factory(
 @pytest.fixture
 def hx2_allocation(
     project,
-    hx2_allocation_factory,
+    hx_allocation_factory,
 ):
     """A Coldfront allocation representing an HX2 RDF storage allocation."""
-    return hx2_allocation_factory(project=project)
+    return hx_allocation_factory(cluster="HX2", project=project)
 
 
 @pytest.fixture
-def hx2_allocation_user(allocation_user_active_status, hx2_allocation, user, mocker):
-    """Provides an active user for hx2_allocation fixture."""
+def allocation_user_factory(mocker, allocation_user_active_status):
+    """Factory for creating AllocationUser instances."""
     from coldfront.core.allocation.models import AllocationUser
 
-    with mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_add_member_to_group",
-    ):
-        return AllocationUser.objects.create(
-            allocation=hx2_allocation,
-            user=user,
-            status=allocation_user_active_status,
-        )
+    def create_allocation_user(allocation, user, status=allocation_user_active_status):
+        with mocker.patch(
+            "imperial_coldfront_plugin.signals.ldap_add_member_to_group",
+        ):
+            return AllocationUser.objects.create(
+                allocation=allocation,
+                user=user,
+                status=status,
+            )
+
+    return create_allocation_user
+
+
+@pytest.fixture
+def hx2_allocation_user(allocation_user_factory, hx2_allocation, user):
+    """Provides an active user for hx2_allocation fixture."""
+    return allocation_user_factory(allocation=hx2_allocation, user=user)
+
+
+@pytest.fixture
+def hx3_allocation(
+    project,
+    hx_allocation_factory,
+):
+    """A Coldfront allocation representing an HX3 RDF storage allocation."""
+    return hx_allocation_factory(cluster="HX3", project=project)
+
+
+@pytest.fixture
+def hx3_allocation_user(allocation_user_factory, hx3_allocation, user):
+    """Provides an active user for hx3_allocation fixture."""
+    return allocation_user_factory(allocation=hx3_allocation, user=user)
 
 
 @pytest.fixture(params=["rdf_allocation", "hx2_allocation"])
@@ -604,6 +623,44 @@ def rdf_or_hx2_allocation(request):
 @pytest.fixture(params=["rdf_allocation_user", "hx2_allocation_user"])
 def rdf_or_hx2_allocation_user(request):
     """Fixture to provide an AllocationUser for either an RDF or HX2 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["hx2_allocation", "hx3_allocation"])
+def hx2_or_hx3_allocation(request):
+    """Fixture to provide either an HX2 or HX3 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["hx2_allocation_user", "hx3_allocation_user"])
+def hx2_or_hx3_allocation_user(request):
+    """Fixture to provide an AllocationUser for either an HX2 or HX3 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["rdf_allocation", "hx2_allocation", "hx3_allocation"])
+def rdf_or_hx_allocation(request):
+    """Fixture to provide either an RDF, HX2, or HX3 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(
+    params=["rdf_allocation_user", "hx2_allocation_user", "hx3_allocation_user"]
+)
+def rdf_or_hx_allocation_user(request):
+    """Fixture to provide an AllocationUser for an RDF, HX2, or HX3 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["rdf_allocation", "hx3_allocation"])
+def rdf_or_hx3_allocation(request):
+    """Fixture to provide either an RDF or HX3 allocation."""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture(params=["rdf_allocation_user", "hx3_allocation_user"])
+def rdf_or_hx3_allocation_user(request):
+    """Fixture to provide an AllocationUser for either an RDF or HX3 allocation."""
     return request.getfixturevalue(request.param)
 
 

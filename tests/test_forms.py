@@ -514,11 +514,11 @@ class TestProjectAddUsersToAllocationShortnameForm:
     def test_filter_hx2(
         self,
         project,
-        hx2_allocation_factory,
+        hx_allocation_factory,
         rdf_allocation,
     ):
         """Test that hx2 allocations are excluded."""
-        hx2_allocation_factory(project=project)
+        hx_allocation_factory(cluster="HX2", project=project)
         form = ProjectAddUsersToAllocationShortnameForm(project.pi, project.pk)
 
         assert [pk for pk, _ in form.fields["allocation"].choices] == [
