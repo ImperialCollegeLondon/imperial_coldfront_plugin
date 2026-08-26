@@ -156,7 +156,7 @@ class BaseRDFAllocationForm(forms.Form):
         queryset=ICLProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
-    description = forms.Charfield(widget=forms.Textarea())
+    description = forms.CharField(widget=forms.Textarea())
     start_date = forms.DateField(
         initial=_todays_date,
         widget=forms.DateInput(attrs={"type": "date"}),
