@@ -762,3 +762,20 @@ class TestAllocationUserPreventMultipleHX2:
             user=hx2_allocation_user.user,
             status=allocation_user_active_status,
         )
+
+    def test_not_applied_to_hx3(
+        self,
+        new_project,
+        hx3_allocation_user,
+        allocation_user_active_status,
+        allocation_active_status,
+        hx_allocation_factory,
+    ):
+        """Single allocation limit does not trigger for HX3 allocations."""
+        # create another HX3 allocation and add user
+        other_allocation = hx_allocation_factory(project=new_project, cluster="HX3")
+        AllocationUser.objects.create(
+            allocation=other_allocation,
+            user=hx3_allocation_user.user,
+            status=allocation_user_active_status,
+        )

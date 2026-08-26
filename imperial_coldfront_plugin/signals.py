@@ -361,16 +361,19 @@ def allocation_user_prevent_multiple_hx2(
     if instance.status.name != "Active":
         return
 
+    # Signal applies only to HXAllocations
     try:
         allocation = HXAllocation.from_allocation(instance.allocation)
     except ValueError:
-        # Signal applies only to HXAllocations
+        return
+
+    if allocation.cluster != "HX2":
         return
 
     active_hx_allocations = AllocationUser.objects.filter(
         user=instance.user,
         status__name="Active",
-        allocation__resources__name=allocation.cluster,
+        allocation__resources__name="HX2",
         allocation__status__name="Active",
     ).exclude(pk=instance.pk)
 
