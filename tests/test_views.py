@@ -26,7 +26,8 @@ from pytest_django.asserts import assertRedirects, assertTemplateUsed
 
 from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
-    HXAllocationForm,
+    HX2AllocationForm,
+    HXAllocationFormBase,
     RDFAllocationForm,
     UserProjectCreationForm,
 )
@@ -278,7 +279,7 @@ class TestHomeView:
 
 
 @pytest.fixture
-def create_hx2allocation_mock(mocker):
+def create_hxallocation_mock(mocker):
     """Mock the create_hx2allocation method."""
     return mocker.patch(
         "imperial_coldfront_plugin.tasks.HXAllocation.objects.create_hxallocation"
@@ -471,17 +472,18 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             mock_get_department_choices.assert_called_once_with(faculty)
 
 
-class TestAddHXAllocation(LoginRequiredMixin):
-    """Tests for the add_hx_allocation view."""
+class _TestAddHXAllocationBase(LoginRequiredMixin):
+    """Base class for testing add_hx_allocation views."""
+
+    cluster: str
+    view_name: str
+    form_class: type[HXAllocationFormBase]
 
     def _get_url(self):
-        return reverse("imperial_coldfront_plugin:add_hx_allocation")
+        return reverse(f"imperial_coldfront_plugin:{self.view_name}")
 
-    def _make_form_data(self, project, resource_type="hx2"):
-        return {
-            "resource_type": resource_type,
-            "project": project,
-        }
+    def _make_form_data(self, project):
+        return {"project": project.pk}
 
     def test_non_admin_forbidden(self, user, auth_client_factory):
         """Test non-admin users cannot access the page."""
@@ -489,43 +491,40 @@ class TestAddHXAllocation(LoginRequiredMixin):
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
 
-    def test_get(self, superuser_client):
-        """Check form rendering."""
-        response = superuser_client.get(self._get_url())
-        assert response.status_code == HTTPStatus.OK
-        assert isinstance(response.context["form"], HXAllocationForm)
+        def test_get(self, superuser_client):
+            """Check form rendering."""
+            response = superuser_client.get(self._get_url())
+            assert response.status_code == HTTPStatus.OK
+            assert isinstance(response.context["form"], self.form_class)
 
     def test_post(
         self,
-        create_hx2allocation_mock,
+        create_hxallocation_mock,
         superuser_client,
         project,
     ):
         """Test successful project creation."""
         # mock the chain to inject the group value to check the redirect later
         group_id = project.group_id
-        resource_type = "hx2"
         allocation_pk = 1
-        create_hx2allocation_mock.return_value.pk = allocation_pk
+        create_hxallocation_mock.return_value.pk = allocation_pk
         AllocationStatusChoice.objects.get_or_create(name="Active")
 
         response = superuser_client.post(
             self._get_url(),
-            data=dict(
-                project=project.pk,
-                resource_type=resource_type,
-            ),
+            data=self._make_form_data(project),
         )
         assertRedirects(
             response,
             reverse(
                 "imperial_coldfront_plugin:hx_allocation_task_result",
-                args=[resource_type, group_id, allocation_pk],
+                args=[self.cluster, group_id, allocation_pk],
             ),
             fetch_redirect_response=False,
         )
-        create_hx2allocation_mock.assert_called_once()
-        _, kwargs = create_hx2allocation_mock.call_args
+        create_hxallocation_mock.assert_called_once()
+        _, kwargs = create_hxallocation_mock.call_args
+        assert kwargs["cluster"] == self.cluster
         assert kwargs["project"] == project
         assert kwargs["quantity"] == 1
         assert kwargs["end_date"] is None
@@ -535,27 +534,14 @@ class TestAddHXAllocation(LoginRequiredMixin):
         assert kwargs["is_changeable"] is True
         assert kwargs["start_date"] is not None
 
-    def test_form_validation_error(
-        self, superuser_client, project, create_hx2allocation_mock
-    ):
-        """Invalid resource type raises ValueError."""
-        response = superuser_client.post(
-            self._get_url(),
-            data=dict(project=project.pk, resource_type="hx99"),
-        )
-
-        # Form validation error should not raise an exception, but should re-render
-        # the form (200 response)
-        assert response.status_code == 200
-        assert response.context["form"].errors
-
-    def test_form_validation_existing_hx2(
-        self, superuser_client, project, hx2_allocation
+    def test_form_validation_existing_allocation(
+        self, superuser_client, project, hx_allocation_factory
     ):
         """Test creating a second HX2 allocation for the same project is blocked."""
+        hx_allocation_factory(project=project, cluster=self.cluster)
         response = superuser_client.post(
             self._get_url(),
-            data=self._make_form_data(project.pk, resource_type="hx2"),
+            data=self._make_form_data(project),
         )
 
         # Form validation error should not raise an exception, but should re-render
@@ -565,6 +551,23 @@ class TestAddHXAllocation(LoginRequiredMixin):
         assert form.errors["project"] == [
             "Select a valid choice. That choice is not one of the available choices."
         ]
+
+
+class TestAddHX2Allocation(_TestAddHXAllocationBase):
+    """Tests for the add_hx_allocation view."""
+
+    cluster = "HX2"
+    view_name = "add_hx2_allocation"
+    form_class = HX2AllocationForm
+
+    # def _get_url(self):
+    #     return reverse("imperial_coldfront_plugin:add_hx_allocation")
+
+    # def _make_form_data(self, project, resource_type="hx2"):
+    #     return {
+    #         "resource_type": resource_type,
+    #         "project": project,
+    #     }
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):

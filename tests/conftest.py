@@ -266,6 +266,14 @@ def project_active_status(db):
 
 
 @pytest.fixture
+def project_inactive_status(db):
+    """Create a ProjectStatusChoice with name='Inactive'."""
+    from coldfront.core.project.models import ProjectStatusChoice
+
+    return ProjectStatusChoice.objects.get_or_create(name="Inactive")[0]
+
+
+@pytest.fixture
 def field_of_science_other(db):
     """Create a FieldOfScience with description='Other'."""
     from coldfront.core.field_of_science.models import FieldOfScience

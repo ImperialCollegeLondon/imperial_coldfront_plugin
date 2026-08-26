@@ -5,7 +5,7 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NotRequired, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
 from coldfront.core.project.forms import ProjectAddUsersToAllocationForm
@@ -437,21 +437,35 @@ class CreditTransactionForm(forms.ModelForm["CreditTransaction"]):
     )
 
 
-class HXAllocationForm(forms.Form):
-    """Form for creating a new HX allocation."""
+class HXAllocationFormBase(forms.Form):
+    """Base form for creating a new HX allocation."""
 
-    # This filters for projects that don't currently have a HX2 allocation.
-    # When functionality for HX3 is added, this filter may need to be removed
-    # or amended to allow projects with HX2 but not HX3 allocations to be selected.
-    project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
-        queryset=ICLProject.objects.filter(status__name="Active").exclude(
-            allocation__resources__name="HX2"
-        ),
-        widget=_js_select_widget(),
-    )
+    cluster: ClassVar[Literal["HX2", "HX3"]]
+    project: forms.ModelChoiceField[ICLProject]
 
-    HX_CHOICES: ClassVar[list[tuple[str, str]]] = [("hx2", "HX2"), ("hx3", "HX3")]
-    resource_type = forms.ChoiceField(choices=HX_CHOICES)
+    @classmethod
+    def _project_field_factory(cls, cluster: str) -> forms.ModelChoiceField[ICLProject]:
+        return forms.ModelChoiceField(
+            queryset=ICLProject.objects.filter(status__name="Active").exclude(
+                allocation__resources__name=cluster,
+                allocation__status__name="Active",
+            ),
+            widget=_js_select_widget(),
+        )
+
+
+class HX2AllocationForm(HXAllocationFormBase):
+    """Form for creating a new HX2 allocation."""
+
+    cluster = "HX2"
+    project = HXAllocationFormBase._project_field_factory(cluster)
+
+
+class HX3AllocationForm(HXAllocationFormBase):
+    """Form for creating a new HX3 allocation."""
+
+    cluster = "HX3"
+    project = HXAllocationFormBase._project_field_factory(cluster)
 
 
 class HXAllocationFormData(TypedDict):
