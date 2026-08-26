@@ -560,14 +560,13 @@ class TestAddHX2Allocation(_TestAddHXAllocationBase):
     view_name = "add_hx2_allocation"
     form_class = HX2AllocationForm
 
-    # def _get_url(self):
-    #     return reverse("imperial_coldfront_plugin:add_hx_allocation")
 
-    # def _make_form_data(self, project, resource_type="hx2"):
-    #     return {
-    #         "resource_type": resource_type,
-    #         "project": project,
-    #     }
+class TestAddHX3Allocation(_TestAddHXAllocationBase):
+    """Tests for the add_hx_allocation view."""
+
+    cluster = "HX3"
+    view_name = "add_hx3_allocation"
+    form_class = HX2AllocationForm
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):
