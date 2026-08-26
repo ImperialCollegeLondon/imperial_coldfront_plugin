@@ -27,6 +27,7 @@ from pytest_django.asserts import assertRedirects, assertTemplateUsed
 from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
     HX2AllocationForm,
+    HX3AllocationForm,
     HXAllocationFormBase,
     RDFAllocationForm,
     UserProjectCreationForm,
@@ -491,11 +492,11 @@ class _TestAddHXAllocationBase(LoginRequiredMixin):
         response = client.get(self._get_url())
         assert response.status_code == HTTPStatus.FORBIDDEN
 
-        def test_get(self, superuser_client):
-            """Check form rendering."""
-            response = superuser_client.get(self._get_url())
-            assert response.status_code == HTTPStatus.OK
-            assert isinstance(response.context["form"], self.form_class)
+    def test_get(self, superuser_client):
+        """Check form rendering."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], self.form_class)
 
     def test_post(
         self,
@@ -566,7 +567,7 @@ class TestAddHX3Allocation(_TestAddHXAllocationBase):
 
     cluster = "HX3"
     view_name = "add_hx3_allocation"
-    form_class = HX2AllocationForm
+    form_class = HX3AllocationForm
 
 
 class TestAllocationTaskResult(LoginRequiredMixin):

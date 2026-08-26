@@ -322,8 +322,10 @@ def ldap_add_member_to_group_mock(mocker):
 class TestHXAllocation:
     """Tests for the HX2Allocation model."""
 
+    @pytest.mark.parametrize("cluster", ["HX2", "HX3"])
     def test_create_hxallocation(
         self,
+        cluster,
         project,
         get_new_gid_mock,
         ldap_gid_in_use_mock,
@@ -335,7 +337,6 @@ class TestHXAllocation:
         """Test that the manager correctly create the HX Allocation."""
         start_date = datetime.date.today()
         end_date = datetime.date.today() + datetime.timedelta(days=365)
-        cluster = "HX2"
 
         allocation = HXAllocation.objects.create_hxallocation(
             cluster=cluster,
@@ -355,7 +356,7 @@ class TestHXAllocation:
         assert allocation.cluster == cluster
         assert allocation.project == project
         assert allocation.status == allocation_active_status
-        assert allocation.get_parent_resource.name == "HX2"
+        assert allocation.get_parent_resource.name == cluster
         assert allocation.start_date == start_date
         assert allocation.end_date == end_date
         assert allocation.justification == "Test justification"
