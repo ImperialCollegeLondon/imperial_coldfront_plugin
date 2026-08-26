@@ -133,6 +133,23 @@ def test_recover_rdf_allocation_rejects_missing_ldap_group(
     assert "LDAP group" in form.errors["allocation_shortname"][0]
 
 
+def test_recover_rdf_allocation_rejects_when_ldap_disabled(
+    settings, recover_rdf_form_data
+):
+    """Test recovery form rejects submissions when LDAP is disabled."""
+    settings.LDAP_ENABLED = False
+    settings.GPFS_ENABLED = False
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert "__all__" in form.errors
+    assert form.errors["__all__"] == [
+        "RDF allocation recovery requires LDAP to be enabled so the existing "
+        "group GID can be retrieved."
+    ]
+
+
 def test_recover_rdf_allocation_sets_gid_from_ldap(
     settings, recover_rdf_form_data, mocker
 ):
@@ -155,9 +172,14 @@ def test_recover_rdf_allocation_rejects_missing_gpfs_fileset(
     settings, recover_rdf_form_data, mocker
 ):
     """Test recovery form blocks when expected GPFS fileset is missing."""
-    settings.LDAP_ENABLED = False
+    settings.LDAP_ENABLED = True
     settings.GPFS_ENABLED = True
     settings.GPFS_FILESYSTEM_NAME = "testfs"
+
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+        return_value=12345,
+    )
     gpfs_client_mock = mocker.patch("imperial_coldfront_plugin.gpfs_client.GPFSClient")
     gpfs_client_mock().retrieve_all_fileset_quotas.return_value = {"other": {}}
 

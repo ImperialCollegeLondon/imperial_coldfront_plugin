@@ -510,10 +510,16 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         superuser,
         project,
         settings,
+        mocker,
     ):
         """Test successful recovery request."""
-        settings.LDAP_ENABLED = False
+        settings.LDAP_ENABLED = True
         settings.GPFS_ENABLED = False
+
+        mocker.patch(
+            "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+            return_value=12345,
+        )
 
         end_date = timezone.now().date() + timedelta(days=30)
         start_date = timezone.now().date()
@@ -551,6 +557,7 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         assert form_data["size"] == size
         assert form_data["allocation_shortname"] == shortname
         assert form_data["description"] == description
+        assert form_data["gid"] == 12345
         assert authoriser == superuser.username
 
     @patch("imperial_coldfront_plugin.views.recover_rdf_allocation")
