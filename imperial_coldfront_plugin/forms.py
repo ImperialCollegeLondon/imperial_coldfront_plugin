@@ -144,7 +144,7 @@ class AllocationFormData(BaseRDFAllocationFormData):
 class RecoverRDFAllocationFormData(BaseRDFAllocationFormData):
     """Structure for holding cleaned RDF allocation form data for recovery."""
 
-    gid: NotRequired[int]
+    gid: int
 
 
 class BaseRDFAllocationForm(forms.Form):
@@ -327,18 +327,25 @@ class RecoverRDFAllocationForm(BaseRDFAllocationForm):
         if not shortname:
             return cleaned_data
 
+        if not settings.LDAP_ENABLED:
+            self.add_error(
+                None,
+                "RDF allocation recovery requires LDAP to be enabled so the existing "
+                "group GID can be retrieved.",
+            )
+            return cleaned_data
+
         ldap_group_name = f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
 
-        if settings.LDAP_ENABLED:
-            gid = ldap_get_group_gid(ldap_group_name)
-            if gid is None:
-                self.add_error(
-                    "allocation_shortname",
-                    f"LDAP group '{ldap_group_name}' was not found. "
-                    "The group must exist before recovering the allocation.",
-                )
-                return cleaned_data
-            cleaned_data["gid"] = gid
+        gid = ldap_get_group_gid(ldap_group_name)
+        if gid is None:
+            self.add_error(
+                "allocation_shortname",
+                f"LDAP group '{ldap_group_name}' was not found. "
+                "The group must exist before recovering the allocation.",
+            )
+            return cleaned_data
+        cleaned_data["gid"] = gid
 
         if settings.GPFS_ENABLED:
             fileset_quotas = GPFSClient().retrieve_all_fileset_quotas(
