@@ -77,6 +77,9 @@ GPFS_FILESET_ACL = ACL(
 GPFS_FILES_QUOTA = ENV.int("GPFS_FILES_QUOTA", default=1000)
 """Quota for the fileset."""
 
+GPFS_FILESET_IGNORE_LIST = ENV.list("GPFS_FILESET_IGNORE_LIST", default=[])
+"""Fileset names to ignore when checking for GPFS filesets missing in Coldfront."""
+
 GPFS_ENABLED = bool(GPFS_API_URL and GPFS_API_USERNAME and GPFS_API_PASSWORD)
 """Computed value of whether GPFS integration is enabled."""
 
@@ -247,3 +250,8 @@ ENABLE_RDF_ALLOCATION_AUTO_CREDIT = ENV.bool(
 
 CREDITS_HELP_URL = ENV.str("CREDITS_HELP_URL", default="")
 """URL of the help page for credits."""
+
+LDAP_SUPPRESS_ADDITIONAL_GROUPS = ENV.list(
+    "LDAP_SUPPRESS_ADDITIONAL_GROUPS", default=[]
+)
+"""LDAP groups excluded from additional-group consistency check alerts."""

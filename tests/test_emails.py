@@ -18,6 +18,7 @@ from imperial_coldfront_plugin.emails import (
     send_allocation_removal_warning,
     send_discrepancy_notification,
     send_fileset_not_found_notification,
+    send_gpfs_fileset_not_in_coldfront_notification,
     send_hx2_access_group_discrepancy_notification,
     send_quota_discrepancy_notification,
 )
@@ -115,6 +116,7 @@ message = Template(
     "\n\n"
     "$membership_discrepancies_text"
     "$missing_ldap_groups_text"
+    "$additional_ldap_groups_text"
 )
 
 
@@ -131,6 +133,7 @@ def test_send_discrepancy_notification_membership_discrepancies(source: str):
             )
         ],
         missing_ldap_groups=[],
+        additional_ldap_groups=[],
     )
 
     membership_discrepancies_text = (
@@ -149,6 +152,7 @@ def test_send_discrepancy_notification_membership_discrepancies(source: str):
         source=source,
         membership_discrepancies_text=membership_discrepancies_text,
         missing_ldap_groups_text="",
+        additional_ldap_groups_text="",
     )
 
 
@@ -158,6 +162,7 @@ def test_send_discrepancy_notification_missing_ldap_groups(source: str):
     check_result = DiscrepancyCheckResult(
         membership_discrepancies=[],
         missing_ldap_groups=["rdfdev-testgroup"],
+        additional_ldap_groups=[],
     )
     missing_ldap_groups_text = (
         f"\n{source} allocations that do not have corresponding AD group:\n"
@@ -171,6 +176,31 @@ def test_send_discrepancy_notification_missing_ldap_groups(source: str):
         source=source,
         membership_discrepancies_text="",
         missing_ldap_groups_text=missing_ldap_groups_text,
+        additional_ldap_groups_text="",
+    )
+
+
+@pytest.mark.parametrize("source", ["RDF", "HX2"])
+def test_send_discrepancy_notification_additional_ldap_groups(source: str):
+    """Test that the discrepancy email includes additional LDAP groups."""
+    check_result = DiscrepancyCheckResult(
+        membership_discrepancies=[],
+        missing_ldap_groups=[],
+        additional_ldap_groups=["rdfdev-additional"],
+    )
+    additional_ldap_groups_text = (
+        f"\nAD groups with no corresponding {source} allocation:\n"
+        "\t- rdfdev-additional\n"
+    )
+
+    send_discrepancy_notification(check_result, source=source)
+
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].body == message.substitute(
+        source=source,
+        membership_discrepancies_text="",
+        missing_ldap_groups_text="",
+        additional_ldap_groups_text=additional_ldap_groups_text,
     )
 
 
@@ -275,3 +305,25 @@ def test_allocation_status_emails_have_imp_flag(send_email, arguments):
     assert headers["Importance"] == "high"
     assert headers["X-Priority"] == "2"
     assert headers["X-MSMail-Priority"] == "High"
+
+
+def test_send_gpfs_fileset_not_in_coldfront_notification():
+    """Test the GPFS fileset not found in Coldfront email."""
+    fileset_names = ["legacy-fileset-01", "orphan-fileset-02"]
+
+    expected_message = """\
+During a regularly scheduled automated check, one or more filesets in GPFS were found \
+to have no corresponding active RDF allocation in Coldfront. Please investigate and \
+reconcile the two.
+
+The following fileset(s) in GPFS had no corresponding active RDF allocation in Coldfront:
+	- legacy-fileset-01
+	- orphan-fileset-02
+"""  # noqa: E501
+
+    send_gpfs_fileset_not_in_coldfront_notification(fileset_names)
+
+    assert len(mail.outbox) == 1
+    actual_message = mail.outbox[0].body
+
+    assert actual_message == expected_message

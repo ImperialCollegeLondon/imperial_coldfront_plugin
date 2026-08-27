@@ -30,11 +30,16 @@ class DiscrepancyCheckResult:
 
     membership_discrepancies: list[Discrepancy]
     missing_ldap_groups: list[str]
+    additional_ldap_groups: list[str]
 
     @property
     def discrepancies_found(self) -> bool:
         """Whether any discrepancies were found."""
-        return bool(self.membership_discrepancies or self.missing_ldap_groups)
+        return bool(
+            self.membership_discrepancies
+            or self.missing_ldap_groups
+            or self.additional_ldap_groups
+        )
 
 
 @dataclass
@@ -53,11 +58,14 @@ class QuotaConsistencyCheckResult:
 
     discrepancies: list[QuotaDiscrepancy]
     missing_filesets: list[str]
+    missing_in_coldfront: list[str]
 
     @property
     def discrepancies_found(self) -> bool:
         """Whether any discrepancies were found."""
-        return bool(self.discrepancies or self.missing_filesets)
+        return bool(
+            self.discrepancies or self.missing_filesets or self.missing_in_coldfront
+        )
 
 
 def send_discrepancy_notification(
@@ -97,6 +105,11 @@ def send_discrepancy_notification(
     if check_result.missing_ldap_groups:
         message += f"\n{source} allocations that do not have corresponding AD group:\n"
         for group in sorted(check_result.missing_ldap_groups):
+            message += f"\t- {group}\n"
+
+    if check_result.additional_ldap_groups:
+        message += f"\nAD groups with no corresponding {source} allocation:\n"
+        for group in sorted(check_result.additional_ldap_groups):
             message += f"\t- {group}\n"
 
     mail_admins(
@@ -335,6 +348,32 @@ def send_hx2_access_group_discrepancy_notification(discrepancy: Discrepancy) -> 
         for member in sorted(discrepancy.extra_members):
             message += f"  - {member}\n"
 
+    mail_admins(
+        subject=subject,
+        message=message,
+    )
+
+
+def send_gpfs_fileset_not_in_coldfront_notification(fileset_names: list[str]) -> None:
+    """Send notification to admins that GPFS filesets are missing in Coldfront.
+
+    Args:
+        fileset_names: The GPFS fileset names with no corresponding Coldfront
+            allocation.
+    """
+    if not settings.ADMINS:
+        return
+
+    subject = "Coldfront GPFS Consistency Check - Filesets Not Found in Coldfront"
+    message = (
+        "During a regularly scheduled automated check, one or more filesets in GPFS "
+        "were found to have no corresponding active RDF allocation in Coldfront. "
+        "Please investigate and reconcile the two.\n\n"
+        "The following fileset(s) in GPFS had no corresponding active RDF "
+        "allocation in Coldfront:\n"
+    )
+    for fileset_name in fileset_names:
+        message += f"\t- {fileset_name}\n"
     mail_admins(
         subject=subject,
         message=message,
