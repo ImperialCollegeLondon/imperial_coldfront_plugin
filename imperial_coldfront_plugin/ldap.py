@@ -273,6 +273,25 @@ def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:
     return len(response) > 0
 
 
+def _normalise_single_ldap_value(value: object) -> str | None:
+    """Normalise LDAP single-value attributes returned as scalar, list, or bytes."""
+    if value is None:
+        return None
+
+    if isinstance(value, list):
+        if len(value) != 1:
+            return None
+        value = value[0]
+
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+
+    if isinstance(value, str):
+        return value
+
+    return str(value)
+
+
 def ldap_get_group_gid(group_name: str, conn: Connection | None = None) -> int | None:
     """Get the gidNumber of an LDAP group.
 
@@ -293,4 +312,13 @@ def ldap_get_group_gid(group_name: str, conn: Connection | None = None) -> int |
     )
     if not response:
         return None
-    return int(response[0]["attributes"]["gidNumber"])
+
+    raw_gid = response[0].get("attributes", {}).get("gidNumber")
+    gid_text = _normalise_single_ldap_value(raw_gid)
+    if gid_text is None:
+        return None
+
+    try:
+        return int(gid_text)
+    except ValueError:
+        return None
