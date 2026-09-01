@@ -100,8 +100,11 @@ LDAP_GROUP_OU = ENV.str(
 """The organisational unit containing RDF access groups."""
 LDAP_RDF_SHORTNAME_PREFIX = ENV.str("LDAP_RDF_SHORTNAME_PREFIX", default="rdfdev-")
 """Prefix added to allocation shortname for RDF Active Directory group."""
-LDAP_HX2_SHORTNAME_PREFIX = ENV.str("LDAP_HX2_SHORTNAME_PREFIX", default="hx2dev-")
-"""Prefix added to allocation shortname for HX2 Active Directory group."""
+LDAP_HX_SHORTNAME_PREFIXES = {
+    "hx2": ENV.str("LDAP_HX2_SHORTNAME_PREFIX", default="hx2dev-"),
+    "hx3": ENV.str("LDAP_HX3_SHORTNAME_PREFIX", default="hx3dev-"),
+}
+"""Prefixes added to allocation shortname for HX2 and HX3 Active Directory groups."""
 
 AD_DOMAIN = ENV.str("AD_DOMAIN", default="IC")
 """The Active Directory domain."""
@@ -115,7 +118,10 @@ LDAP_HX2_ACCESS_GROUP_NAME = ENV.str(
 """Name of the Active Directory group to add users to for HX2 access."""
 
 _GID_RANGES_RDF = ENV.str("GID_RANGE_RDF", default="1031386-1031405")
-_GID_RANGES_HX2 = ENV.str("GID_RANGE_HX2", default="1031406-1031425")
+
+# leave a gap so 1031406 can be used for the HX2 access group in the local ldap setup
+_GID_RANGES_HX2 = ENV.str("GID_RANGE_HX2", default="1031407-1031425")
+_GID_RANGES_HX3 = ENV.str("GID_RANGE_HX3", default="1031426-1031435")
 
 
 def string_to_gid_ranges(gid_ranges_str: str) -> list[range]:
@@ -131,6 +137,7 @@ def string_to_gid_ranges(gid_ranges_str: str) -> list[range]:
 GID_RANGES = dict(
     rdf=string_to_gid_ranges(_GID_RANGES_RDF),
     hx2=string_to_gid_ranges(_GID_RANGES_HX2),
+    hx3=string_to_gid_ranges(_GID_RANGES_HX3),
 )
 """List of ranges of GIDs available for allocation to groups."""
 
