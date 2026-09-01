@@ -259,6 +259,7 @@ pytest==8.3.4
     #   pytest-django
     #   pytest-mock
     #   pytest-mypy
+    #   pytest-unused-fixtures
 pytest-cov==6.0.0
     # via imperial_coldfront_plugin (pyproject.toml)
 pytest-django==4.9.0
@@ -266,6 +267,8 @@ pytest-django==4.9.0
 pytest-mock==3.14.0
     # via imperial_coldfront_plugin (pyproject.toml)
 pytest-mypy==0.10.3
+    # via imperial_coldfront_plugin (pyproject.toml)
+pytest-unused-fixtures==0.3.1
     # via imperial_coldfront_plugin (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
