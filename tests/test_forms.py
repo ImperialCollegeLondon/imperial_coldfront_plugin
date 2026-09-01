@@ -11,6 +11,7 @@ from imperial_coldfront_plugin.forms import (
     HXAllocationForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
+    RecoverRDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
     get_faculty_choices,
@@ -74,6 +75,119 @@ def test_rdf_allocation_form_invalid_dart_id(rdf_form_data):
     form = RDFAllocationForm(data=rdf_form_data)
     assert not form.is_valid()
     assert form.errors == dict(dart_id=["Dart ID outside valid range"])
+
+
+@pytest.fixture
+def recover_rdf_form_data(project):
+    """Fixture to provide RecoverRDFAllocationForm data."""
+    return dict(
+        project=project.pk,
+        start_date=datetime.now().date(),
+        end_date=datetime.now().date() + timedelta(days=7),
+        size=10,
+        allocation_shortname="recovername",
+        description="Recover allocation description",
+    )
+
+
+def test_recover_rdf_allocation_unique(rdf_allocation_shortname, rdf_allocation):
+    """Test recovery form rejects shortnames already present in Coldfront."""
+    form = RecoverRDFAllocationForm(
+        data=dict(allocation_shortname=rdf_allocation_shortname)
+    )
+    form.is_valid()
+    assert form.errors["allocation_shortname"] == [
+        "An allocation with this shortname already exists in Coldfront."
+    ]
+
+
+def test_recover_rdf_allocation_rejects_end_date_before_start_date(
+    recover_rdf_form_data,
+):
+    """Test recovery form rejects end dates before start dates."""
+    recover_rdf_form_data.update(
+        start_date=datetime.now().date() + timedelta(days=2),
+        end_date=datetime.now().date() + timedelta(days=1),
+    )
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["end_date"] == ["End date must be on or after start date."]
+
+
+def test_recover_rdf_allocation_rejects_missing_ldap_group(
+    settings, recover_rdf_form_data, mocker
+):
+    """Test recovery form blocks when LDAP group is missing."""
+    settings.LDAP_ENABLED = True
+    settings.GPFS_ENABLED = False
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+        return_value=None,
+    )
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert "allocation_shortname" in form.errors
+    assert "LDAP group" in form.errors["allocation_shortname"][0]
+
+
+def test_recover_rdf_allocation_rejects_when_ldap_disabled(
+    settings, recover_rdf_form_data
+):
+    """Test recovery form rejects submissions when LDAP is disabled."""
+    settings.LDAP_ENABLED = False
+    settings.GPFS_ENABLED = False
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert "__all__" in form.errors
+    assert form.errors["__all__"] == [
+        "RDF allocation recovery requires LDAP to be enabled so the existing "
+        "group GID can be retrieved."
+    ]
+
+
+def test_recover_rdf_allocation_sets_gid_from_ldap(
+    settings, recover_rdf_form_data, mocker
+):
+    """Test recovery form stores gid in cleaned_data when LDAP group exists."""
+    settings.LDAP_ENABLED = True
+    settings.GPFS_ENABLED = False
+    expected_gid = 12345
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+        return_value=expected_gid,
+    )
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert form.cleaned_data["gid"] == expected_gid
+
+
+def test_recover_rdf_allocation_rejects_missing_gpfs_fileset(
+    settings, recover_rdf_form_data, mocker
+):
+    """Test recovery form blocks when expected GPFS fileset is missing."""
+    settings.LDAP_ENABLED = True
+    settings.GPFS_ENABLED = True
+    settings.GPFS_FILESYSTEM_NAME = "testfs"
+
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+        return_value=12345,
+    )
+    gpfs_client_mock = mocker.patch("imperial_coldfront_plugin.gpfs_client.GPFSClient")
+    gpfs_client_mock().retrieve_all_fileset_quotas.return_value = {"other": {}}
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert "allocation_shortname" in form.errors
+    assert "GPFS fileset" in form.errors["allocation_shortname"][0]
 
 
 PATH_COMPONENT_COMBINATIONS = (

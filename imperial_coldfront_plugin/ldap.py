@@ -271,3 +271,54 @@ def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:
         settings.LDAP_GROUP_OU, f"(gidNumber={gid})", attributes=["cn"]
     )
     return len(response) > 0
+
+
+def _normalise_single_ldap_value(value: object) -> str | None:
+    """Normalise LDAP single-value attributes returned as scalar, list, or bytes."""
+    if value is None:
+        return None
+
+    if isinstance(value, list):
+        if len(value) != 1:
+            return None
+        value = value[0]
+
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+
+    if isinstance(value, str):
+        return value
+
+    return str(value)
+
+
+def ldap_get_group_gid(group_name: str, conn: Connection | None = None) -> int | None:
+    """Get the gidNumber of an LDAP group.
+
+    Args:
+        group_name: The name of the group to look up.
+        conn: Connection to ldap server. If not provided, a new
+            connection will be created.
+
+    Returns:
+        The gidNumber of the group, or None if the group does not exist.
+    """
+    if conn is None:
+        conn = _get_ldap_connection()
+    _, _, response, _ = conn.search(
+        settings.LDAP_GROUP_OU,
+        f"(cn={group_name})",
+        attributes=["gidNumber"],
+    )
+    if not response:
+        return None
+
+    raw_gid = response[0].get("attributes", {}).get("gidNumber")
+    gid_text = _normalise_single_ldap_value(raw_gid)
+    if gid_text is None:
+        return None
+
+    try:
+        return int(gid_text)
+    except ValueError:
+        return None
