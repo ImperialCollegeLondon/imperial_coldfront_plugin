@@ -2,6 +2,7 @@
 
 import logging
 from datetime import date, timedelta
+from typing import Literal
 
 from coldfront.core.allocation.models import (
     AllocationAttribute,
@@ -19,7 +20,7 @@ from django.utils import timezone
 
 from imperial_coldfront_plugin.models import (
     CreditTransaction,
-    HX2Allocation,
+    HXAllocation,
     ICLProject,
     RDFAllocation,
 )
@@ -235,7 +236,7 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
 
 
 def find_discrepancies_helper(
-    allocations: QuerySet[RDFAllocation | HX2Allocation],
+    allocations: QuerySet[RDFAllocation | HXAllocation],
     ldap_groups: dict[str, list[str]],
 ) -> DiscrepancyCheckResult:
     """Finds discrepancies between LDAP groups and allocation users."""
@@ -301,23 +302,25 @@ def check_rdf_ldap_consistency(
     return check_result
 
 
-def check_hx2_ldap_consistency(
+def check_hx_ldap_consistency(
+    cluster: Literal["hx2", "hx3"],
     send_email: bool = True,
 ) -> DiscrepancyCheckResult | None:
     """Check the consistency of LDAP groups with the HX2 allocations in the database."""
     if not settings.LDAP_ENABLED:
         return None
 
-    allocations = HX2Allocation.objects.filter(
-        resources__name="HX2",
+    allocations = HXAllocation.objects.filter(
+        resources__name=cluster.upper(),
         status__name="Active",
     ).distinct()
-    ldap_groups = ldap_group_member_search(f"{settings.LDAP_HX2_SHORTNAME_PREFIX}*")
+    prefix = settings.LDAP_HX_SHORTNAME_PREFIXES[cluster]
+    ldap_groups = ldap_group_member_search(f"{prefix}*")
 
     check_result = find_discrepancies_helper(allocations, ldap_groups)
 
     if check_result.discrepancies_found and send_email:
-        send_discrepancy_notification(check_result, source="HX2")
+        send_discrepancy_notification(check_result, source=cluster.upper())
 
     return check_result
 

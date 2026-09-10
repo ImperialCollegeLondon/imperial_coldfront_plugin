@@ -245,13 +245,22 @@ def ldap_group_member_search(
     _, _, response, _ = conn.search(
         settings.LDAP_GROUP_OU, f"(cn={search_filter})", attributes=["cn", "member"]
     )
-    return {
-        entry["attributes"]["cn"]: [
+    groups: dict[str, list[str]] = {}
+    for entry in response:
+        # Extract the common name (cn) of the group. In some LDAP implementations, this
+        # may be a list so handle both list and string cases.
+        group_cn: list[str] | str = entry["attributes"]["cn"]
+        if isinstance(group_cn, list):
+            if len(group_cn) != 1:
+                raise ValueError(
+                    "Expected LDAP group search result to have exactly one cn."
+                )
+            group_cn = group_cn[0]
+        groups[group_cn] = [
             get_username_from_dn(member_dn)
             for member_dn in entry["attributes"].get("member", [])
         ]
-        for entry in response
-    }
+    return groups
 
 
 def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:

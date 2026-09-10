@@ -10,7 +10,7 @@ from django.db.models import Sum
 
 from imperial_coldfront_plugin.models import (
     CreditTransaction,
-    HX2Allocation,
+    HXAllocation,
     ICLProject,
     RDFAllocation,
 )
@@ -109,7 +109,7 @@ def get_rdf_allocation_credit_projection(
     return current_balance, debit, current_balance + debit
 
 
-def rdf_or_hx2_allocation(instance: Allocation) -> RDFAllocation | HX2Allocation:
+def rdf_or_hx_allocation(instance: Allocation) -> RDFAllocation | HXAllocation:
     """Attempt to instantiate RDFAllocation or HX2Allocation from the given Allocation.
 
     Raises a ValueError if unable to do either.
@@ -123,4 +123,4 @@ def rdf_or_hx2_allocation(instance: Allocation) -> RDFAllocation | HX2Allocation
     try:
         return RDFAllocation.from_allocation(instance)
     except ValueError:
-        return HX2Allocation.from_allocation(instance)
+        return HXAllocation.from_allocation(instance)

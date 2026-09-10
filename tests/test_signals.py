@@ -148,14 +148,14 @@ class TestAllocationUserSyncLDAPGroupMembership:
     """Tests for allocation_user_sync_ldap_group_membership signal handler."""
 
     @pytest.fixture
-    def allocation(self, rdf_or_hx2_allocation):
+    def allocation(self, rdf_or_hx_allocation):
         """Fixture to return an RDF or HX2 allocation."""
-        return rdf_or_hx2_allocation
+        return rdf_or_hx_allocation
 
     @pytest.fixture
-    def allocation_user(self, rdf_or_hx2_allocation_user):
+    def allocation_user(self, rdf_or_hx_allocation_user):
         """Fixture to return an RDF or HX2 allocation user."""
-        return rdf_or_hx2_allocation_user
+        return rdf_or_hx_allocation_user
 
     @pytest.fixture
     def ldap_groupname(self, allocation):
@@ -232,7 +232,7 @@ class TestAllocationUserSyncLDAPGroupMembership:
         ldap_add_member_mock.assert_not_called()
         ldap_remove_member_mock.assert_not_called()
 
-    def test_non_rdf_or_hx2_allocation(
+    def test_non_rdf_or_hx_allocation(
         self,
         ldap_remove_member_mock,
         ldap_add_member_mock,
@@ -307,17 +307,17 @@ class TestAllocationUserSyncHX2AccessGroup(TestAllocationUserSyncLDAPGroupMember
         """Fixture to return the LDAP group name for HX2 access."""
         return settings.LDAP_HX2_ACCESS_GROUP_NAME
 
-    def test_rdf_allocation_does_not_sync(
+    def test_non_hx2_allocation_does_not_sync(
         self,
         ldap_add_member_mock,
         user,
-        rdf_allocation,
+        rdf_or_hx3_allocation,
         allocation_user_active_status,
         settings,
     ):
         """Test that RDF allocations do not sync HX2 access groups."""
         AllocationUser.objects.create(
-            allocation=rdf_allocation,
+            allocation=rdf_or_hx3_allocation,
             user=user,
             status=allocation_user_active_status,
         )
@@ -335,14 +335,14 @@ class TestAllocationUserLDAPGroupRemoveMembership:
     """Tests for allocation_user_ldap_group_membership_deletion signal handler."""
 
     @pytest.fixture
-    def allocation(self, rdf_or_hx2_allocation):
+    def allocation(self, rdf_or_hx_allocation):
         """Fixture to return an RDF or HX2 allocation."""
-        return rdf_or_hx2_allocation
+        return rdf_or_hx_allocation
 
     @pytest.fixture
-    def allocation_user(self, rdf_or_hx2_allocation_user):
+    def allocation_user(self, rdf_or_hx_allocation_user):
         """Fixture to return an RDF or HX2 allocation user."""
-        return rdf_or_hx2_allocation_user
+        return rdf_or_hx_allocation_user
 
     @pytest.fixture
     def ldap_groupname(self, allocation):
@@ -379,7 +379,7 @@ class TestAllocationUserLDAPGroupRemoveMembership:
 
         ldap_remove_member_mock.assert_not_called()
 
-    def test_non_rdf_or_hx2_allocation(
+    def test_non_rdf_or_hx_allocation(
         self,
         ldap_remove_member_mock,
         allocation_active_status,
@@ -497,7 +497,7 @@ class _TestInactiveAllocationBase:
 
         remove_ldap_group_members_mock.assert_not_called()
 
-    def test_non_rdf_or_hx2_allocation(
+    def test_non_rdf_or_hx_allocation(
         self,
         remove_ldap_group_members_mock,
         project,
@@ -539,14 +539,14 @@ class TestAllocationRemoveLDAPGroupMembersIfInactive(_TestInactiveAllocationBase
     """Tests for allocation_remove_ldap_group_members_if_inactive signal handler."""
 
     @pytest.fixture
-    def allocation(self, rdf_or_hx2_allocation):
+    def allocation(self, rdf_or_hx_allocation):
         """Fixture to return an RDF or HX2 allocation."""
-        return rdf_or_hx2_allocation
+        return rdf_or_hx_allocation
 
     @pytest.fixture
-    def allocation_user(self, rdf_or_hx2_allocation_user):
+    def allocation_user(self, rdf_or_hx_allocation_user):
         """Fixture to return an RDF or HX2 allocation user."""
-        return rdf_or_hx2_allocation_user
+        return rdf_or_hx_allocation_user
 
     def test_feature_flag_disabled(
         self,
@@ -587,17 +587,17 @@ class TestAllocationRemoveHX2AccessGroupIfInactive(_TestInactiveAllocationBase):
         """Fixture to return an HX2 allocation user."""
         return hx2_allocation_user
 
-    def test_rdf_allocation_does_not_sync(
+    def test_non_hx2_allocation_does_not_sync(
         self,
         remove_ldap_group_members_mock,
-        rdf_allocation_user,
+        rdf_or_hx3_allocation_user,
         user,
         settings,
         allocation_inactive_status,
     ):
         """Test that RDF allocations do not sync HX2 access groups."""
-        rdf_allocation_user.allocation.status = allocation_inactive_status
-        rdf_allocation_user.allocation.save()
+        rdf_or_hx3_allocation_user.allocation.status = allocation_inactive_status
+        rdf_or_hx3_allocation_user.allocation.save()
         assert (
             call(
                 [user.username],
@@ -662,15 +662,15 @@ class TestAllocationExpiryZeroQuota:
         allocation.save()
         zero_quota_mock.assert_not_called()
 
-    def test_hx2_allocation_does_not_trigger(
+    def test_hx_allocation_does_not_trigger(
         self,
-        hx2_allocation,
+        hx2_or_hx3_allocation,
         zero_quota_mock,
         expired_status,
     ):
         """Test that expiring an HX2 allocation does not trigger the task."""
-        hx2_allocation.status = expired_status
-        hx2_allocation.save()
+        hx2_or_hx3_allocation.status = expired_status
+        hx2_or_hx3_allocation.save()
         zero_quota_mock.assert_not_called()
 
     def test_only_trigger_on_status_change_from_active_to_expired(
@@ -760,5 +760,22 @@ class TestAllocationUserPreventMultipleHX2:
         AllocationUser.objects.create(
             allocation=another_allocation,
             user=hx2_allocation_user.user,
+            status=allocation_user_active_status,
+        )
+
+    def test_not_applied_to_hx3(
+        self,
+        new_project,
+        hx3_allocation_user,
+        allocation_user_active_status,
+        allocation_active_status,
+        hx_allocation_factory,
+    ):
+        """Single allocation limit does not trigger for HX3 allocations."""
+        # create another HX3 allocation and add user
+        other_allocation = hx_allocation_factory(project=new_project, cluster="HX3")
+        AllocationUser.objects.create(
+            allocation=other_allocation,
+            user=hx3_allocation_user.user,
             status=allocation_user_active_status,
         )

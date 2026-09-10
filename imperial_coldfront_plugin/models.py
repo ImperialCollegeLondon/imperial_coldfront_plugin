@@ -3,7 +3,7 @@
 import typing
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from coldfront.core.allocation.models import (
     Allocation,
@@ -147,12 +147,13 @@ class RDFAllocation(Allocation):
         return value
 
 
-class HX2AllocationManager(models.Manager["HX2Allocation"]):
-    """Manager for HX2 Allocations."""
+class HXAllocationManager(models.Manager["HXAllocation"]):
+    """Manager for HX Allocations."""
 
-    def create_hx2allocation(
+    def create_hxallocation(
         self,
         *,
+        cluster: Literal["HX2", "HX3"],
         project: Project,
         status: AllocationStatusChoice,
         quantity: int,
@@ -162,7 +163,7 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
         description: str,
         is_locked: bool,
         is_changeable: bool,
-    ) -> "HX2Allocation":
+    ) -> "HXAllocation":
         """Create a new HX2Allocation from validated data."""
         with transaction.atomic():
             allocation_obj = self.create(
@@ -177,10 +178,10 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
                 is_changeable=is_changeable,
             )
 
-            hx2_resource = Resource.objects.get(name="HX2")
+            hx2_resource = Resource.objects.get(name=cluster)
             allocation_obj.resources.add(hx2_resource)
 
-            gid = get_new_gid("hx2")
+            gid = get_new_gid(cluster.lower())
             gid_attribute_type = AllocationAttributeType.objects.get(name="GID")
             AllocationAttribute.objects.create(
                 allocation=allocation_obj,
@@ -200,33 +201,40 @@ class HX2AllocationManager(models.Manager["HX2Allocation"]):
             return allocation_obj
 
 
-class HX2Allocation(Allocation):
-    """Proxy model for HX2 RDF Active allocations."""
+class HXAllocation(Allocation):
+    """Proxy model for HX allocations."""
 
-    objects = HX2AllocationManager()
+    objects = HXAllocationManager()
 
     class Meta:
-        """Meta class for HX2Allocation."""
+        """Meta class for HXAllocation."""
 
         proxy = True
 
     def __init__(self, *args: object, **kwargs: object) -> None:
-        """Initialise HX2Allocation and validate resource association."""
+        """Initialise HXAllocation and validate resource association."""
         super().__init__(*args, **kwargs)
         if self.pk:
             # Only validate resource association for existing allocations, as new
             # allocations may not have a resource assigned yet.
-            resource = self.get_parent_resource
-            if not resource or resource.name != "HX2":
+            if self.cluster not in ["HX2", "HX3"]:
                 raise ValueError(
-                    "HX2Allocation must be associated with the 'HX2' resource"
+                    "HXAllocation must be associated with the 'HX2' or 'HX3' resource"
                 )
 
+    @property
+    def cluster(self) -> str:
+        """Get the cluster name associated with the allocation."""
+        resource = self.get_parent_resource
+        if not resource:
+            return ""
+        return resource.name
+
     def __str__(self) -> str:
-        """String representation of HX2Allocation."""
+        """String representation of HXAllocation."""
         # This is an override from the base Allocation to avoid including the resource.
         # For further explanation see __str__ method of RDFAllocation.
-        return f"HX2Allocation(id={self.pk}, project={self.project.title})"
+        return f"HXAllocation(id={self.pk}, project={self.project.title})"
 
     @classmethod
     def from_allocation(cls, allocation: Allocation) -> typing.Self:
@@ -265,7 +273,8 @@ class HX2Allocation(Allocation):
     @property
     def ldap_shortname(self) -> str:
         """Get the shortname of the allocation, with the LDAP prefix appended."""
-        return f"{settings.LDAP_HX2_SHORTNAME_PREFIX}{self.shortname}"
+        key = self.cluster.lower()
+        return f"{settings.LDAP_HX_SHORTNAME_PREFIXES[key]}{self.shortname}"
 
 
 class ICLProjectManager(models.Manager["ICLProject"]):
