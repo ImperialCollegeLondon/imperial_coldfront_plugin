@@ -40,6 +40,7 @@ from .forms import (
     HXAllocationForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
+    RecoverRDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
 )
@@ -51,7 +52,7 @@ from .policy import (
     user_eligible_for_hpc_access,
     user_eligible_to_be_pi,
 )
-from .tasks import create_rdf_allocation
+from .tasks import create_rdf_allocation, recover_rdf_allocation
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User as UserType
@@ -124,6 +125,41 @@ def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
         form = RDFAllocationForm()
     return render(
         request, "imperial_coldfront_plugin/rdf_allocation_form.html", dict(form=form)
+    )
+
+
+@login_required
+def recover_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
+    """Recover Coldfront database objects for a pre-existing RDF allocation.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the recovery form or redirects to the task result page.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        form = RecoverRDFAllocationForm(request.POST)
+        if form.is_valid():
+            task_id = async_task(
+                recover_rdf_allocation,
+                form.cleaned_data,
+                request.user.username,
+            )
+            return redirect(
+                "imperial_coldfront_plugin:allocation_task_result",
+                task_id=task_id,
+                shortname=form.cleaned_data["allocation_shortname"],
+            )
+    else:
+        form = RecoverRDFAllocationForm()
+    return render(
+        request,
+        "imperial_coldfront_plugin/recover_rdf_allocation_form.html",
+        dict(form=form),
     )
 
 

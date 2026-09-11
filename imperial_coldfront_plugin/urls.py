@@ -13,6 +13,11 @@ urlpatterns = [
         name="add_rdf_storage_allocation",
     ),
     path(
+        "recover_rdf_allocation/",
+        views.recover_rdf_storage_allocation,
+        name="recover_rdf_storage_allocation",
+    ),
+    path(
         "create_hx_allocation/",
         views.add_hx_allocation,
         name="add_hx_allocation",

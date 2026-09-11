@@ -7,6 +7,7 @@ from imperial_coldfront_plugin.ldap import (
     LDAPGroupModifyError,
     group_dn_from_name,
     ldap_add_member_to_group,
+    ldap_get_group_gid,
     ldap_remove_member_from_group,
 )
 
@@ -119,3 +120,58 @@ def test_ldap_remove_member_from_group_wrong_error_code(ldap_connection_mock):
     )
     with pytest.raises(LDAPGroupModifyError):
         ldap_remove_member_from_group(GROUP_NAME, MEMBER_USERNAME, allow_missing=True)
+
+
+@pytest.mark.parametrize(
+    ("raw_gid", "expected"),
+    [
+        ("12345", 12345),
+        (["12345"], 12345),
+        (b"12345", 12345),
+        (12345, 12345),
+    ],
+    ids=[
+        "scalar-string",
+        "single-item-list",
+        "bytes",
+        "int-input",
+    ],
+)
+def test_ldap_get_group_gid_parses_supported_shapes(mocker, raw_gid, expected):
+    """Test that supported shapes of gidNumber are correctly parsed."""
+    conn = mocker.Mock()
+    conn.search.return_value = (
+        None,
+        None,
+        [{"attributes": {"gidNumber": raw_gid}}],
+        None,
+    )
+
+    assert ldap_get_group_gid("my-group", conn=conn) == expected
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        [],
+        [{"attributes": {}}],
+        [{"attributes": {"gidNumber": None}}],
+        [{"attributes": {"gidNumber": []}}],
+        [{"attributes": {"gidNumber": ["12345", "67890"]}}],
+        [{"attributes": {"gidNumber": "not-a-number"}}],
+    ],
+    ids=[
+        "no-results",
+        "missing-gid-attribute",
+        "gid-none",
+        "empty-list",
+        "multi-value-list",
+        "non-numeric-string",
+    ],
+)
+def test_ldap_get_group_gid_returns_none_for_invalid_shapes(mocker, response):
+    """Test that invalid shapes of gidNumber return None."""
+    conn = mocker.Mock()
+    conn.search.return_value = (None, None, response, None)
+
+    assert ldap_get_group_gid("my-group", conn=conn) is None
