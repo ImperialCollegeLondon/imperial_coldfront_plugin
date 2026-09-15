@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from imperial_coldfront_plugin.models import (
     CreditTransaction,
-    HX2Allocation,
+    HXAllocation,
     ICLProject,
     RDFAllocation,
 )
@@ -319,11 +319,13 @@ def ldap_add_member_to_group_mock(mocker):
     return mocker.patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
 
 
-class TestHX2Allocation:
+class TestHXAllocation:
     """Tests for the HX2Allocation model."""
 
-    def test_create_hx2allocation(
+    @pytest.mark.parametrize("cluster", ["HX2", "HX3"])
+    def test_create_hxallocation(
         self,
+        cluster,
         project,
         get_new_gid_mock,
         ldap_gid_in_use_mock,
@@ -332,11 +334,12 @@ class TestHX2Allocation:
         allocation_active_status,
         allocation_user_active_status,
     ):
-        """Test that the manager correctly create the HX2 Allocation."""
+        """Test that the manager correctly create the HX Allocation."""
         start_date = datetime.date.today()
         end_date = datetime.date.today() + datetime.timedelta(days=365)
 
-        allocation = HX2Allocation.objects.create_hx2allocation(
+        allocation = HXAllocation.objects.create_hxallocation(
+            cluster=cluster,
             project=project,
             status=allocation_active_status,
             quantity=1,
@@ -349,10 +352,11 @@ class TestHX2Allocation:
         )
 
         # Check that the HX2 Allocation was created with the correct inputs:
-        assert isinstance(allocation, HX2Allocation)
+        assert isinstance(allocation, HXAllocation)
+        assert allocation.cluster == cluster
         assert allocation.project == project
         assert allocation.status == allocation_active_status
-        assert allocation.get_parent_resource.name == "HX2"
+        assert allocation.get_parent_resource.name == cluster
         assert allocation.start_date == start_date
         assert allocation.end_date == end_date
         assert allocation.justification == "Test justification"
@@ -378,7 +382,7 @@ class TestHX2Allocation:
             status=allocation_user_active_status,
         )
 
-    def test_create_hx2allocation_ldap_rollback(
+    def test_create_hxallocation_ldap_rollback(
         self,
         project,
         get_new_gid_mock,
@@ -386,11 +390,12 @@ class TestHX2Allocation:
         ldap_create_group_mock,
         allocation_active_status,
     ):
-        """Test that create_hx2allocation rolls back on LDAP error."""
+        """Test that create_hxallocation rolls back on LDAP error."""
         ldap_create_group_mock.side_effect = RuntimeError("oh no!")
 
         with pytest.raises(RuntimeError):
-            HX2Allocation.objects.create_hx2allocation(
+            HXAllocation.objects.create_hxallocation(
+                cluster="HX2",
                 project=project,
                 status=allocation_active_status,
                 quantity=1,
@@ -409,16 +414,16 @@ class TestHX2Allocation:
         assert not Allocation.objects.all()
 
     def test_create(self, project, allocation_active_status):
-        """Test that HX2Allocation can be created without a HX2 resource."""
-        HX2Allocation.objects.create(
+        """Test that HX2Allocation can be created without a HX resource."""
+        HXAllocation.objects.create(
             project=project,
             status=allocation_active_status,
             start_date=timezone.now(),
             end_date=timezone.now(),
         )
 
-    def test_init_for_saved_non_hx2_allocation(self, project, allocation_active_status):
-        """Test initialising HX2Allocation with non-HX2 Allocation raises error."""
+    def test_init_for_saved_non_hx_allocation(self, project, allocation_active_status):
+        """Test initialising HXAllocation with non-HX Allocation raises error."""
         # create a non-RDF allocation
         allocation = Allocation.objects.create(
             project=project,
@@ -428,14 +433,14 @@ class TestHX2Allocation:
         )
 
         with pytest.raises(ValueError):
-            HX2Allocation.objects.get(pk=allocation.pk)
+            HXAllocation.objects.get(pk=allocation.pk)
 
         with pytest.raises(ValueError):
-            HX2Allocation.from_allocation(allocation)
+            HXAllocation.from_allocation(allocation)
 
-    def test_shortname(self, hx2_allocation, user):
+    def test_shortname(self, hx2_or_hx3_allocation, user):
         """Test that shortname returns the correct value."""
-        assert hx2_allocation.shortname == user.username
+        assert hx2_or_hx3_allocation.shortname == user.username
 
     def test_shortname_missing(self, project, hx2_allocation):
         """Test that ValueError is raised when Shortname attribute is missing."""
@@ -460,12 +465,17 @@ class TestHX2Allocation:
         with pytest.raises(ValueError, match="Multiple Group ID attributes"):
             hx2_allocation.shortname
 
-    def test_ldap_shortname(self, hx2_allocation, settings, user):
+    def test_ldap_shortname(self, hx2_or_hx3_allocation, settings, user):
         """Test that ldap_shortname returns shortname with LDAP prefix."""
-        settings.LDAP_HX2_SHORTNAME_PREFIX = "ldap-"
-        assert hx2_allocation.ldap_shortname == f"ldap-{user.username}"
+        test_prefix = "ldap-"
+        settings.LDAP_HX_SHORTNAME_PREFIXES = {
+            hx2_or_hx3_allocation.cluster.lower(): "ldap-",
+        }
+        assert hx2_or_hx3_allocation.ldap_shortname == f"{test_prefix}{user.username}"
 
     def test_ldap_shortname_empty_prefix(self, hx2_allocation, user, settings):
         """Test that ldap_shortname works with an empty prefix."""
-        settings.LDAP_HX2_SHORTNAME_PREFIX = ""
+        settings.LDAP_HX_SHORTNAME_PREFIXES = {
+            "hx2": "",
+        }
         assert hx2_allocation.ldap_shortname == user.username

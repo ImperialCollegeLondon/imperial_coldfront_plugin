@@ -25,8 +25,8 @@ from imperial_coldfront_plugin.gid import get_new_gid
 from imperial_coldfront_plugin.gpfs_client import FilesetPathInfo
 from imperial_coldfront_plugin.models import CreditTransaction
 from imperial_coldfront_plugin.tasks import (
-    check_hx2_ldap_consistency,
     check_hx2_user_group_consistency,
+    check_hx_ldap_consistency,
     check_quota_consistency,
     check_rdf_allocation_expiry_notifications,
     check_rdf_ldap_consistency,
@@ -640,64 +640,62 @@ class TestCheckRDFLdapConsistency:
         notify_mock.assert_not_called()
 
 
-class TestCheckHX2LdapConsistency:
+class TestCheckHXLdapConsistency:
     """Tests for check_hx2_ldap_consistency task."""
 
+    @pytest.fixture
+    def allocation_user(self, hx2_or_hx3_allocation_user):
+        """Fixture to provide an allocation user for HX2 or HX3."""
+        return hx2_or_hx3_allocation_user
+
+    @pytest.fixture
+    def allocation(self, allocation_user):
+        """Fixture to provide the allocation for the allocation user."""
+        return allocation_user.allocation
+
     def test_no_discrepancies(
-        self,
-        hx2_allocation,
-        hx2_allocation_user,
-        ldap_group_search_mock,
-        notify_mock,
+        self, allocation, allocation_user, ldap_group_search_mock, notify_mock
     ):
         """Test when everything is in sync between Coldfront and AD."""
-        username = hx2_allocation_user.user.username
-        ldap_name = hx2_allocation.ldap_shortname
+        username = allocation_user.user.username
+        ldap_name = allocation.ldap_shortname
         ldap_group_search_mock.return_value = {ldap_name: [username]}
 
-        result = check_hx2_ldap_consistency()
+        result = check_hx_ldap_consistency(allocation.cluster.lower())
 
         assert result == DiscrepancyCheckResult([], [], [])
         notify_mock.assert_not_called()
 
     def test_missing_members(
-        self,
-        hx2_allocation,
-        hx2_allocation_user,
-        ldap_group_search_mock,
-        notify_mock,
+        self, allocation, allocation_user, ldap_group_search_mock, notify_mock
     ):
         """Test when a user is missing from AD group."""
-        username = hx2_allocation_user.user.username
-        ldap_name = hx2_allocation.ldap_shortname
+        username = allocation_user.user.username
+        ldap_name = allocation.ldap_shortname
         ldap_group_search_mock.return_value = {ldap_name: []}
 
-        result = check_hx2_ldap_consistency()
+        result = check_hx_ldap_consistency(allocation.cluster.lower())
         membership_discrepancies = result.membership_discrepancies
 
         assert len(membership_discrepancies) == 1
         discrepancy = membership_discrepancies[0]
         assert discrepancy.group_name == ldap_name
-        assert discrepancy.project_name == hx2_allocation.project.title
+        assert discrepancy.project_name == allocation.project.title
         assert discrepancy.missing_members == [username]
         assert not discrepancy.extra_members
 
-        notify_mock.assert_called_once_with(result, source="HX2")
+        notify_mock.assert_called_once_with(result, source=allocation.cluster)
 
     def test_extra_members(
-        self,
-        hx2_allocation,
-        hx2_allocation_user,
-        ldap_group_search_mock,
-        notify_mock,
+        self, allocation, allocation_user, ldap_group_search_mock, notify_mock
     ):
         """Test when there are extra users in AD group."""
-        username = hx2_allocation_user.user.username
+        username = allocation_user.user.username
         extra_user = "extra_user"
-        ldap_name = hx2_allocation_user.allocation.ldap_shortname
+        ldap_name = allocation.ldap_shortname
         ldap_group_search_mock.return_value = {ldap_name: [username, extra_user]}
 
-        result = check_hx2_ldap_consistency()
+        result = check_hx_ldap_consistency(allocation.cluster.lower())
         membership_discrepancies = result.membership_discrepancies
 
         assert len(membership_discrepancies) == 1
@@ -706,42 +704,34 @@ class TestCheckHX2LdapConsistency:
         assert not discrepancy.missing_members
         assert discrepancy.extra_members == [extra_user]
 
-        notify_mock.assert_called_once_with(result, source="HX2")
+        notify_mock.assert_called_once_with(result, source=allocation.cluster)
 
     def test_missing_group(
-        self,
-        hx2_allocation,
-        hx2_allocation_user,
-        ldap_group_search_mock,
-        notify_mock,
+        self, allocation, allocation_user, ldap_group_search_mock, notify_mock
     ):
         """Test when allocation does not have corresponding AD group."""
         ldap_group_search_mock.return_value = {}
 
-        result = check_hx2_ldap_consistency()
+        result = check_hx_ldap_consistency(allocation.cluster.lower())
 
-        assert result == DiscrepancyCheckResult([], [hx2_allocation.ldap_shortname], [])
-        notify_mock.assert_called_once_with(result, source="HX2")
+        assert result == DiscrepancyCheckResult([], [allocation.ldap_shortname], [])
+        notify_mock.assert_called_once_with(result, source=allocation.cluster)
 
     def test_no_email_when_send_email_false(
-        self,
-        hx2_allocation,
-        hx2_allocation_user,
-        ldap_group_search_mock,
-        notify_mock,
+        self, allocation, allocation_user, ldap_group_search_mock, notify_mock
     ):
         """Test that no email is sent when send_email is False."""
-        username = hx2_allocation_user.user.username
-        ldap_name = hx2_allocation.ldap_shortname
+        username = allocation_user.user.username
+        ldap_name = allocation.ldap_shortname
         ldap_group_search_mock.return_value = {ldap_name: []}
 
-        result = check_hx2_ldap_consistency(send_email=False)
+        result = check_hx_ldap_consistency(allocation.cluster.lower(), send_email=False)
         membership_discrepancies = result.membership_discrepancies
 
         assert len(membership_discrepancies) == 1
         discrepancy = membership_discrepancies[0]
         assert discrepancy.group_name == ldap_name
-        assert discrepancy.project_name == hx2_allocation.project.title
+        assert discrepancy.project_name == allocation.project.title
         assert discrepancy.missing_members == [username]
         assert not discrepancy.extra_members
 

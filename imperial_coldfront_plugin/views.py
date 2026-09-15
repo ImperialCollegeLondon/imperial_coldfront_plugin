@@ -36,15 +36,17 @@ from .forms import (
     AdminProjectCreationForm,
     CreditTransactionForm,
     DartIDForm,
+    HX2AllocationForm,
     HX2TermsAndConditionsForm,
-    HXAllocationForm,
+    HX3AllocationForm,
+    HXAllocationFormBase,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
 )
 from .microsoft_graph_client import get_graph_api_client
-from .models import CreditTransaction, HX2Allocation, ICLProject
+from .models import CreditTransaction, HXAllocation, ICLProject
 from .policy import (
     check_project_manager_or_pi_or_superuser,
     check_project_pi_or_superuser,
@@ -127,12 +129,14 @@ def add_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
     )
 
 
-@login_required
-def add_hx_allocation(request: HttpRequest) -> HttpResponse:
-    """Create a new HX2 project allocation.
+def _add_hx_allocation(
+    request: HttpRequest, form_class: type[HXAllocationFormBase]
+) -> HttpResponse:
+    """Create a new HX project allocation.
 
     Args:
       request: The HTTP request object.
+      form_class: The form class to use for the allocation creation.
 
     Returns:
       The page for the allocation creation form or redirects to the task result page.
@@ -141,39 +145,61 @@ def add_hx_allocation(request: HttpRequest) -> HttpResponse:
         return HttpResponseForbidden()
 
     if request.method == "POST":
-        form = HXAllocationForm(request.POST)
+        form = form_class(request.POST)
         if form.is_valid():
             form_data = form.cleaned_data
-            resource_type = form_data["resource_type"]
             project = form_data["project"]
 
-            if resource_type == "hx2":
-                hx_allocation = HX2Allocation.objects.create_hx2allocation(
-                    project=project,
-                    status=AllocationStatusChoice.objects.get(name="Active"),
-                    quantity=1,
-                    start_date=timezone.now().date(),
-                    end_date=None,
-                    justification="",
-                    description="",
-                    is_locked=False,
-                    is_changeable=True,
-                )
-
-            else:
-                raise ValueError(f"Invalid HX resource type: {resource_type}")
+            hx_allocation = HXAllocation.objects.create_hxallocation(
+                cluster=form_class.cluster,
+                project=project,
+                status=AllocationStatusChoice.objects.get(name="Active"),
+                quantity=1,
+                start_date=timezone.now().date(),
+                end_date=None,
+                justification="",
+                description="",
+                is_locked=False,
+                is_changeable=True,
+            )
 
             return redirect(
                 "imperial_coldfront_plugin:hx_allocation_task_result",
-                resource_type=form.cleaned_data["resource_type"],
+                resource_type=form_class.cluster,
                 group_id=form.cleaned_data["project"].group_id,
                 allocation_pk=hx_allocation.pk,
             )
     else:
-        form = HXAllocationForm()
+        form = form_class()
     return render(
         request, "imperial_coldfront_plugin/hx_allocation_form.html", dict(form=form)
     )
+
+
+@login_required
+def add_hx2_allocation(request: HttpRequest) -> HttpResponse:
+    """Create a new HX2 project allocation.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the allocation creation form or redirects to the task result page.
+    """
+    return _add_hx_allocation(request, HX2AllocationForm)
+
+
+@login_required
+def add_hx3_allocation(request: HttpRequest) -> HttpResponse:
+    """Create a new HX3 project allocation.
+
+    Args:
+      request: The HTTP request object.
+
+    Returns:
+      The page for the allocation creation form or redirects to the task result page.
+    """
+    return _add_hx_allocation(request, HX3AllocationForm)
 
 
 @login_required
@@ -558,7 +584,8 @@ def user_create_hx2_allocation(request: "AuthenticatedHttpRequest") -> HttpRespo
     project_field.queryset = projects
 
     if form.is_valid():
-        allocation = HX2Allocation.objects.create_hx2allocation(
+        allocation = HXAllocation.objects.create_hxallocation(
+            cluster="HX2",
             project=form.cleaned_data["project"],
             status=AllocationStatusChoice.objects.get(name="Active"),
             quantity=1,

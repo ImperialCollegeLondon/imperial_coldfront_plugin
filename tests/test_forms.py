@@ -8,7 +8,8 @@ from django.conf import settings
 from imperial_coldfront_plugin.forms import (
     AdminProjectCreationForm,
     CreditTransactionForm,
-    HXAllocationForm,
+    HX2AllocationForm,
+    HX3AllocationForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
     UserProjectCreationForm,
@@ -479,18 +480,47 @@ class TestCreditTransactionForm:
         assert "description" in form.errors
 
 
-class TestHXAllocationForm:
+class TestHXAllocationForms:
     """Tests for HXAllocationForm."""
 
-    def test_project_queryset(self, project):
-        """Test that the project queryset is limited to projects with a PI."""
-        form = HXAllocationForm()
+    @pytest.fixture(params=[HX2AllocationForm, HX3AllocationForm])
+    def form(self, request):
+        """Fixture to provide the form class for HX allocation forms."""
+        return request.param()
+
+    def test_project_queryset(self, project, form):
+        """Project queryset is populated."""
         assert list(form.fields["project"].queryset.all()) == [project]
 
-    def test_project_queryset_existing_hx2_allocation(self, hx2_allocation):
+    def test_project_queryset_inactive(self, project, form, project_inactive_status):
+        """Project queryset includes projects with inactive HX allocation."""
+        project.status = project_inactive_status
+        project.save()
+        assert list(form.fields["project"].queryset.all()) == []
+
+    def test_project_queryset_existing_allocation(
+        self, hx_allocation_factory, project, form
+    ):
         """Test project queryset excludes projects with existing HX2 allocation."""
-        form = HXAllocationForm()
+        hx_allocation_factory(cluster=form.cluster, project=project)
         assert not form.fields["project"].queryset.exists()
+
+    def test_project_queryset_inactive_existing_allocation(
+        self, hx_allocation_factory, project, form, allocation_inactive_status
+    ):
+        """Project queryset includes projects with inactive existing HX allocation."""
+        hx_allocation_factory(
+            cluster=form.cluster, project=project, status=allocation_inactive_status
+        )
+        assert list(form.fields["project"].queryset.all()) == [project]
+
+    def test_project_queryset_allows_other_cluster(
+        self, hx_allocation_factory, project, form
+    ):
+        """Project queryset allows other projects with other active HX allocation."""
+        other_cluster = "HX3" if form.cluster == "HX2" else "HX2"
+        hx_allocation_factory(cluster=other_cluster, project=project)
+        assert list(form.fields["project"].queryset.all()) == [project]
 
 
 class TestProjectAddUsersToAllocationShortnameForm:
@@ -514,11 +544,11 @@ class TestProjectAddUsersToAllocationShortnameForm:
     def test_filter_hx2(
         self,
         project,
-        hx2_allocation_factory,
+        hx_allocation_factory,
         rdf_allocation,
     ):
         """Test that hx2 allocations are excluded."""
-        hx2_allocation_factory(project=project)
+        hx_allocation_factory(cluster="HX2", project=project)
         form = ProjectAddUsersToAllocationShortnameForm(project.pi, project.pk)
 
         assert [pk for pk, _ in form.fields["allocation"].choices] == [
