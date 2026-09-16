@@ -22,5 +22,6 @@ class ImperialColdfrontPluginConfig(AppConfig):
         # Ensure GID_RANGES setting is valid
         # do it here to avoid circular import issues
         validate_gid_ranges(settings.GID_RANGES["hx2"])
+        validate_gid_ranges(settings.GID_RANGES["hx3"])
         validate_gid_ranges(settings.GID_RANGES["rdf"])
         validate_gid_range_overlap(settings.GID_RANGES)

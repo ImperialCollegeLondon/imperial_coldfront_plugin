@@ -18,9 +18,14 @@ urlpatterns = [
         name="recover_rdf_storage_allocation",
     ),
     path(
-        "create_hx_allocation/",
-        views.add_hx_allocation,
-        name="add_hx_allocation",
+        "create_hx2_allocation/",
+        views.add_hx2_allocation,
+        name="add_hx2_allocation",
+    ),
+    path(
+        "create_hx3_allocation/",
+        views.add_hx3_allocation,
+        name="add_hx3_allocation",
     ),
     path(
         "hx_allocation_task_result/<str:resource_type>/<str:group_id>/<int:allocation_pk>/",

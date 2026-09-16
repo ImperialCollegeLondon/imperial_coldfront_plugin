@@ -8,6 +8,7 @@ from imperial_coldfront_plugin.ldap import (
     group_dn_from_name,
     ldap_add_member_to_group,
     ldap_get_group_gid,
+    ldap_group_member_search,
     ldap_remove_member_from_group,
 )
 
@@ -175,3 +176,44 @@ def test_ldap_get_group_gid_returns_none_for_invalid_shapes(mocker, response):
     conn.search.return_value = (None, None, response, None)
 
     assert ldap_get_group_gid("my-group", conn=conn) is None
+
+
+def test_ldap_group_member_search_handles_list_common_name(ldap_connection_mock):
+    """Test that LDAP search results with list-valued common names are normalized."""
+    ldap_connection_mock().search.side_effect = None
+    ldap_connection_mock().search.return_value = (
+        None,
+        None,
+        [
+            {
+                "attributes": {
+                    "cn": [GROUP_NAME],
+                    "member": [_make_dn(MEMBER_USERNAME)],
+                }
+            }
+        ],
+        None,
+    )
+
+    assert ldap_group_member_search(GROUP_NAME) == {GROUP_NAME: [MEMBER_USERNAME]}
+
+
+def test_ldap_group_member_search_cn_list_length_error(ldap_connection_mock):
+    """Test LDAP search results with list-valued cn of length > 1 raise an error."""
+    ldap_connection_mock().search.side_effect = None
+    ldap_connection_mock().search.return_value = (
+        None,
+        None,
+        [
+            {
+                "attributes": {
+                    "cn": [GROUP_NAME, "another_name"],
+                    "member": [_make_dn(MEMBER_USERNAME)],
+                }
+            }
+        ],
+        None,
+    )
+
+    with pytest.raises(ValueError):
+        ldap_group_member_search(GROUP_NAME)
