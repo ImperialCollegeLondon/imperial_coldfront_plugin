@@ -1,0 +1,34 @@
+{% extends "common/base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+  <div class="container mt-4">
+    <div class="card">
+      <div class="card-header">
+        <h2>Recover RDF Allocation</h2>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning" role="alert">
+          <strong>Disaster recovery only.</strong> Use this form to recreate Coldfront
+          database entries for an RDF allocation whose LDAP group and GPFS fileset
+          already exist. The LDAP group and fileset will not be created or modified.
+          Submitting this form with an incorrect shortname or project will create
+          inconsistent data.
+        </div>
+        <form method="post"
+              id="recovery_form"
+              departments-url="{% url 'imperial_coldfront_plugin:load_departments' %}">
+          {% csrf_token %}
+          {{ form|crispy }}
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary">Recover Allocation</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script>
+    $(document).ready(function() {
+      $('.js-example-basic-single').select2();
+    });
+  </script>
+{% endblock content %}
