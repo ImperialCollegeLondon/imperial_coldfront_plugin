@@ -149,8 +149,8 @@ ALLOCATION_SHORTNAME_MIN_LENGTH = 3
 """Minimum length of an allocation shortname."""
 ALLOCATION_SHORTNAME_MAX_LENGTH = 12
 """Maximum length of an allocation shortname."""
-ALLOCATION_DEFAULT_PERIOD_DAYS = 365
-"""Days from current date for the initial form default end date for an allocation."""
+ALLOCATION_DEFAULT_PERIOD_MONTHS = 12
+"""Initial form default for the number of months of an RDF allocation."""
 
 SHOW_CREDIT_BALANCE = ENV.bool("SHOW_CREDIT_BALANCE", default=False)
 """Whether to display the credit balance section on project detail pages."""
@@ -232,10 +232,15 @@ ENABLE_USER_GROUP_CREATION = ENV.bool("ENABLE_USER_GROUP_CREATION", default=Fals
 """Feature flag to enable or disable creation of user groups for allocations."""
 
 SERVICE_CHARGING_RATES: dict[str, pint.Quantity[int]] = {
-    "rdf_active": ENV.int("RDF_ACTIVE_CHARGING_RATE", default=50)
-    / (pint.Unit("terabyte") * pint.Unit("year")),
+    "rdf_active": ENV.int("RDF_ACTIVE_CHARGING_RATE", default=60)
+    / 12
+    / (pint.Unit("terabyte") * pint.Unit("month")),
 }
-"""Charging rates for services as Pint Quantities in TB/year."""
+"""Charging rates for services as Pint Quantities per TB per month.
+
+The environment variable gives the rate per TB per year. Choose a value divisible by 12
+to get whole numbers of credits per month.
+"""
 
 RDF_ASK_TICKET_URL = ENV.str("RDF_ASK_TICKET_URL", default="")
 """URL of the form for users to request RDF access."""

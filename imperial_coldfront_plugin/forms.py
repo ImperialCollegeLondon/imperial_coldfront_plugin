@@ -4,7 +4,7 @@ This module contains form classes used for research group management.
 """
 
 from collections.abc import Iterable
-from datetime import date, timedelta
+from datetime import date
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NotRequired, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
@@ -114,10 +114,6 @@ def _todays_date() -> date:
     return timezone.now().date()
 
 
-def _initial_end_date() -> date:
-    return _todays_date() + timedelta(days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS - 1)
-
-
 def _js_select_widget() -> forms.Select:
     """Get a select widget with the class for select2."""
     return forms.Select(attrs={"class": "js-example-basic-single"})
@@ -129,7 +125,7 @@ class AllocationFormData(TypedDict):
     project: ICLProject
     description: str
     start_date: date
-    end_date: date
+    months: int
     size: int
     dart_id: str
     allocation_shortname: str
@@ -149,10 +145,10 @@ class RDFAllocationForm(forms.Form):
         initial=_todays_date,
         widget=forms.DateInput(attrs={"type": "date"}),
     )
-    end_date = forms.DateField(
-        validators=[MinValueValidator(_todays_date)],
-        initial=_initial_end_date,
-        widget=forms.DateInput(attrs={"type": "date"}),
+    months = forms.IntegerField(
+        min_value=1,
+        initial=settings.ALLOCATION_DEFAULT_PERIOD_MONTHS,
+        help_text="Length of the allocation in months.",
     )
     size = forms.IntegerField(
         validators=[MinValueValidator(1)], help_text="In terabytes"
@@ -212,17 +208,11 @@ class RDFAllocationForm(forms.Form):
         return shortname
 
     def clean(self) -> dict[str, Any]:
-        """Validate date ordering and optional auto-credit debit fields."""
+        """Validate optional auto-credit debit fields."""
         cleaned_data_raw = super().clean()
         cleaned_data: dict[str, Any] = (
             cleaned_data_raw if cleaned_data_raw is not None else {}
         )
-
-        start_date = cleaned_data.get("start_date")
-        end_date = cleaned_data.get("end_date")
-        if start_date and end_date and end_date < start_date:
-            self.add_error("end_date", "End date must be on or after start date.")
-            return cleaned_data
 
         if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
             return cleaned_data
@@ -232,13 +222,13 @@ class RDFAllocationForm(forms.Form):
 
         project = cleaned_data.get("project")
         size = cleaned_data.get("size")
-        if project and size is not None and start_date and end_date:
+        months = cleaned_data.get("months")
+        if project and size is not None and months:
             current_balance, debit, projected_balance = (
                 get_rdf_allocation_credit_projection(
                     project=project,
                     size_tb=size,
-                    start_date=start_date,
-                    end_date=end_date,
+                    months=months,
                 )
             )
             if projected_balance < 0:

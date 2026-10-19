@@ -45,15 +45,17 @@ from .forms import AllocationFormData
 from .gid import get_new_gid
 from .gpfs_client import FilesetPathInfo, GPFSClient, create_fileset_set_quota
 from .ldap import ldap_create_group, ldap_delete_group, ldap_group_member_search
-from .utils import get_rdf_allocation_credit_projection
+from .utils import (
+    calculate_rdf_allocation_end_date,
+    get_rdf_allocation_credit_projection,
+)
 
 
 def _create_rdf_allocation_debit_transaction(
     *,
     project: ICLProject,
     size_tb: int,
-    start_date: date,
-    end_date: date,
+    months: int,
     description: str,
     authoriser: str,
 ) -> ICLProject:
@@ -62,8 +64,7 @@ def _create_rdf_allocation_debit_transaction(
     current_balance, debit, projected_balance = get_rdf_allocation_credit_projection(
         project=locked_project,
         size_tb=size_tb,
-        start_date=start_date,
-        end_date=end_date,
+        months=months,
     )
     if projected_balance < 0:
         raise ValueError(
@@ -124,14 +125,16 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
     department = project.department
     group_id = project.group_id
 
+    start_date = form_data["start_date"]
+    end_date = calculate_rdf_allocation_end_date(start_date, form_data["months"])
+
     logger.info("Creating initial database entries for RDF allocation.")
     with transaction.atomic():
         if should_create_credit_transaction:
             project = _create_rdf_allocation_debit_transaction(
                 project=project,
                 size_tb=storage_size_tb,
-                start_date=form_data["start_date"],
-                end_date=form_data["end_date"],
+                months=form_data["months"],
                 description=f"Creation of RDF allocation - {shortname}",
                 authoriser=authoriser,
             )
@@ -139,8 +142,8 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
         rdf_allocation = RDFAllocation.objects.create(
             project=project,
             status=allocation_active_status,
-            start_date=form_data["start_date"],
-            end_date=form_data["end_date"],
+            start_date=start_date,
+            end_date=end_date,
             is_changeable=True,
             justification=form_data["description"],
         )
