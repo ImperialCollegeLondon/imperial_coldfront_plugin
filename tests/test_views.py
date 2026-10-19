@@ -335,7 +335,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
     ):
         """Test successful project creation."""
         # mock the chain to inject the group value to check the redirect later
-        end_date = timezone.datetime.max.date()
+        months = 12
         start_date = timezone.now().date()
         size = 10
         description = "A longer description text."
@@ -345,7 +345,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             data=dict(
                 project=project.pk,
                 start_date=start_date,
-                end_date=end_date,
+                months=months,
                 size=size,
                 allocation_shortname=rdf_allocation_shortname,
                 description=description,
@@ -365,7 +365,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         authoriser = called_args[1]
         assert form_data["project"] == project
         assert form_data["start_date"] == start_date
-        assert form_data["end_date"] == end_date
+        assert form_data["months"] == months
         assert form_data["size"] == size
         assert form_data["allocation_shortname"] == rdf_allocation_shortname
         assert form_data["description"] == description
@@ -395,7 +395,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             data=dict(
                 project=project.pk,
                 start_date=timezone.now().date(),
-                end_date=timezone.now().date(),
+                months=1,
                 size=1,
                 allocation_shortname=rdf_allocation_shortname,
                 description="A longer description text.",
@@ -428,7 +428,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             data=dict(
                 project=project.pk,
                 start_date=timezone.now().date(),
-                end_date=timezone.now().date(),
+                months=1,
                 size=10,
                 allocation_shortname=rdf_allocation_shortname,
                 description="A longer description text.",

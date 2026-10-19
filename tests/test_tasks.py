@@ -35,6 +35,7 @@ from imperial_coldfront_plugin.tasks import (
     update_quota_usages_task,
     zero_allocation_gpfs_quota,
 )
+from imperial_coldfront_plugin.utils import calculate_rdf_allocation_end_date
 
 
 @pytest.fixture(autouse=True)
@@ -86,7 +87,7 @@ def rdf_form_data(project, settings):
         faculty=faculty_id,
         department=department_id,
         start_date=datetime.now().date(),
-        end_date=datetime.max.date(),
+        months=12,
         size=10,
         allocation_shortname="shorty",
         description="The allocation description",
@@ -231,7 +232,9 @@ class TestCreateRDFAllocation:
         allocation = create_rdf_allocation(form.cleaned_data)
 
         start_date = rdf_form_data["start_date"]
-        end_date = rdf_form_data["end_date"]
+        end_date = calculate_rdf_allocation_end_date(
+            start_date, rdf_form_data["months"]
+        )
         description = rdf_form_data["description"]
         size = rdf_form_data["size"]
         allocation = Allocation.objects.get(
@@ -302,7 +305,7 @@ class TestCreateRDFAllocation:
         )
         rdf_form_data.update(
             start_date=timezone.now().date(),
-            end_date=timezone.now().date(),
+            months=1,
             size=1,
             create_credit_transaction=True,
         )
@@ -319,7 +322,7 @@ class TestCreateRDFAllocation:
             authoriser="adminuser",
             transaction_type=CreditTransaction.TransactionType.STORAGE,
         )
-        assert debit_transaction.amount == -1
+        assert debit_transaction.amount == -5
 
     def test_success_locks_project_row_for_credit_transaction(
         self,
@@ -339,7 +342,7 @@ class TestCreateRDFAllocation:
         )
         rdf_form_data.update(
             start_date=timezone.now().date(),
-            end_date=timezone.now().date(),
+            months=1,
             size=1,
             create_credit_transaction=True,
             credit_transaction_description="Auto debit for RDF allocation",
@@ -369,7 +372,7 @@ class TestCreateRDFAllocation:
         settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
         rdf_form_data.update(
             start_date=timezone.now().date(),
-            end_date=timezone.now().date(),
+            months=1,
             size=1,
             create_credit_transaction=False,
             credit_transaction_description="",
@@ -400,13 +403,13 @@ class TestCreateRDFAllocation:
         settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = True
         CreditTransaction.objects.create(
             project=project,
-            amount=10,
+            amount=50,
             description="seed credit",
             authoriser="admin",
         )
         rdf_form_data.update(
             start_date=timezone.now().date(),
-            end_date=timezone.now().date(),
+            months=1,
             size=10,
             create_credit_transaction=True,
             credit_transaction_description="Auto debit for RDF allocation",
@@ -417,7 +420,7 @@ class TestCreateRDFAllocation:
         # Simulate balance reduction between form submit and async task execution.
         CreditTransaction.objects.create(
             project=project,
-            amount=-10,
+            amount=-50,
             description="intervening debit",
             authoriser="admin",
         )

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from random import choices
 
 import pytest
@@ -62,7 +62,7 @@ def rdf_form_data(project):
         faculty=faculty_id,
         department=department_id,
         start_date=datetime.now().date(),
-        end_date=datetime.max.date(),
+        months=12,
         size=10,
         allocation_shortname="shorty",
         description="The allocation description",
@@ -137,28 +137,21 @@ def test_rdf_allocation_shortname_max_length(settings):
     ]
 
 
-def test_rdf_allocation_end_date_initial_value(rdf_form_data, settings):
-    """Test that the default end_date is set correctly."""
+def test_rdf_allocation_months_initial_value(rdf_form_data, settings):
+    """Test that the default months value is set correctly."""
     form = RDFAllocationForm(data=rdf_form_data)
-    assert form["end_date"].initial == datetime.now().date() + timedelta(
-        days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS - 1
-    )
+    assert form["months"].initial == settings.ALLOCATION_DEFAULT_PERIOD_MONTHS
 
 
 def test_rdf_allocation_credit_cost_equals_service_charge_rate(settings):
-    """Test that the credit cost for default start/end dates equals rdf_active rate."""
-    from imperial_coldfront_plugin.forms import _initial_end_date, _todays_date
+    """Test that the credit cost for a year equals the yearly service charge."""
     from imperial_coldfront_plugin.utils import calculate_rdf_allocation_credit_debit
 
-    start_date = _todays_date()
-    end_date = _initial_end_date()
     rate = settings.SERVICE_CHARGING_RATES["rdf_active"]
 
-    credit_cost = calculate_rdf_allocation_credit_debit(
-        start_date=start_date, end_date=end_date, size_tb=1
-    )
+    credit_cost = calculate_rdf_allocation_credit_debit(months=12, size_tb=1)
 
-    assert credit_cost == int(rate.magnitude) * -1  # Debits are negative
+    assert credit_cost == -int(rate.magnitude * 12)
 
 
 def test_rdf_allocation_form_auto_credit_field_hidden_when_feature_disabled(settings):
@@ -182,18 +175,15 @@ def test_rdf_allocation_form_auto_credit_field_present_when_feature_enabled(sett
     assert form.fields["create_credit_transaction"].initial
 
 
-def test_rdf_allocation_rejects_end_date_before_start_date(settings, rdf_form_data):
-    """Test form rejects end dates before start dates."""
+def test_rdf_allocation_rejects_months_below_one(settings, rdf_form_data):
+    """Test form rejects a non-positive number of months."""
     settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT = False
 
-    rdf_form_data.update(
-        start_date=datetime.now().date() + timedelta(days=2),
-        end_date=datetime.now().date() + timedelta(days=1),
-    )
+    rdf_form_data.update(months=0)
     form = RDFAllocationForm(data=rdf_form_data)
 
     assert not form.is_valid()
-    assert form.errors["end_date"] == ["End date must be on or after start date."]
+    assert "months" in form.errors
 
 
 def test_rdf_allocation_rejects_when_project_has_insufficient_credit(
@@ -204,7 +194,7 @@ def test_rdf_allocation_rejects_when_project_has_insufficient_credit(
 
     rdf_form_data.update(
         start_date=datetime.now().date(),
-        end_date=datetime.now().date(),
+        months=1,
         size=10,
         create_credit_transaction=True,
     )
@@ -229,7 +219,7 @@ def test_rdf_allocation_accepts_when_project_has_sufficient_credit(
 
     rdf_form_data.update(
         start_date=datetime.now().date(),
-        end_date=datetime.now().date(),
+        months=1,
         size=1,
         create_credit_transaction=True,
     )
