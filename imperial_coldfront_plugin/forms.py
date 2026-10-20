@@ -162,7 +162,7 @@ class RDFAllocationForm(forms.Form):
     allocation_shortname = forms.CharField(
         help_text=(
             "Used to identify individual allocations and in the filesystem path."
-            " Lower case letters and numbers only. Must contain between "
+            "Must contain between "
             f"{settings.ALLOCATION_SHORTNAME_MIN_LENGTH} and "
             f"{settings.ALLOCATION_SHORTNAME_MAX_LENGTH} characters."
         ),
@@ -302,7 +302,7 @@ class AdminProjectCreationForm(UserProjectCreationForm):
         help_text=(
             "Provide an ID value for the group. This is used as the directory name on "
             "the RDF to contain all allocations of the group. If left blank, the "
-            "username field will be used instead. Must contain only lowercase letters "
+            "username field will be used instead. "
             "and numbers and be between 3 and 12 characters."
         ),
         label="Group ID",
