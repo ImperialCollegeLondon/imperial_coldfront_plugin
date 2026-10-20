@@ -143,11 +143,21 @@ GID_RANGES = dict(
 
 LOGOUT_REDIRECT_URL = "/"
 
-PATH_COMPONENT_VALID_CHARACTERS = set(ascii_lowercase + digits)
+RDF_ALLOCATION_EXTRA_ALLOWED_CHARACTERS = set(
+    ENV.list("RDF_ALLOCATION_EXTRA_CHARACTERS", default=[])
+)
+"""Additional characters allowed in RDF allocation shortnames.
+
+Specified as a comma separated list.
+"""
+
+PATH_COMPONENT_VALID_CHARACTERS = (
+    set(ascii_lowercase + digits) | RDF_ALLOCATION_EXTRA_ALLOWED_CHARACTERS
+)
 """Characters that are valid to include as part of an allocation shortname."""
-ALLOCATION_SHORTNAME_MIN_LENGTH = 3
+ALLOCATION_SHORTNAME_MIN_LENGTH = ENV.int("ALLOCATION_SHORTNAME_MIN_LENGTH", default=3)
 """Minimum length of an allocation shortname."""
-ALLOCATION_SHORTNAME_MAX_LENGTH = 12
+ALLOCATION_SHORTNAME_MAX_LENGTH = ENV.int("ALLOCATION_SHORTNAME_MAX_LENGTH", default=12)
 """Maximum length of an allocation shortname."""
 ALLOCATION_DEFAULT_PERIOD_MONTHS = 12
 """Initial form default for the number of months of an RDF allocation."""
