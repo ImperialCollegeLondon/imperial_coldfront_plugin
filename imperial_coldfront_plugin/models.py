@@ -408,6 +408,9 @@ class CreditTransaction(models.Model):
         DONATION = "DON", "Donation"
         CREDIT = "CRD", "Credit"
         OTHER = "OTH", "Other"
+        REFUND = "REF", "Refund"
+        CPU = "CPU", "CPU Reservation"
+        GPU = "GPU", "GPU Reservation"
 
     timestamp = models.DateTimeField(auto_now_add=True)
     amount = models.IntegerField()
