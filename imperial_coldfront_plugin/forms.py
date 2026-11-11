@@ -4,7 +4,7 @@ This module contains form classes used for research group management.
 """
 
 from collections.abc import Iterable
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NotRequired, TypedDict
 
@@ -115,10 +115,6 @@ def _todays_date() -> date:
     return timezone.now().date()
 
 
-def _initial_end_date() -> date:
-    return _todays_date() + timedelta(days=settings.ALLOCATION_DEFAULT_PERIOD_DAYS - 1)
-
-
 def _js_select_widget() -> forms.Select:
     """Get a select widget with the class for select2."""
     return forms.Select(attrs={"class": "js-example-basic-single"})
@@ -130,7 +126,7 @@ class BaseRDFAllocationFormData(TypedDict):
     project: ICLProject
     description: str
     start_date: date
-    end_date: date
+    months: int
     size: int
     dart_id: str
     allocation_shortname: str
@@ -149,6 +145,7 @@ class RecoverRDFAllocationFormData(BaseRDFAllocationFormData):
     files_quota: int
     block_usage_tb: float
     files_usage: float
+    end_date: date
 
 
 class BaseRDFAllocationForm(forms.Form):
@@ -163,10 +160,6 @@ class BaseRDFAllocationForm(forms.Form):
     description = forms.CharField(widget=forms.Textarea())
     start_date = forms.DateField(
         initial=_todays_date,
-        widget=forms.DateInput(attrs={"type": "date"}),
-    )
-    end_date = forms.DateField(
-        initial=_initial_end_date,
         widget=forms.DateInput(attrs={"type": "date"}),
     )
     dart_id = forms.CharField(
@@ -228,15 +221,15 @@ class RDFAllocationForm(BaseRDFAllocationForm):
         initial=_todays_date,
         widget=forms.DateInput(attrs={"type": "date"}),
     )
-    end_date = forms.DateField(
-        validators=[MinValueValidator(_todays_date)],
-        initial=_initial_end_date,
-        widget=forms.DateInput(attrs={"type": "date"}),
+    months = forms.IntegerField(
+        min_value=1,
+        initial=settings.ALLOCATION_DEFAULT_PERIOD_MONTHS,
+        help_text="Length of the allocation in months.",
     )
     allocation_shortname = forms.CharField(
         help_text=(
             "Used to identify individual allocations and in the filesystem path."
-            " Lower case letters and numbers only. Must contain between "
+            "Must contain between "
             f"{settings.ALLOCATION_SHORTNAME_MIN_LENGTH} and "
             f"{settings.ALLOCATION_SHORTNAME_MAX_LENGTH} characters."
         ),
@@ -262,7 +255,10 @@ class RDFAllocationForm(BaseRDFAllocationForm):
 
     def clean(self) -> dict[str, Any]:
         """Validate date ordering and optional auto-credit debit fields."""
-        cleaned_data = super().clean()
+        cleaned_data_raw = super().clean()
+        cleaned_data: dict[str, Any] = (
+            cleaned_data_raw if cleaned_data_raw is not None else {}
+        )
 
         if self.errors.get("end_date"):
             return cleaned_data
@@ -273,17 +269,15 @@ class RDFAllocationForm(BaseRDFAllocationForm):
         if not cleaned_data.get("create_credit_transaction"):
             return cleaned_data
 
-        start_date = cleaned_data.get("start_date")
-        end_date = cleaned_data.get("end_date")
         project = cleaned_data.get("project")
         size = cleaned_data.get("size")
-        if project and size is not None and start_date and end_date:
+        months = cleaned_data.get("months")
+        if project and size is not None and months:
             current_balance, debit, projected_balance = (
                 get_rdf_allocation_credit_projection(
                     project=project,
                     size_tb=size,
-                    start_date=start_date,
-                    end_date=end_date,
+                    months=months,
                 )
             )
             if projected_balance < 0:
@@ -302,8 +296,20 @@ class RDFAllocationForm(BaseRDFAllocationForm):
 class RecoverRDFAllocationForm(BaseRDFAllocationForm):
     """Form for recovering Coldfront objects for an existing RDF allocation."""
 
+    field_order = [  # noqa: RUF012
+        "project",
+        "description",
+        "start_date",
+        "end_date",
+        "allocation_shortname",
+    ]
+
     shortname_conflict_error_message = (
         "An allocation with this shortname already exists in Coldfront."
+    )
+    end_date = forms.DateField(
+        initial=_todays_date,
+        widget=forms.DateInput(attrs={"type": "date"}),
     )
     allocation_shortname = forms.CharField(
         help_text=(
@@ -498,7 +504,7 @@ class AdminProjectCreationForm(UserProjectCreationForm):
         help_text=(
             "Provide an ID value for the group. This is used as the directory name on "
             "the RDF to contain all allocations of the group. If left blank, the "
-            "username field will be used instead. Must contain only lowercase letters "
+            "username field will be used instead. "
             "and numbers and be between 3 and 12 characters."
         ),
         label="Group ID",

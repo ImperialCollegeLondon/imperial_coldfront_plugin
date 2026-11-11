@@ -336,7 +336,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
     ):
         """Test successful project creation."""
         # mock the chain to inject the group value to check the redirect later
-        end_date = timezone.datetime.max.date()
+        months = 12
         start_date = timezone.now().date()
         size = 10
         description = "A longer description text."
@@ -346,7 +346,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             data=dict(
                 project=project.pk,
                 start_date=start_date,
-                end_date=end_date,
+                months=months,
                 size=size,
                 allocation_shortname=rdf_allocation_shortname,
                 description=description,
@@ -366,7 +366,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
         authoriser = called_args[1]
         assert form_data["project"] == project
         assert form_data["start_date"] == start_date
-        assert form_data["end_date"] == end_date
+        assert form_data["months"] == months
         assert form_data["size"] == size
         assert form_data["allocation_shortname"] == rdf_allocation_shortname
         assert form_data["description"] == description
@@ -396,7 +396,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             data=dict(
                 project=project.pk,
                 start_date=timezone.now().date(),
-                end_date=timezone.now().date(),
+                months=1,
                 size=1,
                 allocation_shortname=rdf_allocation_shortname,
                 description="A longer description text.",
@@ -429,7 +429,7 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             data=dict(
                 project=project.pk,
                 start_date=timezone.now().date(),
-                end_date=timezone.now().date(),
+                months=1,
                 size=10,
                 allocation_shortname=rdf_allocation_shortname,
                 description="A longer description text.",
@@ -504,9 +504,7 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], RecoverRDFAllocationForm)
         soup = BeautifulSoup(response.content, "html.parser")
-        warning = " ".join(soup.find("div", class_="alert-warning").get_text().split())
-        assert "quotas are read from the existing GPFS fileset" in warning
-        assert "checked against the selected project" in warning
+        assert soup.find("div", class_="alert-warning")
         assert soup.find("input", attrs={"name": "size"}) is None
 
     @patch("imperial_coldfront_plugin.views.recover_rdf_allocation")

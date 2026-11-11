@@ -1,6 +1,6 @@
 """Utility functions for the Imperial Coldfront plugin."""
 
-from datetime import date
+from datetime import date, timedelta
 from math import ceil
 
 import pint
@@ -52,60 +52,59 @@ def calculate_credit_balance(project: ICLProject) -> int:
     return result or 0
 
 
-def calculate_rdf_allocation_credit_debit(
-    size_tb: int,
-    start_date: date,
-    end_date: date,
-) -> int:
+def calculate_rdf_allocation_credit_debit(size_tb: int, months: int) -> int:
     """Calculate the debit amount for a proposed RDF allocation.
 
     Debits are represented as negative values.
 
     Args:
         size_tb: The requested storage size in terabytes.
-        start_date: Allocation start date.
-        end_date: Allocation end date.
+        months: The number of months the allocation will run for.
 
     Returns:
         The debit amount as a negative integer.
-
-    Raises:
-        ValueError: If end_date precedes start_date.
     """
-    if end_date < start_date:
-        raise ValueError("End date must be on or after start date.")
-
-    duration_days = (end_date - start_date).days + 1
     charging_rate = settings.SERVICE_CHARGING_RATES["rdf_active"]
     size = size_tb * pint.Unit("terabyte")
-    duration = duration_days * pint.Unit("day")
+    duration = months * pint.Unit("month")
     charge = (charging_rate * size * duration).to("dimensionless")
     return -ceil(charge.magnitude)
+
+
+def calculate_rdf_allocation_end_date(start_date: date, months: int) -> date:
+    """Calculate the inclusive end date of an RDF allocation.
+
+    Months are converted to days using pint's definition of a month, rounded to the
+    nearest whole day.
+
+    Args:
+        start_date: Allocation start date.
+        months: The number of months the allocation will run for.
+
+    Returns:
+        The last day of the allocation.
+    """
+    days = round((months * pint.Unit("month")).to("day").magnitude)
+    return start_date + timedelta(days=days - 1)
 
 
 def get_rdf_allocation_credit_projection(
     project: ICLProject,
     size_tb: int,
-    start_date: date,
-    end_date: date,
+    months: int,
 ) -> tuple[int, int, int]:
     """Return current balance, debit and projected balance for an RDF allocation.
 
     Args:
         project: Project to evaluate.
         size_tb: Requested storage size in terabytes.
-        start_date: Allocation start date.
-        end_date: Allocation end date.
+        months: The number of months the allocation will run for.
 
     Returns:
         Tuple of current_balance, debit, projected_balance.
     """
     current_balance = calculate_credit_balance(project)
-    debit = calculate_rdf_allocation_credit_debit(
-        size_tb=size_tb,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    debit = calculate_rdf_allocation_credit_debit(size_tb=size_tb, months=months)
     return current_balance, debit, current_balance + debit
 
 

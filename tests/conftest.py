@@ -117,7 +117,7 @@ def pytest_configure():
             ENABLE_USER_GROUP_CREATION=True,
             RDF_ASK_TICKET_URL="http://example.com/ticket",
             SERVICE_CHARGING_RATES={
-                "rdf_active": 50 / (pint.Unit("terabyte") * pint.Unit("year")),
+                "rdf_active": 5 / (pint.Unit("terabyte") * pint.Unit("month")),
             },
         ),  # override settings loaded by env var for tests
     )

@@ -41,6 +41,7 @@ settings.configure(
     ALLOCATION_SHORTNAME_MAX_LENGTH=12,
     GPFS_API_TIMEOUT=4,
     SERVICE_CHARGING_RATES=dict(rdf_active=0),
+    ALLOCATION_DEFAULT_PERIOD_MONTHS=12,
 )
 
 django_stubs_ext.monkeypatch()
