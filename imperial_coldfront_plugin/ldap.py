@@ -260,23 +260,23 @@ def ldap_group_member_search(
     return groups
 
 
-def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:
-    """Check if a GID is already in use by any LDAP group.
+def ldap_get_groups_by_gid(gid: int, conn: Connection | None = None) -> list[str]:
+    """Get the common names of all LDAP groups using a GID.
 
     Args:
-        gid: The gidNumber to check.
+        gid: The gidNumber to search for.
         conn: Connection to ldap server. If not provided, a new connection will be
             created.
 
     Returns:
-        True if the gidNumber is in use, False otherwise.
+        The common names of the groups with the gidNumber.
     """
     if conn is None:
         conn = _get_ldap_connection()
     _, _, response, _ = conn.search(
         settings.LDAP_GROUP_OU, f"(gidNumber={gid})", attributes=["cn"]
     )
-    return len(response) > 0
+    return [get_cn_from_dn(entry["dn"]) for entry in response]
 
 
 def ldap_get_group_gid(group_name: str, conn: Connection | None = None) -> int | None:

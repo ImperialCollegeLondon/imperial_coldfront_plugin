@@ -1626,14 +1626,14 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         assert response.status_code == 200
         assert b"Unable to request HX2 Access" in response.content
 
-    @patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False)
+    @patch("imperial_coldfront_plugin.signals.ldap_get_groups_by_gid", return_value=[])
     @patch("imperial_coldfront_plugin.models.ldap_create_group")
     @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
     def test_post(
         self,
         ldap_add_member_to_group_mock,
         ldap_create_group_mock,
-        ldap_gid_in_use_mock,
+        ldap_get_groups_by_gid_mock,
         auth_client_factory,
         project,
         allocation_dependencies,

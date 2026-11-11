@@ -63,11 +63,11 @@ def ldap_delete_group_mock(mocker):
 
 
 @pytest.fixture(autouse=True)
-def ldap_gid_in_use_mock(mocker):
-    """Mock ldap_gid_in_use in tasks.py."""
+def ldap_get_groups_by_gid_mock(mocker):
+    """Mock ldap_get_groups_by_gid in tasks.py."""
     return mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_gid_in_use",
-        return_value=False,
+        "imperial_coldfront_plugin.signals.ldap_get_groups_by_gid",
+        return_value=[],
     )
 
 
@@ -576,6 +576,30 @@ class TestRecoverRDFAllocation:
         gpfs_create_fileset_mock.assert_not_called()
         ldap_create_group_mock.assert_not_called()
         assert CreditTransaction.objects.count() == before_credit_count
+
+    def test_success_with_gid_in_use_by_own_ldap_group(
+        self,
+        settings,
+        recover_rdf_form_data,
+        allocation_dependencies,
+        ldap_get_groups_by_gid_mock,
+    ):
+        """Test recovery succeeds when the GID is in use by the allocation's group."""
+        settings.LDAP_ENABLED = True
+        shortname = recover_rdf_form_data["allocation_shortname"]
+        ldap_get_groups_by_gid_mock.return_value = [
+            f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
+        ]
+
+        allocation_pk = recover_rdf_allocation(
+            recover_rdf_form_data, authoriser="adminuser"
+        )
+
+        AllocationAttribute.objects.get(
+            allocation_attribute_type__name="GID",
+            allocation__pk=allocation_pk,
+            value=recover_rdf_form_data["gid"],
+        )
 
     def test_rollback_on_error(
         self,

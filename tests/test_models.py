@@ -306,10 +306,10 @@ def get_new_gid_mock(mocker):
 
 
 @pytest.fixture
-def ldap_gid_in_use_mock(mocker):
-    """Mock ldap_gid_in_use."""
+def ldap_get_groups_by_gid_mock(mocker):
+    """Mock ldap_get_groups_by_gid."""
     return mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+        "imperial_coldfront_plugin.signals.ldap_get_groups_by_gid", return_value=[]
     )
 
 
@@ -328,7 +328,7 @@ class TestHXAllocation:
         cluster,
         project,
         get_new_gid_mock,
-        ldap_gid_in_use_mock,
+        ldap_get_groups_by_gid_mock,
         ldap_create_group_mock,
         ldap_add_member_to_group_mock,
         allocation_active_status,
@@ -386,7 +386,7 @@ class TestHXAllocation:
         self,
         project,
         get_new_gid_mock,
-        ldap_gid_in_use_mock,
+        ldap_get_groups_by_gid_mock,
         ldap_create_group_mock,
         allocation_active_status,
     ):
