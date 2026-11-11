@@ -30,11 +30,11 @@ def ldap_remove_member_mock(mocker):
 
 
 @pytest.fixture
-def ldap_gid_in_use_mock(mocker):
-    """Mock ldap_gid_in_use in signals.py."""
+def ldap_get_groups_by_gid_mock(mocker):
+    """Mock ldap_get_groups_by_gid in signals.py."""
     return mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_gid_in_use",
-        return_value=False,
+        "imperial_coldfront_plugin.signals.ldap_get_groups_by_gid",
+        return_value=[],
         autospec=True,
     )
 
@@ -58,17 +58,18 @@ class TestAllocationAttributeEnsureNoExistingGID:
         self,
         settings,
         rdf_allocation,
-        ldap_gid_in_use_mock,
+        ldap_get_groups_by_gid_mock,
         allocation_attribute_factory,
     ):
         """Test that LDAP is not checked when disabled."""
         settings.LDAP_ENABLED = False
-        ldap_gid_in_use_mock.return_value = True
+        ldap_get_groups_by_gid_mock.return_value = ["other-group"]
         allocation_attribute_factory(
             name="GID",
             allocation=rdf_allocation,
             value=123,
         )
+        ldap_get_groups_by_gid_mock.assert_not_called()
 
     def test_existing_gid_database(
         self, rdf_allocation, rdf_allocation_gid, allocation_attribute_factory
@@ -85,16 +86,69 @@ class TestAllocationAttributeEnsureNoExistingGID:
         self,
         rdf_allocation,
         rdf_allocation_gid,
-        ldap_gid_in_use_mock,
+        ldap_get_groups_by_gid_mock,
         allocation_attribute_factory,
     ):
-        """Test creating a project with an existing GID in LDAP raises an error."""
-        ldap_gid_in_use_mock.return_value = True
-        with pytest.raises(ValueError):
+        """Test creating a project with a GID used by another LDAP group fails."""
+        ldap_get_groups_by_gid_mock.return_value = ["other-group"]
+        with pytest.raises(ValueError, match="other-group"):
             allocation_attribute_factory(
                 name="GID",
                 allocation=rdf_allocation,
-                value=rdf_allocation_gid,
+                value=123,
+            )
+
+    def test_existing_gid_ldap_owned_by_allocation(
+        self,
+        rdf_allocation,
+        rdf_allocation_ldap_name,
+        ldap_get_groups_by_gid_mock,
+        allocation_attribute_factory,
+    ):
+        """Test a GID used in LDAP only by the allocation's own group is allowed."""
+        ldap_get_groups_by_gid_mock.return_value = [rdf_allocation_ldap_name]
+        allocation_attribute_factory(
+            name="GID",
+            allocation=rdf_allocation,
+            value=123,
+        )
+
+    def test_existing_gid_ldap_owned_by_allocation_case_insensitive(
+        self,
+        rdf_allocation,
+        rdf_allocation_ldap_name,
+        ldap_get_groups_by_gid_mock,
+        allocation_attribute_factory,
+    ):
+        """Test the allocation's own LDAP group is matched case-insensitively."""
+        ldap_get_groups_by_gid_mock.return_value = [rdf_allocation_ldap_name.upper()]
+        allocation_attribute_factory(
+            name="GID",
+            allocation=rdf_allocation,
+            value=123,
+        )
+
+    def test_existing_gid_ldap_owned_by_allocation_and_other_group(
+        self,
+        rdf_allocation,
+        rdf_allocation_ldap_name,
+        ldap_get_groups_by_gid_mock,
+        allocation_attribute_factory,
+    ):
+        """Test a GID shared by the allocation's group and another group fails.
+
+        In principle, this should not happen, but make sure the logic is robust
+        just in case it does.
+        """
+        ldap_get_groups_by_gid_mock.return_value = [
+            rdf_allocation_ldap_name,
+            "other-group",
+        ]
+        with pytest.raises(ValueError, match="other-group"):
+            allocation_attribute_factory(
+                name="GID",
+                allocation=rdf_allocation,
+                value=123,
             )
 
 

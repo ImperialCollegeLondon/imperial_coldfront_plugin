@@ -57,6 +57,10 @@ def ldap_get_user_dn(username: str, conn: Connection | None = None) -> str:
     )
 
 
+class LDAPResponseError(Exception):
+    """Dedicated exception for unexpectedly structured LDAP response data."""
+
+
 class LDAPGroupCreationError(Exception):
     """Dedicated exception for errors encountered when creating an LDAP group."""
 
@@ -214,20 +218,22 @@ def ldap_remove_member_from_group(
             )
 
 
-def get_username_from_dn(dn: str) -> str:
-    """Extract the username from a distinguished name.
+def get_cn_from_dn(dn: str) -> str:
+    """Extract the common name from a distinguished name.
 
     Args:
-        dn: The distinguished name to extract the username from.
+        dn: The distinguished name to extract the common name from.
 
     Returns:
-        The extracted username, or the original dn if unable to extract.
+        The extracted common name.
+
+    Raises:
+        LDAPResponseError: If the dn does not contain a common name.
     """
-    parts = dn.split(",")
-    for part in parts:
+    for part in dn.split(","):
         if part.lower().startswith("cn="):
             return part[3:]
-    return dn
+    raise LDAPResponseError(f"Unable to extract common name from dn '{dn}'")
 
 
 def ldap_group_member_search(
@@ -243,40 +249,63 @@ def ldap_group_member_search(
     if conn is None:
         conn = _get_ldap_connection()
     _, _, response, _ = conn.search(
-        settings.LDAP_GROUP_OU, f"(cn={search_filter})", attributes=["cn", "member"]
+        settings.LDAP_GROUP_OU, f"(cn={search_filter})", attributes=["member"]
     )
     groups: dict[str, list[str]] = {}
     for entry in response:
-        # Extract the common name (cn) of the group. In some LDAP implementations, this
-        # may be a list so handle both list and string cases.
-        group_cn: list[str] | str = entry["attributes"]["cn"]
-        if isinstance(group_cn, list):
-            if len(group_cn) != 1:
-                raise ValueError(
-                    "Expected LDAP group search result to have exactly one cn."
-                )
-            group_cn = group_cn[0]
-        groups[group_cn] = [
-            get_username_from_dn(member_dn)
+        groups[get_cn_from_dn(entry["dn"])] = [
+            get_cn_from_dn(member_dn)
             for member_dn in entry["attributes"].get("member", [])
         ]
     return groups
 
 
-def ldap_gid_in_use(gid: int, conn: Connection | None = None) -> bool:
-    """Check if a GID is already in use by any LDAP group.
+def ldap_get_groups_by_gid(gid: int, conn: Connection | None = None) -> list[str]:
+    """Get the common names of all LDAP groups using a GID.
 
     Args:
-        gid: The gidNumber to check.
+        gid: The gidNumber to search for.
         conn: Connection to ldap server. If not provided, a new connection will be
             created.
 
     Returns:
-        True if the gidNumber is in use, False otherwise.
+        The common names of the groups with the gidNumber.
     """
     if conn is None:
         conn = _get_ldap_connection()
     _, _, response, _ = conn.search(
         settings.LDAP_GROUP_OU, f"(gidNumber={gid})", attributes=["cn"]
     )
-    return len(response) > 0
+    return [get_cn_from_dn(entry["dn"]) for entry in response]
+
+
+def ldap_get_group_gid(group_name: str, conn: Connection | None = None) -> int | None:
+    """Get the gidNumber of an LDAP group.
+
+    Args:
+        group_name: The name of the group to look up.
+        conn: Connection to ldap server. If not provided, a new
+            connection will be created.
+
+    Returns:
+        The gidNumber of the group, or None if the group does not exist.
+
+    Raises:
+        LDAPResponseError: If the group's gidNumber is missing or not an integer.
+    """
+    if conn is None:
+        conn = _get_ldap_connection()
+    _, _, response, _ = conn.search(
+        settings.LDAP_GROUP_OU,
+        f"(cn={group_name})",
+        attributes=["gidNumber"],
+    )
+    if not response:
+        return None
+
+    gid = response[0]["attributes"].get("gidNumber")
+    if not isinstance(gid, int):
+        raise LDAPResponseError(
+            f"Expected integer gidNumber for group '{group_name}', got {gid!r}"
+        )
+    return gid

@@ -5,8 +5,11 @@ from imperial_coldfront_plugin.ldap import (
     AD_ENTITY_ALREADY_EXISTS_ERROR_CODE,
     AD_WILL_NOT_PERFORM_ERROR_CODE,
     LDAPGroupModifyError,
+    LDAPResponseError,
+    get_cn_from_dn,
     group_dn_from_name,
     ldap_add_member_to_group,
+    ldap_get_group_gid,
     ldap_group_member_search,
     ldap_remove_member_from_group,
 )
@@ -122,42 +125,65 @@ def test_ldap_remove_member_from_group_wrong_error_code(ldap_connection_mock):
         ldap_remove_member_from_group(GROUP_NAME, MEMBER_USERNAME, allow_missing=True)
 
 
-def test_ldap_group_member_search_handles_list_common_name(ldap_connection_mock):
-    """Test that LDAP search results with list-valued common names are normalized."""
-    ldap_connection_mock().search.side_effect = None
-    ldap_connection_mock().search.return_value = (
-        None,
-        None,
+def _mock_search_conn(mocker, response):
+    conn = mocker.Mock()
+    conn.search.return_value = (None, None, response, None)
+    return conn
+
+
+def test_ldap_get_group_gid(mocker):
+    """Test that an integer gidNumber is returned."""
+    conn = _mock_search_conn(mocker, [{"attributes": {"gidNumber": 12345}}])
+
+    assert ldap_get_group_gid("my-group", conn=conn) == 12345
+
+
+def test_ldap_get_group_gid_no_group(mocker):
+    """Test that None is returned when the group does not exist."""
+    conn = _mock_search_conn(mocker, [])
+
+    assert ldap_get_group_gid("my-group", conn=conn) is None
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    [{}, {"gidNumber": []}, {"gidNumber": "12345"}, {"gidNumber": [12345]}],
+    ids=["missing", "empty-list", "string", "list"],
+)
+def test_ldap_get_group_gid_malformed(mocker, attributes):
+    """Test that a missing or non-integer gidNumber raises an error."""
+    conn = _mock_search_conn(mocker, [{"attributes": attributes}])
+
+    with pytest.raises(LDAPResponseError):
+        ldap_get_group_gid("my-group", conn=conn)
+
+
+@pytest.mark.parametrize(
+    "dn", ["CN=user1,OU=Users,DC=ic", "cn=user1,ou=Users,dc=ic"], ids=["ad", "openldap"]
+)
+def test_get_cn_from_dn(dn):
+    """Test that the common name is extracted regardless of attribute case."""
+    assert get_cn_from_dn(dn) == "user1"
+
+
+def test_get_cn_from_dn_no_cn():
+    """Test that a dn without a common name raises an error."""
+    with pytest.raises(LDAPResponseError):
+        get_cn_from_dn("OU=Users,DC=ic,DC=ac,DC=uk")
+
+
+def test_ldap_group_member_search(mocker):
+    """Test that group names and members are taken from their dns."""
+    conn = _mock_search_conn(
+        mocker,
         [
             {
-                "attributes": {
-                    "cn": [GROUP_NAME],
-                    "member": [_make_dn(MEMBER_USERNAME)],
-                }
+                "dn": group_dn_from_name(GROUP_NAME),
+                "attributes": {"member": [_make_dn(MEMBER_USERNAME)]},
             }
         ],
-        None,
     )
 
-    assert ldap_group_member_search(GROUP_NAME) == {GROUP_NAME: [MEMBER_USERNAME]}
-
-
-def test_ldap_group_member_search_cn_list_length_error(ldap_connection_mock):
-    """Test LDAP search results with list-valued cn of length > 1 raise an error."""
-    ldap_connection_mock().search.side_effect = None
-    ldap_connection_mock().search.return_value = (
-        None,
-        None,
-        [
-            {
-                "attributes": {
-                    "cn": [GROUP_NAME, "another_name"],
-                    "member": [_make_dn(MEMBER_USERNAME)],
-                }
-            }
-        ],
-        None,
-    )
-
-    with pytest.raises(ValueError):
-        ldap_group_member_search(GROUP_NAME)
+    assert ldap_group_member_search(GROUP_NAME, conn=conn) == {
+        GROUP_NAME: [MEMBER_USERNAME]
+    }

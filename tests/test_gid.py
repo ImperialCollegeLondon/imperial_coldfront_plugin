@@ -74,10 +74,10 @@ def test_get_new_gid_no_existing_gids(db, settings):
 
 
 @pytest.fixture(autouse=True)
-def ldap_gid_in_use_mock(mocker):
-    """Mock the ldap_gid_in_use function to always return False."""
+def ldap_get_groups_by_gid_mock(mocker):
+    """Mock the ldap_get_groups_by_gid function to always return no groups."""
     return mocker.patch(
-        "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+        "imperial_coldfront_plugin.signals.ldap_get_groups_by_gid", return_value=[]
     )
 
 

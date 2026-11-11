@@ -5,6 +5,7 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 from datetime import date
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NotRequired, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
@@ -119,8 +120,8 @@ def _js_select_widget() -> forms.Select:
     return forms.Select(attrs={"class": "js-example-basic-single"})
 
 
-class AllocationFormData(TypedDict):
-    """Structure for holding cleaned RDF allocation form data with types."""
+class BaseRDFAllocationFormData(TypedDict):
+    """Shared structure for cleaned RDF allocation form data."""
 
     project: ICLProject
     description: str
@@ -129,17 +130,92 @@ class AllocationFormData(TypedDict):
     size: int
     dart_id: str
     allocation_shortname: str
+
+
+class AllocationFormData(BaseRDFAllocationFormData):
+    """Structure for holding cleaned RDF allocation form data with types."""
+
     create_credit_transaction: NotRequired[bool]
 
 
-class RDFAllocationForm(forms.Form):
-    """Form for creating a new RDF allocation."""
+class RecoverRDFAllocationFormData(BaseRDFAllocationFormData):
+    """Structure for holding cleaned RDF allocation form data for recovery."""
+
+    gid: int
+    files_quota: int
+    block_usage_tb: float
+    files_usage: float
+    end_date: date
+
+
+class BaseRDFAllocationForm(forms.Form):
+    """Shared fields and validation for RDF allocation forms."""
+
+    shortname_conflict_error_message = "Name already in use."
 
     project: forms.ModelChoiceField[ICLProject] = forms.ModelChoiceField(
         queryset=ICLProject.objects.filter(status__name="Active"),
         widget=_js_select_widget(),
     )
     description = forms.CharField(widget=forms.Textarea())
+    start_date = forms.DateField(
+        initial=_todays_date,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    dart_id = forms.CharField(
+        help_text="The associated DART entry.",
+        disabled=False,
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+    allocation_shortname = forms.CharField(
+        min_length=settings.ALLOCATION_SHORTNAME_MIN_LENGTH,
+        max_length=settings.ALLOCATION_SHORTNAME_MAX_LENGTH,
+        validators=[filesystem_path_component_validator],
+    )
+
+    def clean_dart_id(self) -> str:
+        """Validate provided Dart ID."""
+        dart_id = self.cleaned_data["dart_id"]
+        allocation = self.cleaned_data.get("allocation")
+        if dart_id:
+            try:
+                validate_dart_id(dart_id, allocation)
+            except DartIDValidationError as e:
+                raise ValidationError(e.args[0])
+        return dart_id
+
+    def clean_allocation_shortname(self) -> str:
+        """Validate the shortname is not already registered in Coldfront."""
+        shortname = self.cleaned_data["allocation_shortname"]
+        if AllocationAttribute.objects.filter(
+            allocation_attribute_type__name="Shortname", value=shortname
+        ).exists():
+            raise ValidationError(self.shortname_conflict_error_message)
+
+        return shortname
+
+    def clean(self) -> dict[str, Any]:
+        """Validate date ordering."""
+        cleaned_data_raw = super().clean()
+        cleaned_data: dict[str, Any] = (
+            cleaned_data_raw if cleaned_data_raw is not None else {}
+        )
+
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date must be on or after start date.")
+
+        return cleaned_data
+
+
+class RDFAllocationForm(BaseRDFAllocationForm):
+    """Form for creating a new RDF allocation."""
+
+    size = forms.IntegerField(
+        validators=[MinValueValidator(1)], help_text="In terabytes"
+    )
     start_date = forms.DateField(
         validators=[MinValueValidator(_todays_date)],
         initial=_todays_date,
@@ -149,15 +225,6 @@ class RDFAllocationForm(forms.Form):
         min_value=1,
         initial=settings.ALLOCATION_DEFAULT_PERIOD_MONTHS,
         help_text="Length of the allocation in months.",
-    )
-    size = forms.IntegerField(
-        validators=[MinValueValidator(1)], help_text="In terabytes"
-    )
-    dart_id = forms.CharField(
-        help_text="The associated DART entry.",
-        disabled=False,
-        required=False,
-        widget=forms.HiddenInput(),
     )
     allocation_shortname = forms.CharField(
         help_text=(
@@ -186,33 +253,15 @@ class RDFAllocationForm(forms.Form):
         if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
             self.fields["create_credit_transaction"].widget = forms.HiddenInput()
 
-    def clean_dart_id(self) -> str:
-        """Validate provided Dart ID."""
-        dart_id = self.cleaned_data["dart_id"]
-        allocation = self.cleaned_data.get("allocation")
-        if dart_id:
-            try:
-                validate_dart_id(dart_id, allocation)
-            except DartIDValidationError as e:
-                raise ValidationError(e.args[0])
-        return dart_id
-
-    def clean_allocation_shortname(self) -> str:
-        """Validate allocation shortname contains only valid characters."""
-        shortname = self.cleaned_data["allocation_shortname"]
-        if AllocationAttribute.objects.filter(
-            allocation_attribute_type__name="Shortname", value=shortname
-        ):
-            raise ValidationError("Name already in use.")
-
-        return shortname
-
     def clean(self) -> dict[str, Any]:
-        """Validate optional auto-credit debit fields."""
+        """Validate date ordering and optional auto-credit debit fields."""
         cleaned_data_raw = super().clean()
         cleaned_data: dict[str, Any] = (
             cleaned_data_raw if cleaned_data_raw is not None else {}
         )
+
+        if self.errors.get("end_date"):
+            return cleaned_data
 
         if not settings.ENABLE_RDF_ALLOCATION_AUTO_CREDIT:
             return cleaned_data
@@ -241,6 +290,159 @@ class RDFAllocationForm(forms.Form):
                     ),
                 )
 
+        return cleaned_data
+
+
+class RecoverRDFAllocationForm(BaseRDFAllocationForm):
+    """Form for recovering Coldfront objects for an existing RDF allocation."""
+
+    field_order = [  # noqa: RUF012
+        "project",
+        "description",
+        "start_date",
+        "end_date",
+        "allocation_shortname",
+    ]
+
+    shortname_conflict_error_message = (
+        "An allocation with this shortname already exists in Coldfront."
+    )
+    end_date = forms.DateField(
+        initial=_todays_date,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    allocation_shortname = forms.CharField(
+        help_text=(
+            "Shortname of the existing allocation to recover."
+            " Lower case letters and numbers only. Must contain between "
+            f"{settings.ALLOCATION_SHORTNAME_MIN_LENGTH} and "
+            f"{settings.ALLOCATION_SHORTNAME_MAX_LENGTH} characters."
+        ),
+        min_length=settings.ALLOCATION_SHORTNAME_MIN_LENGTH,
+        max_length=settings.ALLOCATION_SHORTNAME_MAX_LENGTH,
+        validators=[filesystem_path_component_validator],
+    )
+
+    def clean(self) -> dict[str, Any]:
+        """Validate the allocation against the existing LDAP group and GPFS fileset.
+
+        Populates the GID from LDAP and the quotas and usages from GPFS.
+        """
+        from .gpfs_client import GPFSClient
+        from .ldap import ldap_get_group_gid, ldap_group_member_search
+        from .tasks import _build_rdf_fileset_path_info
+
+        cleaned_data = super().clean()
+
+        if self.errors.get("end_date"):
+            return cleaned_data
+
+        shortname = cleaned_data.get("allocation_shortname")
+        if not shortname:
+            return cleaned_data
+
+        if not settings.LDAP_ENABLED:
+            self.add_error(
+                None,
+                "RDF allocation recovery requires LDAP to be enabled so the existing "
+                "group GID can be retrieved.",
+            )
+            return cleaned_data
+
+        if not settings.GPFS_ENABLED:
+            self.add_error(
+                None,
+                "RDF allocation recovery requires GPFS to be enabled so the existing "
+                "fileset can be verified and its quotas retrieved.",
+            )
+            return cleaned_data
+
+        ldap_group_name = f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
+
+        gid = ldap_get_group_gid(ldap_group_name)
+        if gid is None:
+            self.add_error(
+                "allocation_shortname",
+                f"AD group '{ldap_group_name}' was not found. "
+                "Only allocations with existing AD groups can be recovered.",
+            )
+            return cleaned_data
+        cleaned_data["gid"] = gid
+
+        rdf_gid_ranges = settings.GID_RANGES["rdf"]
+        if not any(gid in gid_range for gid_range in rdf_gid_ranges):
+            ranges_text = ", ".join(f"{r.start}-{r.stop - 1}" for r in rdf_gid_ranges)
+            self.add_error(
+                "allocation_shortname",
+                f"AD group GID {gid} is not within the configured RDF GID "
+                f"ranges: {ranges_text}.",
+            )
+            return cleaned_data
+
+        project = cleaned_data.get("project")
+        if project:
+            members = ldap_group_member_search(ldap_group_name)[ldap_group_name]
+            if project.pi.username not in members:
+                self.add_error(
+                    "project",
+                    f"The project PI is not a member of AD group '{ldap_group_name}'.",
+                )
+                return cleaned_data
+
+        client = GPFSClient()
+        fileset_quotas = client.retrieve_all_fileset_quotas(
+            settings.GPFS_FILESYSTEM_NAME
+        )
+        quota = fileset_quotas.get(shortname)
+        if quota is None:
+            self.add_error(
+                "allocation_shortname",
+                f"GPFS fileset '{shortname}' was not found in filesystem "
+                f"'{settings.GPFS_FILESYSTEM_NAME}'. "
+                "The fileset must exist before recovering the allocation.",
+            )
+            return cleaned_data
+
+        block_limit_tb = quota["block_limit_tb"]
+        if block_limit_tb == 0 or not block_limit_tb.is_integer():
+            self.add_error(
+                "allocation_shortname",
+                f"GPFS fileset '{shortname}' has a block quota of {block_limit_tb} TB. "
+                "The block quota must be a non-zero whole number of TB.",
+            )
+            return cleaned_data
+        cleaned_data["size"] = int(block_limit_tb)
+        cleaned_data["files_quota"] = int(quota["files_limit"])
+        cleaned_data["block_usage_tb"] = quota["block_usage_tb"]
+        cleaned_data["files_usage"] = quota["files_usage"]
+
+        if not project:
+            return cleaned_data
+
+        actual_path = client.retrieve_fileset_path(
+            settings.GPFS_FILESYSTEM_NAME, shortname
+        )
+        path_info = _build_rdf_fileset_path_info(project, shortname)
+        expected_path = path_info.fileset_absolute_path
+        if Path(actual_path) != expected_path:
+            self.add_error(
+                None,
+                f"GPFS fileset '{shortname}' is located at '{actual_path}' but the "
+                f"selected project expects '{expected_path}'.",
+            )
+            return cleaned_data
+
+        owner = client.retrieve_directory_owner(
+            settings.GPFS_FILESYSTEM_NAME,
+            str(path_info.fileset_path_relative_to_filesystem),
+        )
+        if owner["gid"] != gid:
+            self.add_error(
+                None,
+                f"GPFS fileset '{shortname}' directory is owned by group "
+                f"'{owner['group']}' (gid {owner['gid']}) but the AD group has "
+                f"gid {gid}.",
+            )
         return cleaned_data
 
 

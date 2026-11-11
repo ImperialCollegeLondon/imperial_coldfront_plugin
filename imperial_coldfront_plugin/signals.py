@@ -20,7 +20,7 @@ from imperial_coldfront_plugin.models import HXAllocation, RDFAllocation
 
 from .ldap import (
     ldap_add_member_to_group,
-    ldap_gid_in_use,
+    ldap_get_groups_by_gid,
     ldap_remove_member_from_group,
 )
 from .tasks import remove_ldap_group_members
@@ -33,7 +33,10 @@ def allocation_attribute_ensure_no_existing_gid(
 ) -> None:
     """Prevent saving of GID attribute if it is already in use.
 
-    This checks both existing allocation attributes and LDAP (if enabled).
+    This checks both existing allocation attributes and LDAP (if enabled). A GID
+    already in use in LDAP is permitted only if every group using it is the LDAP group
+    of the allocation the attribute belongs to. This supports recovering database
+    entries for pre-existing LDAP groups.
 
     Note that this makes all operations that create or modify GID attributes
     potentially slow as they involve a network call to the LDAP server. GID attributes
@@ -53,8 +56,18 @@ def allocation_attribute_ensure_no_existing_gid(
         raise ValueError(
             f"GID {instance.value} is already assigned to another allocation."
         )
-    if settings.LDAP_ENABLED and ldap_gid_in_use(instance.value):
-        raise ValueError(f"GID {instance.value} is already in use in LDAP.")
+
+    if not settings.LDAP_ENABLED:
+        return
+    groups = ldap_get_groups_by_gid(instance.value)
+    if not groups:
+        return
+    own_group = rdf_or_hx_allocation(instance.allocation).ldap_shortname.casefold()
+    if [group.casefold() for group in groups] != [own_group]:
+        raise ValueError(
+            f"GID {instance.value} is already in use in LDAP by group(s): "
+            f"{', '.join(groups)}."
+        )
 
 
 @receiver(pre_save, sender=AllocationAttribute)

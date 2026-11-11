@@ -30,6 +30,7 @@ from imperial_coldfront_plugin.forms import (
     HX3AllocationForm,
     HXAllocationFormBase,
     RDFAllocationForm,
+    RecoverRDFAllocationForm,
     UserProjectCreationForm,
 )
 from imperial_coldfront_plugin.models import CreditTransaction
@@ -471,6 +472,147 @@ class TestAddRDFStorageAllocation(LoginRequiredMixin):
             )
             assert response.context["departments"] == ["Computer Science", "Mechanical"]
             mock_get_department_choices.assert_called_once_with(faculty)
+
+
+class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
+    """Tests for the recover_rdf_storage_allocation view."""
+
+    mock_task_id = 1
+
+    @pytest.fixture(autouse=True)
+    def async_task_mock(self, mocker):
+        """Mock async_task in favour of direct task execution."""
+
+        def f(func, *args, **kwargs):
+            func(*args, **kwargs)
+            return self.mock_task_id
+
+        return mocker.patch("imperial_coldfront_plugin.views.async_task", f)
+
+    def _get_url(self):
+        return reverse("imperial_coldfront_plugin:recover_rdf_storage_allocation")
+
+    def test_non_admin_forbidden(self, user, auth_client_factory):
+        """Test non-admin users cannot access the page."""
+        client = auth_client_factory(user)
+        response = client.get(self._get_url())
+        assert response.status_code == HTTPStatus.FORBIDDEN
+
+    def test_get(self, superuser_client):
+        """Check recovery form rendering."""
+        response = superuser_client.get(self._get_url())
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], RecoverRDFAllocationForm)
+        soup = BeautifulSoup(response.content, "html.parser")
+        assert soup.find("div", class_="alert-warning")
+        assert soup.find("input", attrs={"name": "size"}) is None
+
+    @patch("imperial_coldfront_plugin.views.recover_rdf_allocation")
+    def test_post_success(
+        self,
+        recover_rdf_allocation_mock,
+        superuser_client,
+        project,
+        settings,
+        mocker,
+    ):
+        """Test successful recovery request."""
+        settings.LDAP_ENABLED = True
+        settings.GPFS_ENABLED = True
+        settings.GPFS_FILESYSTEM_NAME = "testfs"
+        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
+        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
+
+        shortname = "recover1"
+        mocker.patch(
+            "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+            return_value=1031390,
+        )
+        mocker.patch(
+            "imperial_coldfront_plugin.ldap.ldap_group_member_search",
+            return_value={f"rdfdev-{shortname}": [project.pi.username]},
+        )
+        gpfs_client_mock = mocker.patch(
+            "imperial_coldfront_plugin.gpfs_client.GPFSClient"
+        ).return_value
+        gpfs_client_mock.retrieve_all_fileset_quotas.return_value = {
+            shortname: dict(
+                block_limit_tb=10.0,
+                files_limit=5000,
+                block_usage_tb=3.5,
+                files_usage=1234,
+            )
+        }
+        gpfs_client_mock.retrieve_directory_owner.return_value = dict(
+            user="root", uid=0, group="recovergroup", gid=1031390
+        )
+        gpfs_client_mock.retrieve_fileset_path.return_value = (
+            f"/mountpath/testfs/top/level/{project.faculty}/{project.department}/"
+            f"{project.group_id}/{shortname}"
+        )
+
+        end_date = timezone.now().date() + timedelta(days=30)
+        start_date = timezone.now().date()
+        description = "Recover allocation description"
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                start_date=start_date,
+                end_date=end_date,
+                allocation_shortname=shortname,
+                description=description,
+            ),
+        )
+
+        assertRedirects(
+            response,
+            reverse(
+                "imperial_coldfront_plugin:allocation_task_result",
+                args=[self.mock_task_id, shortname],
+            ),
+            fetch_redirect_response=False,
+        )
+        recover_rdf_allocation_mock.assert_called_once()
+        called_args, _ = recover_rdf_allocation_mock.call_args
+        form_data = called_args[0]
+        assert form_data["project"] == project
+        assert form_data["start_date"] == start_date
+        assert form_data["end_date"] == end_date
+        assert form_data["size"] == 10
+        assert form_data["files_quota"] == 5000
+        assert form_data["block_usage_tb"] == 3.5
+        assert form_data["files_usage"] == 1234
+        assert form_data["allocation_shortname"] == shortname
+        assert form_data["description"] == description
+        assert form_data["gid"] == 1031390
+
+    @patch("imperial_coldfront_plugin.views.recover_rdf_allocation")
+    def test_post_invalid_form_does_not_enqueue_task(
+        self, recover_rdf_allocation_mock, superuser_client, project, settings, mocker
+    ):
+        """Test invalid submissions do not call async task."""
+        settings.LDAP_ENABLED = False
+        settings.GPFS_ENABLED = False
+        async_task_patch = mocker.patch("imperial_coldfront_plugin.views.async_task")
+
+        response = superuser_client.post(
+            self._get_url(),
+            data=dict(
+                project=project.pk,
+                start_date=timezone.now().date(),
+                end_date=timezone.now().date(),
+                allocation_shortname="recover2",
+                description="LDAP disabled should fail",
+            ),
+        )
+
+        assert response.status_code == HTTPStatus.OK
+        assert isinstance(response.context["form"], RecoverRDFAllocationForm)
+        assert not response.context["form"].is_valid()
+        async_task_patch.assert_not_called()
+        recover_rdf_allocation_mock.assert_not_called()
 
 
 class _TestAddHXAllocationBase(LoginRequiredMixin):
@@ -1510,14 +1652,14 @@ class TestUserCreateHX2AllocationView(LoginRequiredMixin):
         assert response.status_code == 200
         assert b"Unable to request HX2 Access" in response.content
 
-    @patch("imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False)
+    @patch("imperial_coldfront_plugin.signals.ldap_get_groups_by_gid", return_value=[])
     @patch("imperial_coldfront_plugin.models.ldap_create_group")
     @patch("imperial_coldfront_plugin.signals.ldap_add_member_to_group")
     def test_post(
         self,
         ldap_add_member_to_group_mock,
         ldap_create_group_mock,
-        ldap_gid_in_use_mock,
+        ldap_get_groups_by_gid_mock,
         auth_client_factory,
         project,
         allocation_dependencies,

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from random import choices
 
 import pytest
@@ -12,6 +12,7 @@ from imperial_coldfront_plugin.forms import (
     HX3AllocationForm,
     ProjectAddUsersToAllocationShortnameForm,
     RDFAllocationForm,
+    RecoverRDFAllocationForm,
     UserProjectCreationForm,
     get_department_choices,
     get_faculty_choices,
@@ -75,6 +76,248 @@ def test_rdf_allocation_form_invalid_dart_id(rdf_form_data):
     form = RDFAllocationForm(data=rdf_form_data)
     assert not form.is_valid()
     assert form.errors == dict(dart_id=["Dart ID outside valid range"])
+
+
+@pytest.fixture
+def recover_rdf_form_data(project):
+    """Fixture to provide RecoverRDFAllocationForm data."""
+    return dict(
+        project=project.pk,
+        start_date=datetime.now().date(),
+        end_date=datetime.now().date() + timedelta(days=7),
+        allocation_shortname="recovername",
+        description="Recover allocation description",
+    )
+
+
+@pytest.fixture
+def recover_gpfs_client_mock(settings, mocker, project):
+    """Mock LDAP and GPFS lookups so that recovery validation succeeds."""
+    settings.LDAP_ENABLED = True
+    settings.GPFS_ENABLED = True
+    settings.GPFS_FILESYSTEM_NAME = "testfs"
+    settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
+    settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+        return_value=1031390,
+    )
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_group_member_search",
+        return_value={"rdfdev-recovername": [project.pi.username, "othermember"]},
+    )
+    client_mock = mocker.patch(
+        "imperial_coldfront_plugin.gpfs_client.GPFSClient"
+    ).return_value
+    client_mock.retrieve_directory_owner.return_value = dict(
+        user="root", uid=0, group="recovergroup", gid=1031390
+    )
+    client_mock.retrieve_all_fileset_quotas.return_value = {
+        "recovername": dict(
+            block_limit_tb=10.0,
+            files_limit=5000,
+            block_usage_tb=3.5,
+            files_usage=1234,
+        )
+    }
+    client_mock.retrieve_fileset_path.return_value = (
+        f"/mountpath/testfs/top/level/{project.faculty}/{project.department}/"
+        f"{project.group_id}/recovername"
+    )
+    return client_mock
+
+
+def test_recover_rdf_allocation_unique(rdf_allocation_shortname, rdf_allocation):
+    """Test recovery form rejects shortnames already present in Coldfront."""
+    form = RecoverRDFAllocationForm(
+        data=dict(allocation_shortname=rdf_allocation_shortname)
+    )
+    form.is_valid()
+    assert form.errors["allocation_shortname"] == [
+        "An allocation with this shortname already exists in Coldfront."
+    ]
+
+
+def test_recover_rdf_allocation_rejects_missing_ldap_group(
+    recover_rdf_form_data, recover_gpfs_client_mock, mocker
+):
+    """Test recovery form blocks when LDAP group is missing."""
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+        return_value=None,
+    )
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert "allocation_shortname" in form.errors
+    assert "AD group" in form.errors["allocation_shortname"][0]
+
+
+def test_recover_rdf_allocation_rejects_when_ldap_disabled(
+    settings, recover_rdf_form_data, recover_gpfs_client_mock
+):
+    """Test recovery form rejects submissions when LDAP is disabled."""
+    settings.LDAP_ENABLED = False
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["__all__"] == [
+        "RDF allocation recovery requires LDAP to be enabled so the existing "
+        "group GID can be retrieved."
+    ]
+
+
+def test_recover_rdf_allocation_rejects_when_gpfs_disabled(
+    settings, recover_rdf_form_data, recover_gpfs_client_mock
+):
+    """Test recovery form rejects submissions when GPFS is disabled."""
+    settings.GPFS_ENABLED = False
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["__all__"] == [
+        "RDF allocation recovery requires GPFS to be enabled so the existing "
+        "fileset can be verified and its quotas retrieved."
+    ]
+
+
+def test_recover_rdf_allocation_derives_data_from_ldap_and_gpfs(
+    recover_rdf_form_data, recover_gpfs_client_mock, project
+):
+    """Test recovery form populates gid, quotas and usage from LDAP and GPFS."""
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
+    assert form.cleaned_data["gid"] == 1031390
+    assert form.cleaned_data["size"] == 10
+    assert form.cleaned_data["files_quota"] == 5000
+    assert form.cleaned_data["block_usage_tb"] == 3.5
+    assert form.cleaned_data["files_usage"] == 1234
+    recover_gpfs_client_mock.retrieve_fileset_path.assert_called_once_with(
+        "testfs", "recovername"
+    )
+    recover_gpfs_client_mock.retrieve_directory_owner.assert_called_once_with(
+        "testfs",
+        f"top/level/{project.faculty}/{project.department}/"
+        f"{project.group_id}/recovername",
+    )
+
+
+def test_recover_rdf_allocation_rejects_gid_out_of_range(
+    recover_rdf_form_data, recover_gpfs_client_mock, mocker
+):
+    """Test recovery form blocks when the AD group GID is outside the RDF ranges."""
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
+        return_value=12345,
+    )
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["allocation_shortname"] == [
+        "AD group GID 12345 is not within the configured RDF GID ranges: "
+        "1031386-1031404."
+    ]
+
+
+def test_recover_rdf_allocation_rejects_pi_not_in_group(
+    recover_rdf_form_data, recover_gpfs_client_mock, mocker
+):
+    """Test recovery form blocks when the project PI is not an AD group member."""
+    mocker.patch(
+        "imperial_coldfront_plugin.ldap.ldap_group_member_search",
+        return_value={"rdfdev-recovername": ["othermember"]},
+    )
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["project"] == [
+        "The project PI is not a member of AD group 'rdfdev-recovername'."
+    ]
+
+
+def test_recover_rdf_allocation_rejects_owner_gid_mismatch(
+    recover_rdf_form_data, recover_gpfs_client_mock
+):
+    """Test recovery form blocks when the fileset directory group differs from AD."""
+    recover_gpfs_client_mock.retrieve_directory_owner.return_value = dict(
+        user="root", uid=0, group="wronggroup", gid=999
+    )
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["__all__"] == [
+        "GPFS fileset 'recovername' directory is owned by group 'wronggroup' "
+        "(gid 999) but the AD group has gid 1031390."
+    ]
+
+
+def test_recover_rdf_allocation_rejects_missing_gpfs_fileset(
+    recover_rdf_form_data, recover_gpfs_client_mock
+):
+    """Test recovery form blocks when expected GPFS fileset is missing."""
+    recover_gpfs_client_mock.retrieve_all_fileset_quotas.return_value = {"other": {}}
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["allocation_shortname"] == [
+        "GPFS fileset 'recovername' was not found in filesystem 'testfs'. "
+        "The fileset must exist before recovering the allocation."
+    ]
+
+
+@pytest.mark.parametrize("block_limit_tb", [0.0, 10.5])
+def test_recover_rdf_allocation_rejects_invalid_block_limit(
+    recover_rdf_form_data, recover_gpfs_client_mock, block_limit_tb
+):
+    """Test recovery form blocks when the fileset block limit is not whole TB."""
+    quotas = recover_gpfs_client_mock.retrieve_all_fileset_quotas.return_value
+    quotas["recovername"]["block_limit_tb"] = block_limit_tb
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["allocation_shortname"] == [
+        f"GPFS fileset 'recovername' has a block quota of {block_limit_tb} TB. "
+        "The block quota must be a non-zero whole number of TB."
+    ]
+
+
+def test_recover_rdf_allocation_rejects_path_mismatch(
+    recover_rdf_form_data, recover_gpfs_client_mock, project
+):
+    """Test recovery form blocks when the fileset path differs from expected."""
+    recover_gpfs_client_mock.retrieve_fileset_path.return_value = (
+        "/mountpath/testfs/elsewhere/recovername"
+    )
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert not form.is_valid()
+    assert form.errors["__all__"] == [
+        "GPFS fileset 'recovername' is located at "
+        "'/mountpath/testfs/elsewhere/recovername' but the selected project "
+        "expects '/mountpath/testfs/top/level/"
+        f"{project.faculty}/{project.department}/{project.group_id}/recovername'."
+    ]
+
+
+def test_recover_rdf_allocation_accepts_path_with_trailing_slash(
+    recover_rdf_form_data, recover_gpfs_client_mock
+):
+    """Test recovery form ignores trailing slashes when comparing paths."""
+    recover_gpfs_client_mock.retrieve_fileset_path.return_value += "/"
+
+    form = RecoverRDFAllocationForm(data=recover_rdf_form_data)
+
+    assert form.is_valid(), f"Form errors: {form.errors}"
 
 
 PATH_COMPONENT_COMBINATIONS = (

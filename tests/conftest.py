@@ -486,7 +486,7 @@ def rdf_allocation_factory(
             allocation=allocation, name="Shortname", value=shortname
         )
         with patch(
-            "imperial_coldfront_plugin.signals.ldap_gid_in_use", return_value=False
+            "imperial_coldfront_plugin.signals.ldap_get_groups_by_gid", return_value=[]
         ):
             allocation_attribute_factory(allocation=allocation, name="GID", value=gid)
         return allocation

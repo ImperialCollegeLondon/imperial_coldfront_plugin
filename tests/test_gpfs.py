@@ -311,6 +311,41 @@ def test_filesystems(mocker):
     assert response == [{"name": FILESYSTEM_NAME}]
 
 
+def test_retrieve_fileset_path(request_mock):
+    """Test that retrieve_fileset_path returns the fileset junction path."""
+    request_mock.return_value.json.return_value = {
+        "filesets": [{"config": {"path": "/gpfs0/top/level/myfileset"}}]
+    }
+    client = GPFSClient()
+
+    path = client.retrieve_fileset_path(FILESYSTEM_NAME, FILESET_NAME)
+
+    assert path == "/gpfs0/top/level/myfileset"
+    request_mock.assert_called_once_with(
+        method="GET",
+        url=f"http://example.com/filesystems/{FILESYSTEM_NAME}/filesets/{FILESET_NAME}",
+        headers=HEADERS,
+        json={},
+    )
+
+
+def test_retrieve_directory_owner(request_mock):
+    """Test that retrieve_directory_owner returns the owner details."""
+    owner = {"user": "root", "uid": 0, "group": "mygroup", "gid": 1031390}
+    request_mock.return_value.json.return_value = {"owner": owner}
+    client = GPFSClient()
+
+    result = client.retrieve_directory_owner(FILESYSTEM_NAME, "top/level/myfileset")
+
+    assert result == owner
+    request_mock.assert_called_once_with(
+        method="GET",
+        url=f"http://example.com/filesystems/{FILESYSTEM_NAME}/owner/top%2Flevel%2Fmyfileset",
+        headers=HEADERS,
+        json={},
+    )
+
+
 def test__retrieve_quota_usage(request_mock):
     """Test that _retrieve_quota_usage method works correctly."""
     client = GPFSClient()
