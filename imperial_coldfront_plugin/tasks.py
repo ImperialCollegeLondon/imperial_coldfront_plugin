@@ -138,6 +138,9 @@ def _create_rdf_allocation_db_rows(
     shortname: str,
     gid: int,
     storage_size_tb: int,
+    files_quota: int,
+    storage_usage_tb: float,
+    files_usage: float,
     start_date: date,
     end_date: date,
     description: str,
@@ -160,16 +163,16 @@ def _create_rdf_allocation_db_rows(
         value=storage_size_tb,
     )
     AllocationAttributeUsage.objects.create(
-        allocation_attribute=quota_attribute, value=0
+        allocation_attribute=quota_attribute, value=storage_usage_tb
     )
 
     files_attribute = AllocationAttribute.objects.create(
         allocation_attribute_type=setup.files_quota_attribute_type,
         allocation=rdf_allocation,
-        value=settings.GPFS_FILES_QUOTA,
+        value=files_quota,
     )
     AllocationAttributeUsage.objects.create(
-        allocation_attribute=files_attribute, value=0
+        allocation_attribute=files_attribute, value=files_usage
     )
 
     AllocationAttribute.objects.create(
@@ -238,6 +241,9 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
             shortname=shortname,
             gid=gid,
             storage_size_tb=storage_size_tb,
+            files_quota=settings.GPFS_FILES_QUOTA,
+            storage_usage_tb=0,
+            files_usage=0,
             start_date=form_data["start_date"],
             end_date=form_data["end_date"],
             description=form_data["description"],
@@ -304,6 +310,9 @@ def recover_rdf_allocation(
             shortname=shortname,
             gid=gid,
             storage_size_tb=storage_size_tb,
+            files_quota=form_data["files_quota"],
+            storage_usage_tb=form_data["block_usage_tb"],
+            files_usage=form_data["files_usage"],
             start_date=form_data["start_date"],
             end_date=form_data["end_date"],
             description=form_data["description"],

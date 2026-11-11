@@ -5,6 +5,7 @@ This module contains form classes used for research group management.
 
 from collections.abc import Iterable
 from datetime import date, timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NotRequired, TypedDict
 
 from coldfront.core.allocation.models import AllocationAttribute
@@ -145,6 +146,9 @@ class RecoverRDFAllocationFormData(BaseRDFAllocationFormData):
     """Structure for holding cleaned RDF allocation form data for recovery."""
 
     gid: int
+    files_quota: int
+    block_usage_tb: float
+    files_usage: float
 
 
 class BaseRDFAllocationForm(forms.Form):
@@ -164,9 +168,6 @@ class BaseRDFAllocationForm(forms.Form):
     end_date = forms.DateField(
         initial=_initial_end_date,
         widget=forms.DateInput(attrs={"type": "date"}),
-    )
-    size = forms.IntegerField(
-        validators=[MinValueValidator(1)], help_text="In terabytes"
     )
     dart_id = forms.CharField(
         help_text="The associated DART entry.",
@@ -219,6 +220,9 @@ class BaseRDFAllocationForm(forms.Form):
 class RDFAllocationForm(BaseRDFAllocationForm):
     """Form for creating a new RDF allocation."""
 
+    size = forms.IntegerField(
+        validators=[MinValueValidator(1)], help_text="In terabytes"
+    )
     start_date = forms.DateField(
         validators=[MinValueValidator(_todays_date)],
         initial=_todays_date,
@@ -314,9 +318,13 @@ class RecoverRDFAllocationForm(BaseRDFAllocationForm):
     )
 
     def clean(self) -> dict[str, Any]:
-        """Validate date ordering and confirm the LDAP group and GPFS fileset exist."""
+        """Validate the allocation against the existing LDAP group and GPFS fileset.
+
+        Populates the GID from LDAP and the quotas and usages from GPFS.
+        """
         from .gpfs_client import GPFSClient
         from .ldap import ldap_get_group_gid
+        from .tasks import _build_rdf_fileset_path_info
 
         cleaned_data = super().clean()
 
@@ -335,6 +343,14 @@ class RecoverRDFAllocationForm(BaseRDFAllocationForm):
             )
             return cleaned_data
 
+        if not settings.GPFS_ENABLED:
+            self.add_error(
+                None,
+                "RDF allocation recovery requires GPFS to be enabled so the existing "
+                "fileset can be verified and its quotas retrieved.",
+            )
+            return cleaned_data
+
         ldap_group_name = f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
 
         gid = ldap_get_group_gid(ldap_group_name)
@@ -347,17 +363,49 @@ class RecoverRDFAllocationForm(BaseRDFAllocationForm):
             return cleaned_data
         cleaned_data["gid"] = gid
 
-        if settings.GPFS_ENABLED:
-            fileset_quotas = GPFSClient().retrieve_all_fileset_quotas(
-                settings.GPFS_FILESYSTEM_NAME
+        client = GPFSClient()
+        fileset_quotas = client.retrieve_all_fileset_quotas(
+            settings.GPFS_FILESYSTEM_NAME
+        )
+        quota = fileset_quotas.get(shortname)
+        if quota is None:
+            self.add_error(
+                "allocation_shortname",
+                f"GPFS fileset '{shortname}' was not found in filesystem "
+                f"'{settings.GPFS_FILESYSTEM_NAME}'. "
+                "The fileset must exist before recovering the allocation.",
             )
-            if shortname not in fileset_quotas:
-                self.add_error(
-                    "allocation_shortname",
-                    f"GPFS fileset '{shortname}' was not found in filesystem "
-                    f"'{settings.GPFS_FILESYSTEM_NAME}'. "
-                    "The fileset must exist before recovering the allocation.",
-                )
+            return cleaned_data
+
+        block_limit_tb = quota["block_limit_tb"]
+        if block_limit_tb == 0 or not block_limit_tb.is_integer():
+            self.add_error(
+                "allocation_shortname",
+                f"GPFS fileset '{shortname}' has a block quota of {block_limit_tb} TB. "
+                "The block quota must be a non-zero whole number of TB.",
+            )
+            return cleaned_data
+        cleaned_data["size"] = int(block_limit_tb)
+        cleaned_data["files_quota"] = int(quota["files_limit"])
+        cleaned_data["block_usage_tb"] = quota["block_usage_tb"]
+        cleaned_data["files_usage"] = quota["files_usage"]
+
+        project = cleaned_data.get("project")
+        if not project:
+            return cleaned_data
+
+        actual_path = client.retrieve_fileset_path(
+            settings.GPFS_FILESYSTEM_NAME, shortname
+        )
+        expected_path = _build_rdf_fileset_path_info(
+            project, shortname
+        ).fileset_absolute_path
+        if Path(actual_path) != expected_path:
+            self.add_error(
+                None,
+                f"GPFS fileset '{shortname}' is located at '{actual_path}' but the "
+                f"selected project expects '{expected_path}'.",
+            )
         return cleaned_data
 
 

@@ -11,6 +11,8 @@
           <strong>Disaster recovery only.</strong> Use this form to recreate Coldfront
           database entries for an RDF allocation whose LDAP group and GPFS fileset
           already exist. The LDAP group and fileset will not be created or modified.
+          Storage and files quotas are read from the existing GPFS fileset, and the
+          fileset's location is checked against the selected project.
           Submitting this form with an incorrect shortname or project will create
           inconsistent data.
         </div>

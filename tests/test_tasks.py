@@ -498,6 +498,9 @@ def recover_rdf_form_data(project):
         description="Recover allocation description",
         gid=12345,
         dart_id="",
+        files_quota=5000,
+        block_usage_tb=3.5,
+        files_usage=1234,
     )
 
 
@@ -545,14 +548,14 @@ class TestRecoverRDFAllocation:
             allocation=allocation,
             value=recover_rdf_form_data["size"],
         )
-        assert storage_attribute.allocationattributeusage.value == 0
+        assert storage_attribute.allocationattributeusage.value == 3.5
 
         files_attribute = AllocationAttribute.objects.get(
             allocation_attribute_type__name="Files Quota",
             allocation=allocation,
-            value=settings.GPFS_FILES_QUOTA,
+            value=5000,
         )
-        assert files_attribute.allocationattributeusage.value == 0
+        assert files_attribute.allocationattributeusage.value == 1234
 
         AllocationAttribute.objects.get(
             allocation_attribute_type__name="Shortname",

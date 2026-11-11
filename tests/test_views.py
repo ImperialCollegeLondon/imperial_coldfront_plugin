@@ -503,6 +503,11 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         response = superuser_client.get(self._get_url())
         assert response.status_code == HTTPStatus.OK
         assert isinstance(response.context["form"], RecoverRDFAllocationForm)
+        soup = BeautifulSoup(response.content, "html.parser")
+        warning = " ".join(soup.find("div", class_="alert-warning").get_text().split())
+        assert "quotas are read from the existing GPFS fileset" in warning
+        assert "checked against the selected project" in warning
+        assert soup.find("input", attrs={"name": "size"}) is None
 
     @patch("imperial_coldfront_plugin.views.recover_rdf_allocation")
     def test_post_success(
@@ -516,17 +521,34 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
     ):
         """Test successful recovery request."""
         settings.LDAP_ENABLED = True
-        settings.GPFS_ENABLED = False
+        settings.GPFS_ENABLED = True
+        settings.GPFS_FILESYSTEM_NAME = "testfs"
+        settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
+        settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
 
         mocker.patch(
             "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
             return_value=12345,
         )
+        shortname = "recover1"
+        gpfs_client_mock = mocker.patch(
+            "imperial_coldfront_plugin.gpfs_client.GPFSClient"
+        ).return_value
+        gpfs_client_mock.retrieve_all_fileset_quotas.return_value = {
+            shortname: dict(
+                block_limit_tb=10.0,
+                files_limit=5000,
+                block_usage_tb=3.5,
+                files_usage=1234,
+            )
+        }
+        gpfs_client_mock.retrieve_fileset_path.return_value = (
+            f"/mountpath/testfs/top/level/{project.faculty}/{project.department}/"
+            f"{project.group_id}/{shortname}"
+        )
 
         end_date = timezone.now().date() + timedelta(days=30)
         start_date = timezone.now().date()
-        size = 10
-        shortname = "recover1"
         description = "Recover allocation description"
 
         response = superuser_client.post(
@@ -535,7 +557,6 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
                 project=project.pk,
                 start_date=start_date,
                 end_date=end_date,
-                size=size,
                 allocation_shortname=shortname,
                 description=description,
             ),
@@ -556,7 +577,10 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         assert form_data["project"] == project
         assert form_data["start_date"] == start_date
         assert form_data["end_date"] == end_date
-        assert form_data["size"] == size
+        assert form_data["size"] == 10
+        assert form_data["files_quota"] == 5000
+        assert form_data["block_usage_tb"] == 3.5
+        assert form_data["files_usage"] == 1234
         assert form_data["allocation_shortname"] == shortname
         assert form_data["description"] == description
         assert form_data["gid"] == 12345
@@ -578,7 +602,7 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
                 start_date=timezone.now().date(),
                 end_date=timezone.now().date(),
                 allocation_shortname="recover2",
-                description="Missing size should fail",
+                description="LDAP disabled should fail",
             ),
         )
 

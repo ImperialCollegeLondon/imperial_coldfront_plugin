@@ -437,6 +437,31 @@ class GPFSClient(Consumer):
 
     @status_success
     @json
+    @get("filesystems/{filesystemName}/filesets/{filesetName}")
+    def _retrieve_fileset(  # type: ignore[empty-body]
+        self,
+        filesystemName: str,
+        filesetName: str,
+    ) -> requests.Response:
+        """Method (private) to retrieve the details of a fileset."""
+
+    def retrieve_fileset_path(self, filesystem_name: str, fileset_name: str) -> str:
+        """Retrieve the junction path of a fileset.
+
+        Args:
+            filesystem_name: Name of the filesystem containing the fileset.
+            fileset_name: Name of the fileset.
+
+        Returns:
+            The absolute path at which the fileset is linked.
+        """
+        response = self._retrieve_fileset(
+            filesystemName=filesystem_name, filesetName=fileset_name
+        )
+        return response.json()["filesets"][0]["config"]["path"]
+
+    @status_success
+    @json
     @get("filesystems/{filesystemName}/filesets/{filesetName}/quotas")
     def _retrieve_quota_usage(  # type: ignore[empty-body]
         self,
