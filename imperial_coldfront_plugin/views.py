@@ -146,11 +146,7 @@ def recover_rdf_storage_allocation(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = RecoverRDFAllocationForm(request.POST)
         if form.is_valid():
-            task_id = async_task(
-                recover_rdf_allocation,
-                form.cleaned_data,
-                request.user.username,
-            )
+            task_id = async_task(recover_rdf_allocation, form.cleaned_data)
             return redirect(
                 "imperial_coldfront_plugin:allocation_task_result",
                 task_id=task_id,

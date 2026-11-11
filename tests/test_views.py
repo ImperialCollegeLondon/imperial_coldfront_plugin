@@ -514,7 +514,6 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         self,
         recover_rdf_allocation_mock,
         superuser_client,
-        superuser,
         project,
         settings,
         mocker,
@@ -526,11 +525,15 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         settings.GPFS_FILESYSTEM_MOUNT_PATH = "/mountpath"
         settings.GPFS_FILESYSTEM_TOP_LEVEL_DIRECTORIES = "top/level"
 
+        shortname = "recover1"
         mocker.patch(
             "imperial_coldfront_plugin.ldap.ldap_get_group_gid",
-            return_value=12345,
+            return_value=1031390,
         )
-        shortname = "recover1"
+        mocker.patch(
+            "imperial_coldfront_plugin.ldap.ldap_group_member_search",
+            return_value={f"rdfdev-{shortname}": [project.pi.username]},
+        )
         gpfs_client_mock = mocker.patch(
             "imperial_coldfront_plugin.gpfs_client.GPFSClient"
         ).return_value
@@ -542,6 +545,9 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
                 files_usage=1234,
             )
         }
+        gpfs_client_mock.retrieve_directory_owner.return_value = dict(
+            user="root", uid=0, group="recovergroup", gid=1031390
+        )
         gpfs_client_mock.retrieve_fileset_path.return_value = (
             f"/mountpath/testfs/top/level/{project.faculty}/{project.department}/"
             f"{project.group_id}/{shortname}"
@@ -573,7 +579,6 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         recover_rdf_allocation_mock.assert_called_once()
         called_args, _ = recover_rdf_allocation_mock.call_args
         form_data = called_args[0]
-        authoriser = called_args[1]
         assert form_data["project"] == project
         assert form_data["start_date"] == start_date
         assert form_data["end_date"] == end_date
@@ -583,8 +588,7 @@ class TestRecoverRDFStorageAllocation(LoginRequiredMixin):
         assert form_data["files_usage"] == 1234
         assert form_data["allocation_shortname"] == shortname
         assert form_data["description"] == description
-        assert form_data["gid"] == 12345
-        assert authoriser == superuser.username
+        assert form_data["gid"] == 1031390
 
     @patch("imperial_coldfront_plugin.views.recover_rdf_allocation")
     def test_post_invalid_form_does_not_enqueue_task(

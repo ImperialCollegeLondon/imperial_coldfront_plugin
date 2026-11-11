@@ -534,9 +534,7 @@ class TestRecoverRDFAllocation:
 
         before_credit_count = CreditTransaction.objects.count()
 
-        allocation_pk = recover_rdf_allocation(
-            recover_rdf_form_data, authoriser="adminuser"
-        )
+        allocation_pk = recover_rdf_allocation(recover_rdf_form_data)
 
         allocation = Allocation.objects.get(pk=allocation_pk)
         assert allocation.project == project
@@ -594,9 +592,7 @@ class TestRecoverRDFAllocation:
             f"{settings.LDAP_RDF_SHORTNAME_PREFIX}{shortname}"
         ]
 
-        allocation_pk = recover_rdf_allocation(
-            recover_rdf_form_data, authoriser="adminuser"
-        )
+        allocation_pk = recover_rdf_allocation(recover_rdf_form_data)
 
         AllocationAttribute.objects.get(
             allocation_attribute_type__name="GID",
@@ -617,7 +613,7 @@ class TestRecoverRDFAllocation:
         )
 
         with pytest.raises(RuntimeError):
-            recover_rdf_allocation(recover_rdf_form_data, authoriser="adminuser")
+            recover_rdf_allocation(recover_rdf_form_data)
 
         assert not Allocation.objects.exists()
         assert not AllocationAttribute.objects.exists()

@@ -323,7 +323,7 @@ class RecoverRDFAllocationForm(BaseRDFAllocationForm):
         Populates the GID from LDAP and the quotas and usages from GPFS.
         """
         from .gpfs_client import GPFSClient
-        from .ldap import ldap_get_group_gid
+        from .ldap import ldap_get_group_gid, ldap_group_member_search
         from .tasks import _build_rdf_fileset_path_info
 
         cleaned_data = super().clean()
@@ -357,11 +357,31 @@ class RecoverRDFAllocationForm(BaseRDFAllocationForm):
         if gid is None:
             self.add_error(
                 "allocation_shortname",
-                f"LDAP group '{ldap_group_name}' was not found. "
-                "The group must exist before recovering the allocation.",
+                f"AD group '{ldap_group_name}' was not found. "
+                "Only allocations with existing AD groups can be recovered.",
             )
             return cleaned_data
         cleaned_data["gid"] = gid
+
+        rdf_gid_ranges = settings.GID_RANGES["rdf"]
+        if not any(gid in gid_range for gid_range in rdf_gid_ranges):
+            ranges_text = ", ".join(f"{r.start}-{r.stop - 1}" for r in rdf_gid_ranges)
+            self.add_error(
+                "allocation_shortname",
+                f"AD group GID {gid} is not within the configured RDF GID "
+                f"ranges: {ranges_text}.",
+            )
+            return cleaned_data
+
+        project = cleaned_data.get("project")
+        if project:
+            members = ldap_group_member_search(ldap_group_name)[ldap_group_name]
+            if project.pi.username not in members:
+                self.add_error(
+                    "project",
+                    f"The project PI is not a member of AD group '{ldap_group_name}'.",
+                )
+                return cleaned_data
 
         client = GPFSClient()
         fileset_quotas = client.retrieve_all_fileset_quotas(
@@ -390,21 +410,32 @@ class RecoverRDFAllocationForm(BaseRDFAllocationForm):
         cleaned_data["block_usage_tb"] = quota["block_usage_tb"]
         cleaned_data["files_usage"] = quota["files_usage"]
 
-        project = cleaned_data.get("project")
         if not project:
             return cleaned_data
 
         actual_path = client.retrieve_fileset_path(
             settings.GPFS_FILESYSTEM_NAME, shortname
         )
-        expected_path = _build_rdf_fileset_path_info(
-            project, shortname
-        ).fileset_absolute_path
+        path_info = _build_rdf_fileset_path_info(project, shortname)
+        expected_path = path_info.fileset_absolute_path
         if Path(actual_path) != expected_path:
             self.add_error(
                 None,
                 f"GPFS fileset '{shortname}' is located at '{actual_path}' but the "
                 f"selected project expects '{expected_path}'.",
+            )
+            return cleaned_data
+
+        owner = client.retrieve_directory_owner(
+            settings.GPFS_FILESYSTEM_NAME,
+            str(path_info.fileset_path_relative_to_filesystem),
+        )
+        if owner["gid"] != gid:
+            self.add_error(
+                None,
+                f"GPFS fileset '{shortname}' directory is owned by group "
+                f"'{owner['group']}' (gid {owner['gid']}) but the AD group has "
+                f"gid {gid}.",
             )
         return cleaned_data
 

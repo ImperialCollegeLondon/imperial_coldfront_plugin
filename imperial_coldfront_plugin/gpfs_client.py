@@ -51,6 +51,15 @@ class JobResponseData(TypedDict):
     result: dict[str, str]
 
 
+class DirectoryOwner(TypedDict):
+    """TypedDict for the owner of a directory."""
+
+    user: str
+    uid: int
+    group: str
+    gid: int
+
+
 class UnknownGroupDuringFilesetCreation(Exception):
     """Raised when an unknown group is specified during fileset creation."""
 
@@ -459,6 +468,31 @@ class GPFSClient(Consumer):
             filesystemName=filesystem_name, filesetName=fileset_name
         )
         return response.json()["filesets"][0]["config"]["path"]
+
+    @status_success
+    @json
+    @get("filesystems/{filesystemName}/owner/{path}")
+    def _retrieve_directory_owner(  # type: ignore[empty-body]
+        self, filesystemName: str, path: str
+    ) -> requests.Response:
+        """Method (private) to retrieve the owner of a directory."""
+
+    def retrieve_directory_owner(
+        self, filesystem_name: str, path: str
+    ) -> DirectoryOwner:
+        """Retrieve the owning user and group of a directory.
+
+        Args:
+            filesystem_name: Name of the filesystem containing the directory.
+            path: Relative path of the directory within the filesystem.
+
+        Returns:
+            Dictionary with the keys "user", "uid", "group" and "gid".
+        """
+        response = self._retrieve_directory_owner(
+            filesystemName=filesystem_name, path=path
+        )
+        return response.json()["owner"]
 
     @status_success
     @json

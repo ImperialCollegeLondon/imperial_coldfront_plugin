@@ -282,15 +282,12 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
     return rdf_allocation.pk
 
 
-def recover_rdf_allocation(
-    form_data: RecoverRDFAllocationFormData, authoriser: str = ""
-) -> int:
+def recover_rdf_allocation(form_data: RecoverRDFAllocationFormData) -> int:
     """Create Coldfront database objects for a pre-existing RDF allocation.
 
     Returns:
         The primary key of the created Allocation.
     """
-    del authoriser  # kept for parity with create_rdf_allocation signature
     logger = logging.getLogger("django-q")
 
     storage_size_tb = form_data["size"]

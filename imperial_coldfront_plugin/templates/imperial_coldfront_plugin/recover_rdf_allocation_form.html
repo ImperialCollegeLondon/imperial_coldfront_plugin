@@ -9,12 +9,12 @@
       <div class="card-body">
         <div class="alert alert-warning" role="alert">
           <strong>Disaster recovery only.</strong> Use this form to recreate Coldfront
-          database entries for an RDF allocation whose LDAP group and GPFS fileset
-          already exist. The LDAP group and fileset will not be created or modified.
-          Storage and files quotas are read from the existing GPFS fileset, and the
-          fileset's location is checked against the selected project.
-          Submitting this form with an incorrect shortname or project will create
-          inconsistent data.
+          database entries for an RDF allocation whose AD group and GPFS fileset
+          already exist. The AD group and fileset will not be created or modified.
+          The recovery process uses data from AD and GPFS to populate the Coldfront
+          database. It performs various checks to make sure that the data added to
+          Coldfront is consistent and provides feedback via form errors in the case of
+          discrepancies.
         </div>
         <form method="post"
               id="recovery_form"
