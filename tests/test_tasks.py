@@ -279,7 +279,7 @@ class TestCreateRDFAllocation:
         gpfs_create_fileset_mock.assert_called_once_with(
             fileset_path_info=fileset_path_info,
             owner_id="root",
-            group_id=rdf_allocation_ldap_name,
+            gid=gid,
             fileset_posix_permissions=settings.GPFS_FILESET_POSIX_PERMISSIONS,
             fileset_acl=settings.GPFS_FILESET_ACL,
             parent_posix_permissions=settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,

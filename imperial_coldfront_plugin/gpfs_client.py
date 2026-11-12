@@ -259,7 +259,7 @@ class GPFSClient(Consumer):
         filesystem_name: str,
         fileset_name: str,
         owner_id: str,
-        group_id: str,
+        gid: int,
         path: str | Path,
         permissions: str,
         parent_fileset: str,
@@ -269,8 +269,8 @@ class GPFSClient(Consumer):
         Args:
             filesystem_name: Name of the filesystem where the fileset will be created.
             fileset_name: Name of the fileset to create (rdf project id).
-            owner_id: ID of the owner (pi username).
-            group_id: ID of the group (rdf project id).
+            owner_id: ID of the owner.
+            gid: GID of the owning group.
             path: Absolute path where the fileset will be created.
             permissions: Permissions.
             parent_fileset: Name of the fileset the new fileset will beloong to.
@@ -282,7 +282,7 @@ class GPFSClient(Consumer):
             response = self._create_fileset(
                 filesystemName=filesystem_name,
                 filesetName=fileset_name,
-                owner=f"{owner_id}:{group_id}",
+                owner=f"{owner_id}:{gid}",
                 path=str(path),
                 permissions=permissions,
                 inodeSpace=parent_fileset,
@@ -756,7 +756,7 @@ class FilesetPathInfo:
 def create_fileset_set_quota(
     fileset_path_info: FilesetPathInfo,
     owner_id: str,
-    group_id: str,
+    gid: int,
     fileset_posix_permissions: str,
     fileset_acl: ACL,
     parent_posix_permissions: str,
@@ -777,8 +777,8 @@ def create_fileset_set_quota(
 
     Args:
         fileset_path_info: path information for the fileset to create.
-        owner_id: ID of the owner (pi username).
-        group_id: ID of the group (AD group name).
+        owner_id: ID of the owner.
+        gid: gid of the owner.
         fileset_posix_permissions: POSIX permissions to set on the fileset.
         fileset_acl: ACL for the fileset.
         parent_posix_permissions: POSIX permissions to set on any intermediate
@@ -836,7 +836,7 @@ def create_fileset_set_quota(
         fileset_path_info.filesystem_name,
         fileset_path_info.fileset_name,
         owner_id,
-        f"{settings.AD_DOMAIN}\\{group_id}",
+        gid,
         fileset_path_info.fileset_absolute_path,
         fileset_posix_permissions,
         fileset_path_info.faculty,

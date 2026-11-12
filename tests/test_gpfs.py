@@ -23,7 +23,7 @@ DEPARTMENT = "compsci"
 GROUP_NAME = "mygroup"
 FILESET_NAME = "myfileset"
 OWNER_ID = "someowner"
-GROUP_ID = r"IC\\rdf-somegroup"
+GID = 1000
 BLOCK_QUOTA = "123456T"
 FILES_QUOTA = "654321T"
 PERMISSIONS = "755"
@@ -121,7 +121,7 @@ def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
     create_fileset_set_quota(
         fileset_path_info,
         OWNER_ID,
-        GROUP_ID,
+        GID,
         settings.GPFS_FILESET_POSIX_PERMISSIONS,
         settings.GPFS_FILESET_ACL,
         settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
@@ -154,7 +154,7 @@ def test_create_fileset_set_quota(client_mock, fileset_path_info, settings):
         FILESYSTEM_NAME,
         FILESET_NAME,
         OWNER_ID,
-        f"IC\\{GROUP_ID}",
+        GID,
         fileset_path_info.fileset_absolute_path,
         settings.GPFS_FILESET_POSIX_PERMISSIONS,
         FACULTY,
@@ -183,7 +183,7 @@ def test_create_fileset_set_quota_existing_directory(
     create_fileset_set_quota(
         fileset_path_info,
         OWNER_ID,
-        GROUP_ID,
+        GID,
         settings.GPFS_FILESET_POSIX_PERMISSIONS,
         settings.GPFS_FILESET_ACL,
         settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
@@ -234,7 +234,7 @@ def test_create_fileset_set_quota_backoff(client_mock, fileset_path_info, settin
     create_fileset_set_quota(
         fileset_path_info,
         OWNER_ID,
-        GROUP_ID,
+        GID,
         settings.GPFS_FILESET_POSIX_PERMISSIONS,
         settings.GPFS_FILESET_ACL,
         settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
@@ -487,8 +487,7 @@ def test__create_fileset(completed_job_status, request_mock):
     client._create_fileset(
         filesystemName=FILESYSTEM_NAME,
         filesetName=FILESET_NAME,
-        ownerId=OWNER_ID,
-        groupId=GROUP_ID,
+        owner=f"{OWNER_ID}:{GID}",
         path=expected_path,
         permissions=PERMISSIONS,
         parent_fileset=PARENT_FILESET,
@@ -500,8 +499,7 @@ def test__create_fileset(completed_job_status, request_mock):
         headers=HEADERS,
         json={
             "filesetName": FILESET_NAME,
-            "ownerId": OWNER_ID,
-            "groupId": GROUP_ID,
+            "owner": f"{OWNER_ID}:{GID}",
             "path": expected_path,
             "permissions": PERMISSIONS,
             "parent_fileset": PARENT_FILESET,
@@ -537,7 +535,7 @@ class TestCreateFileset:
             filesystem_name=FILESYSTEM_NAME,
             fileset_name=FILESET_NAME,
             owner_id=OWNER_ID,
-            group_id=GROUP_ID,
+            gid=GID,
             path=self.FILESET_PATH,
             permissions=PERMISSIONS,
             parent_fileset=PARENT_FILESET,
@@ -546,7 +544,7 @@ class TestCreateFileset:
         _create_fileset_mock.assert_called_once_with(
             filesystemName=FILESYSTEM_NAME,
             filesetName=FILESET_NAME,
-            owner=f"{OWNER_ID}:{GROUP_ID}",
+            owner=f"{OWNER_ID}:{GID}",
             path=self.FILESET_PATH,
             permissions=PERMISSIONS,
             inodeSpace=PARENT_FILESET,
@@ -572,7 +570,7 @@ class TestCreateFileset:
                 filesystem_name=FILESYSTEM_NAME,
                 fileset_name=FILESET_NAME,
                 owner_id=OWNER_ID,
-                group_id=GROUP_ID,
+                gid=GID,
                 path=self.FILESET_PATH,
                 permissions=PERMISSIONS,
                 parent_fileset=PARENT_FILESET,
@@ -582,7 +580,7 @@ class TestCreateFileset:
         """Test that create_fileset wrapper raises an error on unknown group."""
         error_message = (
             "Input validation failed: EFSSP0010C CLI parser: "
-            f'The object "{GROUP_ID}" specified for "group" does not exist.'
+            f'The object "{GID}" specified for "group" does not exist.'
         )
         response_json = dict(status=dict(message=error_message))
         _create_fileset_mock.side_effect = requests.HTTPError(
@@ -598,7 +596,7 @@ class TestCreateFileset:
                 filesystem_name=FILESYSTEM_NAME,
                 fileset_name=FILESET_NAME,
                 owner_id=OWNER_ID,
-                group_id=GROUP_ID,
+                gid=GID,
                 path=self.FILESET_PATH,
                 permissions=PERMISSIONS,
                 parent_fileset=PARENT_FILESET,
@@ -614,7 +612,7 @@ class TestCreateFileset:
                 filesystem_name=FILESYSTEM_NAME,
                 fileset_name=FILESET_NAME,
                 owner_id=OWNER_ID,
-                group_id=GROUP_ID,
+                gid=GID,
                 path=(
                     f"{FILESYSTEM_MOUNT_PATH}/{TOP_LEVEL_DIRECTORIES}/{FACULTY}/"
                     f"{DEPARTMENT}/{GROUP_NAME}/{FILESET_NAME}"

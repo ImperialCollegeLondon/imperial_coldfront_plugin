@@ -266,7 +266,7 @@ def create_rdf_allocation(form_data: AllocationFormData, authoriser: str = "") -
                 create_fileset_set_quota(
                     fileset_path_info=fileset_path_info,
                     owner_id="root",
-                    group_id=ldap_name,
+                    gid=gid,
                     fileset_posix_permissions=settings.GPFS_FILESET_POSIX_PERMISSIONS,
                     fileset_acl=settings.GPFS_FILESET_ACL,
                     parent_posix_permissions=settings.GPFS_PARENT_DIRECTORY_POSIX_PERMISSIONS,
